@@ -37,7 +37,7 @@ export function Integrations() {
 
   const handleTikTokConnect = async () => {
     try {
-      const response = await fetch('/api/auth/tiktok/url');
+      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/tiktok/url`);
       if (!response.ok) throw new Error('Failed to get auth URL');
       const { url } = await response.json();
       
@@ -59,7 +59,7 @@ export function Integrations() {
 
   const handleMetaConnect = async () => {
     try {
-      const response = await fetch('/api/auth/meta/url');
+      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/meta/url`);
       if (!response.ok) throw new Error('Failed to get auth URL');
       const { url } = await response.json();
       
@@ -81,7 +81,7 @@ export function Integrations() {
 
   const handleGoogleConnect = async () => {
     try {
-      const response = await fetch('/api/auth/google/url');
+      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/google/url`);
       
       // Log the full response for debugging
       const responseText = await response.text();
