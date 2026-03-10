@@ -27,15 +27,18 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const t = (key: string) => {
     const keys = key.split('.');
-    let value: any = translations[language];
+    const currentTranslations = translations[language as keyof typeof translations];
+    if (!currentTranslations) return key;
+    
+    let value: any = currentTranslations;
     for (const k of keys) {
-      if (value && value[k]) {
+      if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
         return key; // fallback
       }
     }
-    return value as string;
+    return typeof value === 'string' ? value : key;
   };
 
   const dir = language === 'he' ? 'rtl' : 'ltr';

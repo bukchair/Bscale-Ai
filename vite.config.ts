@@ -21,6 +21,17 @@ export default defineConfig(({mode}) => {
     build: {
       outDir: 'dist',
       sourcemap: false,
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-utils': ['lucide-react', 'clsx', 'tailwind-merge'],
+            'vendor-charts': ['recharts'],
+            'vendor-motion': ['motion'],
+          },
+        },
+      },
     }
   };
 });
