@@ -10,6 +10,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  console.log('ThemeProvider is rendering');
   const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
