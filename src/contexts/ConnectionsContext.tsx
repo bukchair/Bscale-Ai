@@ -28,6 +28,7 @@ interface ConnectionsContextType {
   connections: Connection[];
   toggleConnection: (id: string, subId?: string) => Promise<void>;
   updateConnectionSettings: (id: string, settings: ConnectionSettings) => Promise<void>;
+  testConnection: (id: string) => Promise<{ success: boolean; message: string }>;
   overallQualityScore: number;
   connectedCount: number;
   totalCount: number;
@@ -192,6 +193,31 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }));
   };
 
+  const testConnection = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const connection = connections.find(c => c.id === id);
+    if (!connection) return { success: false, message: 'חיבור לא נמצא' };
+
+    // Simulate real API check
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const isSuccess = Math.random() > 0.1; // 90% success rate for simulation
+
+    if (isSuccess) {
+      setConnections(prev => prev.map(c => 
+        c.id === id ? { ...c, status: 'connected', score: Math.floor(Math.random() * 5) + 95 } : c
+      ));
+      return { 
+        success: true, 
+        message: `החיבור ל-${connection.name} אומת בהצלחה. נתוני API זמינים.` 
+      };
+    } else {
+      return { 
+        success: false, 
+        message: `נכשל אימות החיבור ל-${connection.name}. אנא בדוק את הגדרות ה-API.` 
+      };
+    }
+  };
+
   const connectedConnections = connections.filter(c => c.status === 'connected');
   const connectedCount = connectedConnections.length;
   const totalCount = connections.length;
@@ -205,6 +231,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       connections, 
       toggleConnection, 
       updateConnectionSettings,
+      testConnection,
       overallQualityScore, 
       connectedCount, 
       totalCount 

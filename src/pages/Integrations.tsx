@@ -23,10 +23,11 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 };
 
 export function Integrations() {
-  const { connections, toggleConnection, updateConnectionSettings } = useConnections();
+  const { connections, toggleConnection, updateConnectionSettings, testConnection } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [testingId, setTestingId] = useState<string | null>(null);
 
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -55,6 +56,25 @@ export function Integrations() {
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       setError({ id, message: 'מפתח ה-API או הפרטים שהוזנו אינם תקינים. אנא בדוק שוב.' });
+    }
+  };
+
+  const handleTest = async (id: string) => {
+    setTestingId(id);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await testConnection(id);
+      if (result.success) {
+        setSuccess(result.message);
+        setTimeout(() => setSuccess(null), 5000);
+      } else {
+        setError({ id, message: result.message });
+      }
+    } catch (err) {
+      setError({ id, message: 'אירעה שגיאה במהלך בדיקת החיבור.' });
+    } finally {
+      setTestingId(null);
     }
   };
 
@@ -214,6 +234,14 @@ export function Integrations() {
                   >
                     {isConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
                     עדכן הגדרות
+                  </button>
+                  <button
+                    onClick={() => handleTest(integration.id)}
+                    disabled={testingId === integration.id}
+                    className="flex-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {testingId === integration.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    בדיקת חיבור
                   </button>
                   <button
                     onClick={() => {
@@ -408,6 +436,16 @@ export function Integrations() {
             <p className="text-[11px] text-gray-500 font-medium">נהל את החיבורים לפלטפורמות הפרסום והאנליטיקה שלך.</p>
           </div>
         </div>
+        <button 
+          onClick={() => {
+            const connected = connections.filter(c => c.status === 'connected');
+            connected.forEach(c => handleTest(c.id));
+          }}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          בדוק את כל החיבורים
+        </button>
       </div>
 
       {success && (
