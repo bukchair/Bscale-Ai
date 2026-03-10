@@ -7,16 +7,20 @@ import { DateRangeProvider } from './contexts/DateRangeContext';
 import { ConnectionsProvider } from './contexts/ConnectionsContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
+import {ErrorBoundary} from './components/ErrorBoundary';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <LanguageProvider>
-        <DateRangeProvider>
-          <ConnectionsProvider>
-            <App />
-          </ConnectionsProvider>
-        </DateRangeProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LanguageProvider>
+          <DateRangeProvider>
+            <ConnectionsProvider>
+              <App />
+            </ConnectionsProvider>
+          </DateRangeProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );
