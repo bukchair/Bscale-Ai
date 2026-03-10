@@ -1,44 +1,89 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Users as UsersIcon, Shield, UserPlus, MoreVertical, Search, Edit2, Trash2, Building, Mail, CheckCircle2, XCircle } from 'lucide-react';
+import { Users as UsersIcon, Shield, UserPlus, MoreVertical, Search, Edit2, Trash2, Building, Mail, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { db, auth } from '../lib/firebase';
+import { collection, onSnapshot, query, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-interface User {
-  id: string;
+interface UserProfile {
+  uid: string;
   name: string;
   email: string;
-  role: 'creator' | 'agency_manager' | 'site_owner' | 'editor' | 'viewer';
-  status: 'active' | 'invited' | 'disabled';
-  stores: string[];
-  lastActive: string;
+  role: 'admin' | 'agency' | 'owner' | 'editor' | 'viewer';
+  createdAt: string;
+  storeIds?: string[];
+  photoURL?: string;
 }
 
-const mockUsers: User[] = [
-  { id: '1', name: 'Asher', email: 'asher205@gmail.com', role: 'creator', status: 'active', stores: ['All Stores'], lastActive: 'Just now' },
-  { id: '2', name: 'Yossi Cohen', email: 'yossi@shoes.co.il', role: 'site_owner', status: 'active', stores: ['Yossi Shoes'], lastActive: '2 hours ago' },
-  { id: '3', name: 'Dana Levi', email: 'dana@shoes.co.il', role: 'editor', status: 'active', stores: ['Yossi Shoes'], lastActive: '1 day ago' },
-  { id: '4', name: 'Digital Agency Ltd', email: 'hello@agency.com', role: 'agency_manager', status: 'active', stores: ['Yossi Shoes', 'Tech Gadgets', 'Beauty Shop'], lastActive: '5 hours ago' },
-  { id: '5', name: 'Ron Viewer', email: 'ron@investor.com', role: 'viewer', status: 'invited', stores: ['Tech Gadgets'], lastActive: 'Never' },
-];
-
-const roleLabels: Record<User['role'], { label: string, icon: React.ElementType, color: string, bg: string }> = {
-  creator: { label: 'יוצר ממשק', icon: Shield, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
-  agency_manager: { label: 'מנהל סוכנות', icon: UsersIcon, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  site_owner: { label: 'בעל האתר', icon: Building, color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
+const roleLabels: Record<UserProfile['role'], { label: string, icon: React.ElementType, color: string, bg: string }> = {
+  admin: { label: 'יוצר המערכת', icon: Shield, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  agency: { label: 'בעל סוכנות', icon: UsersIcon, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+  owner: { label: 'בעל חנות', icon: Building, color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
   editor: { label: 'עורך', icon: Edit2, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
   viewer: { label: 'צופה', icon: Search, color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
 };
 
 export function Users() {
   const { t, dir } = useLanguage();
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
 
-  const filteredUsers = mockUsers.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({
+        ...doc.data()
+      })) as UserProfile[];
+      setUsers(usersData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching users:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleRoleChange = async (userId: string, newRole: UserProfile['role']) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
+    } catch (error) {
+      console.error("Error updating role:", error);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('האם אתה בטוח שברצונך למחוק משתמש זה?')) return;
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+    } catch (error) {
+      console.error("Error deleting user:", error);
+    }
+  };
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                         (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     return matchesSearch && matchesRole;
   });
+
+  const stats = {
+    total: users.length,
+    active: users.length, // For now assuming all are active
+    agencies: users.filter(u => u.role === 'agency').length,
+    admins: users.filter(u => u.role === 'admin').length
+  };
+
+  if (loading) {
+    return (
+      <div className="h-96 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -60,7 +105,7 @@ export function Users() {
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">סה"כ משתמשים</p>
-            <p className="text-2xl font-bold text-gray-900">24</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-4">
@@ -69,16 +114,16 @@ export function Users() {
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">משתמשים פעילים</p>
-            <p className="text-2xl font-bold text-gray-900">18</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-            <Mail className="w-6 h-6" />
+            <Building className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">הזמנות ממתינות</p>
-            <p className="text-2xl font-bold text-gray-900">5</p>
+            <p className="text-sm text-gray-500 font-medium">סוכנויות</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.agencies}</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-4">
@@ -87,7 +132,7 @@ export function Users() {
           </div>
           <div>
             <p className="text-sm text-gray-500 font-medium">מנהלי מערכת</p>
-            <p className="text-2xl font-bold text-gray-900">3</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.admins}</p>
           </div>
         </div>
       </div>
@@ -144,12 +189,16 @@ export function Users() {
                 const RoleIcon = roleInfo.icon;
                 
                 return (
-                  <tr key={user.id} className="hover:bg-gray-50/50 transition-colors group">
+                   <tr key={user.uid} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-200/50">
-                          {user.name.charAt(0)}
-                        </div>
+                        {user.photoURL ? (
+                          <img src={user.photoURL} alt={user.name} className="w-10 h-10 rounded-full border border-gray-200" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0 border border-indigo-200/50">
+                            {user.name?.charAt(0) || '?'}
+                          </div>
+                        )}
                         <div>
                           <p className="font-bold text-gray-900">{user.name}</p>
                           <p className="text-gray-500 text-xs mt-0.5">{user.email}</p>
@@ -157,47 +206,54 @@ export function Users() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border", roleInfo.bg, roleInfo.color)}>
-                        <RoleIcon className="w-3.5 h-3.5" />
-                        {roleInfo.label}
-                      </span>
+                      <select 
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.uid, e.target.value as UserProfile['role'])}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
+                          roleInfo.bg, 
+                          roleInfo.color
+                        )}
+                        disabled={user.email === 'asher205@gmail.com'}
+                      >
+                        {Object.entries(roleLabels).map(([key, role]) => (
+                          <option key={key} value={key}>{role.label}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1.5">
-                        {user.stores.slice(0, 2).map((store, idx) => (
+                        {(user.storeIds || []).slice(0, 2).map((store, idx) => (
                           <span key={idx} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs font-medium border border-gray-200/50">
                             {store}
                           </span>
                         ))}
-                        {user.stores.length > 2 && (
+                        {(user.storeIds || []).length > 2 && (
                           <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded-md text-xs font-medium border border-gray-200/50">
-                            +{user.stores.length - 2}
+                            +{(user.storeIds || []).length - 2}
                           </span>
+                        )}
+                        {(user.storeIds || []).length === 0 && (
+                          <span className="text-gray-400 text-xs italic">אין חנויות</span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold",
-                        user.status === 'active' ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                        user.status === 'invited' ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                        "bg-red-50 text-red-700 border border-red-200"
-                      )}>
-                        {user.status === 'active' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {user.status === 'invited' && <Mail className="w-3.5 h-3.5" />}
-                        {user.status === 'disabled' && <XCircle className="w-3.5 h-3.5" />}
-                        {user.status === 'active' ? 'פעיל' : user.status === 'invited' ? 'הוזמן' : 'מושעה'}
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        פעיל
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500 text-xs font-medium">
-                      {user.lastActive}
+                      {new Date(user.createdAt).toLocaleDateString('he-IL')}
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                        <button 
+                          onClick={() => handleDeleteUser(user.uid)}
+                          disabled={user.email === 'asher205@gmail.com'}
+                          className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>

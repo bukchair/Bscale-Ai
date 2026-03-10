@@ -6,11 +6,13 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
+import { auth } from '../lib/firebase';
 
 export function Dashboard() {
   const { t, dir } = useLanguage();
   const { dateRange } = useDateRange();
   const { connections } = useConnections();
+  const currentUser = auth.currentUser;
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -56,6 +58,16 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Personalized Welcome */}
+      <div className="mb-8">
+        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+          {t('dashboard.welcome')}, {currentUser?.displayName?.split(' ')[0] || 'User'}! 👋
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">
+          {t('dashboard.welcomeSubtitle')}
+        </p>
+      </div>
+
       {/* Quick Smart Actions */}
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">

@@ -22,7 +22,7 @@ import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
 import { WooCommerce } from './pages/WooCommerce';
 import { useLanguage } from './contexts/LanguageContext';
-import { auth, onAuthStateChanged } from './lib/firebase';
+import { auth, onAuthStateChanged, syncUserProfile } from './lib/firebase';
 
 export default function App() {
   const { dir } = useLanguage();
@@ -30,12 +30,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        const profile = await syncUserProfile(user);
+        setUserProfile(profile);
         setView('app');
       } else {
+        setUserProfile(null);
         // Only go back to landing if we were in the app
         setView(prev => prev === 'app' ? 'landing' : prev);
       }
@@ -86,7 +90,7 @@ export default function App() {
       case 'connections':
         return <Integrations />;
       case 'users':
-        return <Users />;
+        return userProfile?.role === 'admin' ? <Users /> : <Dashboard />;
       case 'settings':
         return <Settings />;
       default:
@@ -101,6 +105,7 @@ export default function App() {
         setActiveTab={setActiveTab} 
         isOpen={isSidebarOpen} 
         setIsOpen={setIsSidebarOpen} 
+        userProfile={userProfile}
       />
       
       <div className="flex-1 flex flex-col overflow-hidden">

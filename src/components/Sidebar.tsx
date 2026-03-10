@@ -16,7 +16,8 @@ import {
   Activity,
   BarChart3,
   ListTodo,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -28,12 +29,16 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  userProfile?: any;
 }
 
-export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfile }: SidebarProps) {
   const { t } = useLanguage();
+  const currentUser = auth.currentUser;
+  const isAdmin = userProfile?.role === 'admin';
 
-  const handleLogout = async () => {
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await signOut(auth);
     } catch (error) {
@@ -71,7 +76,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
       items: [
         { id: 'approvals-automations', label: t('nav.approvalsAutomations'), icon: ShieldAlert },
         { id: 'connections', label: t('nav.connections'), icon: Plug },
-        { id: 'users', label: t('nav.users'), icon: Users },
+        ...(isAdmin ? [{ id: 'users', label: t('nav.users'), icon: Users }] : []),
         { id: 'settings', label: t('nav.settings'), icon: Settings },
       ]
     }
@@ -149,19 +154,37 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
         </div>
 
         <div className="shrink-0 p-4 border-t border-gray-200 dark:border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-[#1a1a1a] flex items-center justify-center text-gray-600 dark:text-gray-400 font-bold">
-              <User className="w-5 h-5" />
+          <div className="group flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all duration-200 cursor-pointer">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold overflow-hidden shadow-sm">
+                {currentUser?.photoURL ? (
+                  <img 
+                    src={currentUser.photoURL} 
+                    alt={currentUser.displayName || ''} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-[#111] rounded-full shadow-sm" />
             </div>
             <div className="flex-1 min-w-0 text-start">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Asher Buksspan</p>
-              <button 
-                onClick={handleLogout}
-                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-              >
-                {t('nav.logout')}
-              </button>
+              <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">
+                {currentUser?.displayName || 'User'}
+              </p>
+              <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
+                {userProfile?.role || 'User'}
+              </p>
             </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all duration-200"
+              title={t('nav.logout')}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

@@ -78,7 +78,9 @@ export const translations = {
       createAdAi: "Create Ad with AI",
       createAdAiDesc: "Generate new creatives for top products",
       fixSeoIssues: "Fix SEO Issues",
-      fixSeoIssuesDesc: "Missing alt text on 2 products"
+      fixSeoIssuesDesc: "Missing alt text on 2 products",
+      welcome: "Welcome back",
+      welcomeSubtitle: "Here's what's happening with your business today."
     },
     landing: {
       login: "Login",
@@ -229,7 +231,9 @@ export const translations = {
       createAdAi: "צור מודעה עם AI",
       createAdAiDesc: "צור קריאייטיבים חדשים למוצרים המובילים",
       fixSeoIssues: "תקן בעיות SEO",
-      fixSeoIssuesDesc: "חסר טקסט חלופי ב-2 מוצרים"
+      fixSeoIssuesDesc: "חסר טקסט חלופי ב-2 מוצרים",
+      welcome: "ברוך שובך",
+      welcomeSubtitle: "הנה מה שקורה בעסק שלך היום."
     },
     landing: {
       login: "התחברות למערכת",
