@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './pages/Dashboard';
@@ -22,12 +22,36 @@ import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
 import { WooCommerce } from './pages/WooCommerce';
 import { useLanguage } from './contexts/LanguageContext';
+import { auth, onAuthStateChanged } from './lib/firebase';
 
 export default function App() {
   const { dir } = useLanguage();
   const [view, setView] = useState<'landing' | 'auth' | 'app'>('landing');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setView('app');
+      } else {
+        // Only go back to landing if we were in the app
+        setView(prev => prev === 'app' ? 'landing' : prev);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50 dark:bg-[#050505]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
 
   if (view === 'landing') {
     return <Landing onEnter={() => setView('auth')} />;

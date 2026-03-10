@@ -21,6 +21,8 @@ import {
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 
+import { auth, signOut } from '../lib/firebase';
+
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -30,6 +32,14 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarProps) {
   const { t } = useLanguage();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
 
   const navGroups = [
     {
@@ -145,7 +155,10 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: SidebarP
             </div>
             <div className="flex-1 min-w-0 text-start">
               <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Asher Buksspan</p>
-              <button className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+              <button 
+                onClick={handleLogout}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
                 {t('nav.logout')}
               </button>
             </div>
