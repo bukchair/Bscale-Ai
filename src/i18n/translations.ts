@@ -194,7 +194,63 @@ export const translations = {
       connected: "Connected",
       connecting: "Connecting",
       disconnected: "Disconnected",
-      errorStatus: "Error"
+      errorStatus: "Error",
+      platforms: {
+        gemini: {
+          name: "Google Gemini AI",
+          desc: "The core AI engine powering recommendations, creative generation, and automated optimizations."
+        },
+        google: {
+          name: "Google Ecosystem",
+          desc: "Connect all Google services at once. Includes Ads, Analytics 4, Search Console, and Gmail for reports."
+        },
+        meta: {
+          name: "Meta (Ads, Pixel)",
+          desc: "Manage Facebook and Instagram campaigns, sync audiences, and track pixel conversions."
+        },
+        tiktok: {
+          name: "TikTok Ads",
+          desc: "Manage video campaigns on TikTok, track conversions and trends."
+        },
+        woocommerce: {
+          name: "WooCommerce",
+          desc: "Sync products, inventory, orders, and automatically update product descriptions and SEO."
+        },
+        shopify: {
+          name: "Shopify",
+          desc: "Connect your Shopify store to sync products, track sales, and optimize campaigns."
+        }
+      },
+      gemini: {
+        step1: "Go to",
+        step2: "Create an API Key",
+        step3: "Paste it in the field on the left"
+      },
+      google: {
+        step1: "Ads ID (10 digits)",
+        step2: "Measurement ID from GA4",
+        step3: "Click Save to finish"
+      },
+      meta: {
+        step1: "Click 'Connect with Meta Ads' below",
+        step2: "Authorize the app in the popup",
+        step3: "Enter your Ads Account ID (act_...)"
+      },
+      tiktok: {
+        step1: "Click 'Connect with TikTok' below",
+        step2: "Authorize the app in the popup",
+        step3: "Select your Advertiser ID"
+      },
+      woo: {
+        step1: "Settings > REST API",
+        step2: "Create Key (Read/Write)",
+        step3: "Copy keys here"
+      },
+      shopify: {
+        step1: "Settings > Develop apps",
+        step2: "Create and install app",
+        step3: "Copy Admin Token"
+      }
     },
     campaigns: {
       title: "Campaign Management & Optimization",
@@ -213,7 +269,50 @@ export const translations = {
       noRecommendations: "No recommendations at the moment. Click refresh to analyze data.",
       impactHigh: "High",
       impactMedium: "Medium",
-      impactLow: "Low"
+      impactLow: "Low",
+      searchPlaceholder: "Search campaigns...",
+      allPlatforms: "All Platforms",
+      allStatuses: "All Statuses",
+      sortBy: "Sort By",
+      sortOrder: "Order",
+      ascending: "Ascending",
+      descending: "Descending",
+      noCampaigns: "No campaigns found matching your criteria.",
+    },
+    ai: {
+      subtitle: "Cross-platform analysis and AI-driven optimization suggestions.",
+      refresh: "Refresh Recommendations",
+      applyAll: "Apply All Quick Wins",
+      analysisTitle: "AI Performance Analysis",
+      analysisSummary: "Based on the last 30 days of data across Google, Meta, and TikTok, we identified key trends: Meta drives 40% of top-funnel traffic, but Google Search captures 65% of final conversions. TikTok has the lowest CPA for brand awareness but struggles with direct sales.",
+      proposedImprovements: "Proposed Improvements",
+      expectedImpact: "Expected Impact",
+      recentlyApplied: "Recently Applied",
+      appliedSuccessfully: "Applied Successfully"
+    },
+    budget: {
+      subtitle: "Cross-platform budget management and AI optimizations.",
+      settings: "Budget Settings",
+      totalBudget: "Total Budget",
+      monthlyAllocation: "Monthly Allocation",
+      currentSpend: "Current Spend",
+      remaining: "Remaining",
+      availableAllocation: "Available for Allocation",
+      aiOptimization: "AI Budget Optimization",
+      aiOptimizationDesc: "Based on the last 7 days of performance, reallocating budget can increase overall ROAS by about 12%.",
+      reduceTikTok: "Reduce TikTok Ads",
+      reduceTikTokDesc: "Current ROAS is 2.1x, below account average.",
+      increaseGoogle: "Increase Google Ads",
+      increaseGoogleDesc: "Search campaigns yield 3.2x ROAS with available impression share.",
+      applyTransfer: "Apply Transfer",
+      allocationByPlatform: "Allocation by Platform",
+      platform: "Platform",
+      allocatedBudget: "Allocated Budget",
+      roas: "ROAS",
+      status: "Status",
+      statusOptimal: "Optimal",
+      statusOverspending: "Overspending",
+      statusUnderperforming: "Underperforming"
     },
     profitability: {
       title: "Profitability / Financial Reports",
@@ -343,7 +442,56 @@ export const translations = {
       notConnected: "WooCommerce Not Connected",
       notConnectedDesc: "Connect your WooCommerce store on the integrations page to view products and perform AI-based optimization.",
       goToIntegrations: "Go to Integrations Page",
-      errorLoading: "An error occurred while loading products from WooCommerce. Make sure keys and URL are correct."
+      errorLoading: "An error occurred while loading products from WooCommerce. Make sure keys and URL are correct.",
+      optimizationFailed: 'AI SEO optimization failed. Please try again later.',
+      suggestedAiImprovements: 'Suggested AI & SEO Improvements',
+      new: 'New',
+      suggestedSeoTitle: 'Suggested SEO Title',
+      improvedShortDescription: 'Improved Short Description',
+      keywords: 'Keywords',
+      improvedFullDescription: 'Improved Full Description',
+      updateInWooCommerce: 'Update Product in WooCommerce',
+    },
+    search: {
+      subtitle: 'Analyze search terms and manage negative keywords in Google Ads.',
+      filters: 'Filters',
+      export: 'Export',
+      aiInsightsTitle: 'AI-Powered Search Insights',
+      aiInsightsDesc: 'The system analyzed 1,432 search terms across your paid and organic channels. We identified <strong>$440 in wasted ad spend</strong> on irrelevant terms.',
+      negativeCandidates: 'Negative Keyword Candidates',
+      negativeCandidatesDesc: 'Terms containing "free" or "cheap" bring clicks but zero conversions. Adding them as negatives will save about $200 per week.',
+      seoOpportunity: 'SEO Opportunity',
+      seoOpportunityDesc: '"How to start running" has high organic impressions (4.5k) but low CTR. Optimize meta description to capture more traffic.',
+      monthlySavings: 'Potential Monthly Savings',
+      reviewAndApply: 'Review and Apply Negative Keywords',
+      performanceTitle: 'Search Term Performance',
+      allTerms: 'All Terms',
+      organicGsc: 'Organic (GSC)',
+      negativeKeywords: 'Negative Keywords',
+      manageNegatives: 'Manage Negative Keywords',
+      addNegative: 'Add Negative Keyword',
+      negativeKeyword: 'Negative Keyword',
+      matchType: 'Match Type',
+      campaignGroup: 'Campaign / Group',
+      addedDate: 'Added Date',
+      remove: 'Remove',
+      searchTerm: 'Search Term',
+      source: 'Source',
+      metrics: 'Metrics',
+      performance: 'Performance',
+      aiStatus: 'AI Status',
+      clicks: 'Clicks',
+      spend: 'Spend',
+      impressions: 'Impressions',
+      position: 'Position',
+      conversions: 'Conversions',
+      statusOptimal: 'Optimal',
+      statusNegativeCandidate: 'Negative Candidate',
+      statusOpportunity: 'Opportunity',
+      statusReview: 'To Review',
+      statusImprove: 'To Improve',
+      addAsNegative: 'Add as Negative',
+      viewDetails: 'View Details',
     },
     common: {
       loading: "Loading...",
@@ -357,7 +505,12 @@ export const translations = {
       status: "Status",
       date: "Date",
       all: "All",
-      viewAll: "View All"
+      viewAll: "View All",
+      easy: "Easy",
+      medium: "Medium",
+      hard: "Hard",
+      dismiss: "Dismiss",
+      applyNow: "Apply Now"
     }
   },
   he: {
@@ -555,7 +708,63 @@ export const translations = {
       connected: "מחובר",
       connecting: "מתחבר",
       disconnected: "לא מחובר",
-      errorStatus: "שגיאה"
+      errorStatus: "שגיאה",
+      platforms: {
+        gemini: {
+          name: "Google Gemini AI",
+          desc: "מנוע ה-AI המרכזי המניע המלצות, יצירת קריאייטיב ואופטימיזציות אוטומטיות."
+        },
+        google: {
+          name: "Google Ecosystem",
+          desc: "חבר את כל שירותי גוגל בבת אחת. כולל Ads, Analytics 4, Search Console ו-Gmail לדוחות."
+        },
+        meta: {
+          name: "Meta (Ads, Pixel)",
+          desc: "נהל קמפיינים בפייסבוק ואינסטגרם, סנכרן קהלים ועקוב אחר המרות פיקסל."
+        },
+        tiktok: {
+          name: "TikTok Ads",
+          desc: "נהל קמפיינים של וידאו בטיקטוק, עקוב אחר המרות ומגמות."
+        },
+        woocommerce: {
+          name: "WooCommerce",
+          desc: "סנכרן מוצרים, מלאי, הזמנות ועדכן אוטומטית תיאורי מוצרים ו-SEO."
+        },
+        shopify: {
+          name: "Shopify",
+          desc: "חבר את חנות ה-Shopify שלך כדי לסנכרן מוצרים, לעקוב אחר מכירות ולבצע אופטימיזציה לקמפיינים."
+        }
+      },
+      gemini: {
+        step1: "כנס ל-",
+        step2: "צור API Key",
+        step3: "הדבק בשדה משמאל"
+      },
+      google: {
+        step1: "מזהה Ads (10 ספרות)",
+        step2: "Measurement ID מ-GA4",
+        step3: "לחץ שמור לסיום"
+      },
+      meta: {
+        step1: "לחץ על 'התחבר עם Meta Ads' למטה",
+        step2: "אשר את האפליקציה בחלון הקופץ",
+        step3: "הזן את מזהה חשבון המודעות שלך (act_...)"
+      },
+      tiktok: {
+        step1: "לחץ על 'התחבר עם TikTok' למטה",
+        step2: "אשר את האפליקציה בחלון הקופץ",
+        step3: "בחר את מזהה המפרסם שלך"
+      },
+      woo: {
+        step1: "Settings > REST API",
+        step2: "צור Key (Read/Write)",
+        step3: "העתק מפתחות לכאן"
+      },
+      shopify: {
+        step1: "Settings > Develop apps",
+        step2: "צור אפליקציה והתקן",
+        step3: "העתק Admin Token"
+      }
     },
     campaigns: {
       title: "ניהול קמפיינים ואופטימיזציה",
@@ -574,7 +783,50 @@ export const translations = {
       noRecommendations: "אין המלצות כרגע. לחץ על רענן כדי לנתח נתונים.",
       impactHigh: "גבוהה",
       impactMedium: "בינונית",
-      impactLow: "נמוכה"
+      impactLow: "נמוכה",
+      searchPlaceholder: "חפש קמפיינים...",
+      allPlatforms: "כל הפלטפורמות",
+      allStatuses: "כל הסטטוסים",
+      sortBy: "מיין לפי",
+      sortOrder: "סדר",
+      ascending: "עולה",
+      descending: "יורד",
+      noCampaigns: "לא נמצאו קמפיינים התואמים את הקריטריונים שלך.",
+    },
+    ai: {
+      subtitle: "ניתוח חוצה פלטפורמות והצעות אופטימיזציה מבוססות בינה מלאכותית.",
+      refresh: "רענן המלצות",
+      applyAll: "החל את כל הניצחונות המהירות",
+      analysisTitle: "ניתוח ביצועי AI",
+      analysisSummary: "בהתבסס על נתוני 30 הימים האחרונים ב-Google, Meta ו-TikTok, זיהינו מגמות מפתח: Meta מביאה 40% מהתנועה בראש המשפך, אך רשת החיפוש של Google לוכדת 65% מההמרות הסופיות. ל-TikTok יש את ה-CPA הנמוך ביותר למודעות למותג אך היא מתקשה במכירות ישירות.",
+      proposedImprovements: "שיפורים מוצעים",
+      expectedImpact: "השפעה צפויה",
+      recentlyApplied: "הוחלו לאחרונה",
+      appliedSuccessfully: "הוחל בהצלחה"
+    },
+    budget: {
+      subtitle: "ניהול תקציבים חוצה פלטפורמות והחלת אופטימיזציות AI.",
+      settings: "הגדרות תקציב",
+      totalBudget: "תקציב כולל",
+      monthlyAllocation: "הקצאה חודשית",
+      currentSpend: "הוצאה נוכחית",
+      remaining: "נותר",
+      availableAllocation: "זמין להקצאה",
+      aiOptimization: "אופטימיזציית תקציב AI",
+      aiOptimizationDesc: "בהתבסס על ביצועי 7 הימים האחרונים, הקצאה מחדש של התקציב יכולה להגדיל את ה-ROAS הכולל בכ-12%.",
+      reduceTikTok: "הפחתת TikTok Ads",
+      reduceTikTokDesc: "ה-ROAS הנוכחי הוא 2.1x, מתחת לממוצע החשבון.",
+      increaseGoogle: "הגדלת Google Ads",
+      increaseGoogleDesc: "קמפיינים ברשת החיפוש מניבים ROAS של 3.2x עם נתח חשיפות פנוי.",
+      applyTransfer: "החל העברה",
+      allocationByPlatform: "הקצאה לפי פלטפורמה",
+      platform: "פלטפורמה",
+      allocatedBudget: "תקציב מוקצה",
+      roas: "ROAS",
+      status: "סטטוס",
+      statusOptimal: "אופטימלי",
+      statusOverspending: "חריגה מהתקציב",
+      statusUnderperforming: "ביצועים חלשים"
     },
     profitability: {
       title: "רווחיות / דוחות כספיים",
@@ -704,7 +956,56 @@ export const translations = {
       notConnected: "WooCommerce לא מחובר",
       notConnectedDesc: "חבר את חנות ה-WooCommerce שלך בדף האינטגרציות כדי לצפות במוצרים ולבצע אופטימיזציה מבוססת AI.",
       goToIntegrations: "עבור לדף אינטגרציות",
-      errorLoading: "אירעה שגיאה בטעינת מוצרים מ-WooCommerce. וודא שהמפתחות וה-URL תקינים."
+      errorLoading: "אירעה שגיאה בטעינת מוצרים מ-WooCommerce. וודא שהמפתחות וה-URL תקינים.",
+      optimizationFailed: 'נכשל ביצוע אופטימיזציית AI. אנא נסה שוב מאוחר יותר.',
+      suggestedAiImprovements: 'שיפורי AI ו-SEO מוצעים',
+      new: 'חדש',
+      suggestedSeoTitle: 'כותרת SEO מוצעת',
+      improvedShortDescription: 'תיאור קצר משופר',
+      keywords: 'מילות מפתח',
+      improvedFullDescription: 'תיאור מלא משופר',
+      updateInWooCommerce: 'עדכן מוצר ב-WooCommerce',
+    },
+    search: {
+      subtitle: 'נתח מונחי חיפוש ונהל מילות מפתח שליליות ב-Google Ads.',
+      filters: 'סינונים',
+      export: 'ייצוא',
+      aiInsightsTitle: 'תובנות חיפוש מבוססות AI',
+      aiInsightsDesc: 'המערכת ניתחה 1,432 מונחי חיפוש בערוצים הממומנים והאורגניים שלך. זיהינו <strong>₪440 בהוצאות מודעות מבוזבזות</strong> על מונחים לא רלוונטיים.',
+      negativeCandidates: 'מועמדים למילות מפתח שליליות',
+      negativeCandidatesDesc: 'מונחים המכילים "חינם" או "זול" מביאים קליקים אך אפס המרות. הוספתם כשליליים תחסוך כ-₪200 בשבוע.',
+      seoOpportunity: 'הזדמנות SEO',
+      seoOpportunityDesc: 'ל-"איך להתחיל לרוץ" יש חשיפות אורגניות גבוהות (4.5k) אך CTR נמוך. בצע אופטימיזציה לתיאור המטא כדי ללכוד יותר תנועה.',
+      monthlySavings: 'חיסכון חודשי פוטנציאלי',
+      reviewAndApply: 'סקור והחל מילות מפתח שליליות',
+      performanceTitle: 'ביצועי מונחי חיפוש',
+      allTerms: 'כל המונחים',
+      organicGsc: 'אורגני (GSC)',
+      negativeKeywords: 'מילות מפתח שליליות',
+      manageNegatives: 'ניהול מילות מפתח שליליות',
+      addNegative: 'הוסף מילה שלילית',
+      negativeKeyword: 'מילה שלילית',
+      matchType: 'סוג התאמה',
+      campaignGroup: 'קמפיין / קבוצה',
+      addedDate: 'תאריך הוספה',
+      remove: 'הסר',
+      searchTerm: 'מונח חיפוש',
+      source: 'מקור',
+      metrics: 'מדדים',
+      performance: 'ביצועים',
+      aiStatus: 'סטטוס AI',
+      clicks: 'קליקים',
+      spend: 'הוצאה',
+      impressions: 'חשיפות',
+      position: 'מיקום',
+      conversions: 'המרות',
+      statusOptimal: 'אופטימלי',
+      statusNegativeCandidate: 'מועמד לשלילי',
+      statusOpportunity: 'הזדמנות',
+      statusReview: 'לסקירה',
+      statusImprove: 'לשיפור',
+      addAsNegative: 'הוסף כשלילי',
+      viewDetails: 'צפה בפרטים',
     },
     common: {
       loading: "טוען...",
@@ -718,7 +1019,12 @@ export const translations = {
       status: "סטטוס",
       date: "תאריך",
       all: "הכל",
-      viewAll: "צפה בהכל"
+      viewAll: "צפה בהכל",
+      easy: "קל",
+      medium: "בינוני",
+      hard: "קשה",
+      dismiss: "התעלם",
+      applyNow: "החל עכשיו"
     }
   },
   ru: {
@@ -744,8 +1050,72 @@ export const translations = {
         connection_error_desc: "Подключение Google Ads требует повторной аутентификации."
       }
     },
-    integrations: { title: "Интеграции", subtitle: "Управление подключениями", testAll: "Тест всех", testConnection: "Тест", saveAndConnect: "Сохранить", updateSettings: "Обновить", disconnect: "Отключить", connectionSettings: "Настройки", quickGuide: "Гайд", success: "Успешно {name}", error: "Ошибка {name}", apiKey: "Ключ API", defaultModel: "Модель", storeUrl: "URL", consumerKey: "Key", consumerSecret: "Secret", accessToken: "Token", businessId: "ID", pixelId: "Pixel", adsAccountId: "Ads ID", ga4MeasurementId: "GA4 ID", advertiserId: "Adv ID", adminAccessToken: "Admin Token", connected: "Подключено", connecting: "Подключение", disconnected: "Отключено", errorStatus: "Ошибка" },
-    campaigns: { title: "Управление кампаниями", refreshAi: "Обновить AI", activeCampaigns: "Активные", campaignName: "Имя", platform: "Платформа", status: "Статус", spend: "Расход", roas: "ROAS", cpa: "CPA", aiRecommendations: "Рекомендации AI", impact: "Влияние", applyAuto: "Применить", appliedSuccess: "Успешно", noRecommendations: "Нет рекомендаций", impactHigh: "Высокое", impactMedium: "Среднее", impactLow: "Низкое" },
+    integrations: {
+      title: "Интеграции",
+      subtitle: "Управление подключениями",
+      testAll: "Тест всех",
+      testConnection: "Тест",
+      saveAndConnect: "Сохранить",
+      updateSettings: "Обновить",
+      disconnect: "Отключить",
+      connectionSettings: "Настройки",
+      quickGuide: "Гайд",
+      success: "Успешно {name}",
+      error: "Ошибка {name}",
+      apiKey: "Ключ API",
+      defaultModel: "Модель",
+      storeUrl: "URL",
+      consumerKey: "Key",
+      consumerSecret: "Secret",
+      accessToken: "Token",
+      businessId: "ID",
+      pixelId: "Pixel",
+      adsAccountId: "Ads ID",
+      ga4MeasurementId: "GA4 ID",
+      advertiserId: "Adv ID",
+      adminAccessToken: "Admin Token",
+      connected: "Подключено",
+      connecting: "Подключение",
+      disconnected: "Отключено",
+      errorStatus: "Ошибка",
+      tiktok: {
+        step1: "Нажмите 'Подключить TikTok' ниже",
+        step2: "Авторизуйте приложение во всплывающем окне",
+        step3: "Выберите ID рекламодателя"
+      },
+      meta: {
+        step1: "Нажмите 'Подключить Meta Ads' ниже",
+        step2: "Авторизуйте приложение во всплывающем окне",
+        step3: "Введите ID рекламного аккаунта (act_...)"
+      }
+    },
+    campaigns: {
+      title: "Управление кампаниями",
+      refreshAi: "Обновить AI",
+      activeCampaigns: "Активные",
+      campaignName: "Имя",
+      platform: "Платформа",
+      status: "Статус",
+      spend: "Расход",
+      roas: "ROAS",
+      cpa: "CPA",
+      aiRecommendations: "Рекомендации AI",
+      impact: "Влияние",
+      applyAuto: "Применить",
+      appliedSuccess: "Успешно",
+      noRecommendations: "Нет рекомендаций",
+      impactHigh: "Высокое",
+      impactMedium: "Среднее",
+      impactLow: "Низкое",
+      searchPlaceholder: "Поиск кампаний...",
+      allPlatforms: "Все платформы",
+      allStatuses: "Все статусы",
+      sortBy: "Сортировать по",
+      sortOrder: "Порядок",
+      ascending: "По возрастанию",
+      descending: "По убыванию",
+      noCampaigns: "Кампании, соответствующие вашим критериям, не найдены.",
+    },
     profitability: {
       title: "Прибыльность / Финансовые отчеты",
       subtitle: "Комплексный финансовый анализ, отчеты и AI-инсайты для вашего бизнеса.",
@@ -853,7 +1223,80 @@ export const translations = {
         viewer: 'Зритель',
       }
     },
-    woocommerce: { title: "Продукты WooCommerce", active: "Активно", subtitle: "Каталог и AI", refreshProducts: "Обновить", productList: "Список", loadingProducts: "Загрузка...", noProducts: "Нет продуктов", sku: "SKU", inStock: "В наличии", outOfStock: "Нет в наличии", aiOptimization: "AI Оптимизация", price: "Цена", category: "Категория", shortDescription: "Описание", fullDescription: "Полное описание", noProductSelected: "Не выбран", noProductSelectedDesc: "Выберите продукт", notConnected: "Не подключено", notConnectedDesc: "Подключите WooCommerce", goToIntegrations: "Интеграции", errorLoading: "Ошибка загрузки" },
+    woocommerce: {
+      title: "Интеграция WooCommerce",
+      subtitle: "Управляйте своими товарами и оптимизируйте их для SEO с помощью AI.",
+      notConnected: "WooCommerce не подключен",
+      notConnectedDesc: "Подключите свой магазин WooCommerce, чтобы начать управлять и оптимизировать свои товары.",
+      goToIntegrations: "Перейти к интеграциям",
+      searchProducts: "Поиск товаров...",
+      allCategories: "Все категории",
+      loadingProducts: "Загрузка товаров...",
+      noProducts: "Товары не найдены.",
+      sku: "Артикул",
+      inStock: "В наличии",
+      outOfStock: "Нет в наличии",
+      price: "Цена",
+      category: "Категория",
+      shortDescription: "Краткое описание",
+      fullDescription: "Полное описание",
+      aiOptimization: "AI-оптимизация",
+      noProductSelected: "Товар не выбран",
+      noProductSelectedDesc: "Выберите товар из списка, чтобы просмотреть детали и оптимизировать.",
+      optimizationFailed: "Ошибка AI SEO оптимизации. Пожалуйста, попробуйте позже.",
+      suggestedAiImprovements: "Предлагаемые AI и SEO улучшения",
+      new: "Новое",
+      suggestedSeoTitle: "Предлагаемый SEO заголовок",
+      improvedShortDescription: "Улучшенное краткое описание",
+      keywords: "Ключевые слова",
+      improvedFullDescription: "Улучшенное полное описание",
+      updateInWooCommerce: "Обновить товар в WooCommerce",
+      active: "Активно",
+      refreshProducts: "Обновить",
+      productList: "Список",
+      errorLoading: "Ошибка загрузки"
+    },
+    search: {
+      subtitle: 'Анализируйте поисковых запросов и управляйте минус-словами в Google Ads.',
+      filters: 'Фильтры',
+      export: 'Экспорт',
+      aiInsightsTitle: 'AI-аналитика поиска',
+      aiInsightsDesc: 'Система проанализировала 1432 поисковых запроса в ваших платных и органических каналах. Мы выявили <strong>$440 потраченных впустую расходов на рекламу</strong> по нерелевантным запросам.',
+      negativeCandidates: 'Кандидаты в минус-слова',
+      negativeCandidatesDesc: 'Запросы, содержащие "бесплатно" или "дешево", приносят клики, но ноль конверсий. Добавление их в минус-слова сэкономит около $200 в неделю.',
+      seoOpportunity: 'SEO-возможность',
+      seoOpportunityDesc: 'Запрос "как начать бегать" имеет высокие органические показы (4.5k), но низкий CTR. Оптимизируйте мета-описание, чтобы привлечь больше трафика.',
+      monthlySavings: 'Потенциальная ежемесячная экономия',
+      reviewAndApply: 'Просмотреть и применить минус-слова',
+      performanceTitle: 'Эффективность поисковых запросов',
+      allTerms: 'Все запросы',
+      organicGsc: 'Органические (GSC)',
+      negativeKeywords: 'Минус-слова',
+      manageNegatives: 'Управление минус-словами',
+      addNegative: 'Добавить минус-слово',
+      negativeKeyword: 'Минус-слово',
+      matchType: 'Тип соответствия',
+      campaignGroup: 'Кампания / Группа',
+      addedDate: 'Дата добавления',
+      remove: 'Удалить',
+      searchTerm: 'Поисковый запрос',
+      source: 'Источник',
+      metrics: 'Метрики',
+      performance: 'Эффективность',
+      aiStatus: 'AI-статус',
+      clicks: 'Клики',
+      spend: 'Затраты',
+      impressions: 'Показы',
+      position: 'Позиция',
+      conversions: 'Конверсии',
+      statusOptimal: 'Оптимально',
+      statusNegativeCandidate: 'Кандидат в минус-слова',
+      statusOpportunity: 'Возможность',
+      statusReview: 'На проверку',
+      statusImprove: 'На улучшение',
+      addAsNegative: 'Добавить как минус-слово',
+      viewDetails: 'Подробнее',
+    },
     common: { loading: "Загрузка...", error: "Ошибка", success: "Успех", save: "Сохранить", cancel: "Отмена", delete: "Удалить", edit: "Править", actions: "Действия", status: "Статус", date: "Дата", all: "Все", viewAll: "Показать все" }
   },
   pt: {
@@ -879,7 +1322,45 @@ export const translations = {
         connection_error_desc: "A conexão com o Google Ads requer reautenticação."
       }
     },
-    integrations: { title: "Integrações", subtitle: "Gerenciar conexões", testAll: "Testar todos", testConnection: "Testar", saveAndConnect: "Salvar", updateSettings: "Atualizar", disconnect: "Desconectar", connectionSettings: "Configurações", quickGuide: "Guia", success: "Sucesso {name}", error: "Erro {name}", apiKey: "Chave API", defaultModel: "Modelo", storeUrl: "URL", consumerKey: "Key", consumerSecret: "Secret", accessToken: "Token", businessId: "ID", pixelId: "Pixel", adsAccountId: "Ads ID", ga4MeasurementId: "GA4 ID", advertiserId: "Adv ID", adminAccessToken: "Admin Token", connected: "Conectado", connecting: "Conectando", disconnected: "Desconectado", errorStatus: "Erro" },
+    integrations: {
+      title: "Integrações",
+      subtitle: "Gerenciar conexões",
+      testAll: "Testar todos",
+      testConnection: "Testar",
+      saveAndConnect: "Salvar",
+      updateSettings: "Atualizar",
+      disconnect: "Desconectar",
+      connectionSettings: "Configurações",
+      quickGuide: "Guia",
+      success: "Sucesso {name}",
+      error: "Erro {name}",
+      apiKey: "Chave API",
+      defaultModel: "Modelo",
+      storeUrl: "URL",
+      consumerKey: "Key",
+      consumerSecret: "Secret",
+      accessToken: "Token",
+      businessId: "ID",
+      pixelId: "Pixel",
+      adsAccountId: "Ads ID",
+      ga4MeasurementId: "GA4 ID",
+      advertiserId: "Adv ID",
+      adminAccessToken: "Admin Token",
+      connected: "Conectado",
+      connecting: "Conectando",
+      disconnected: "Desconectado",
+      errorStatus: "Erro",
+      tiktok: {
+        step1: "Clique em 'Conectar com TikTok' abaixo",
+        step2: "Autorize o aplicativo no pop-up",
+        step3: "Selecione seu ID de anunciante"
+      },
+      meta: {
+        step1: "Clique em 'Conectar com Meta Ads' abaixo",
+        step2: "Autorize o aplicativo no pop-up",
+        step3: "Insira seu ID de conta de anúncios (act_...)"
+      }
+    },
     campaigns: { title: "Gestão de Campanhas", refreshAi: "Atualizar AI", activeCampaigns: "Ativas", campaignName: "Nome", platform: "Plataforma", status: "Status", spend: "Gasto", roas: "ROAS", cpa: "CPA", aiRecommendations: "Recs AI", impact: "Impacto", applyAuto: "Aplicar", appliedSuccess: "Sucesso", noRecommendations: "Sem recs", impactHigh: "Alto", impactMedium: "Médio", impactLow: "Baixo" },
     profitability: {
       title: "Lucratividade / Relatórios Financeiros",
@@ -1014,8 +1495,72 @@ export const translations = {
         connection_error_desc: "La connexion Google Ads nécessite une ré-authentification."
       }
     },
-    integrations: { title: "Intégrations", subtitle: "Gérer connexions", testAll: "Tester tout", testConnection: "Tester", saveAndConnect: "Sauver", updateSettings: "Mettre à jour", disconnect: "Déconnecter", connectionSettings: "Paramètres", quickGuide: "Guide", success: "Succès {name}", error: "Erreur {name}", apiKey: "Clé API", defaultModel: "Modèle", storeUrl: "URL", consumerKey: "Key", consumerSecret: "Secret", accessToken: "Token", businessId: "ID", pixelId: "Pixel", adsAccountId: "Ads ID", ga4MeasurementId: "GA4 ID", advertiserId: "Adv ID", adminAccessToken: "Admin Token", connected: "Connecté", connecting: "Connexion", disconnected: "Déconnecté", errorStatus: "Erreur" },
-    campaigns: { title: "Gestion des Campagnes", refreshAi: "Actualiser AI", activeCampaigns: "Actives", campaignName: "Nom", platform: "Plateforme", status: "Statut", spend: "Dépense", roas: "ROAS", cpa: "CPA", aiRecommendations: "Recs AI", impact: "Impact", applyAuto: "Appliquer", appliedSuccess: "Succès", noRecommendations: "Pas de recs", impactHigh: "Haut", impactMedium: "Moyen", impactLow: "Bas" },
+    integrations: {
+      title: "Intégrations",
+      subtitle: "Gérer connexions",
+      testAll: "Tester tout",
+      testConnection: "Tester",
+      saveAndConnect: "Sauver",
+      updateSettings: "Mettre à jour",
+      disconnect: "Déconnecter",
+      connectionSettings: "Paramètres",
+      quickGuide: "Guide",
+      success: "Succès {name}",
+      error: "Erreur {name}",
+      apiKey: "Clé API",
+      defaultModel: "Modèle",
+      storeUrl: "URL",
+      consumerKey: "Key",
+      consumerSecret: "Secret",
+      accessToken: "Token",
+      businessId: "ID",
+      pixelId: "Pixel",
+      adsAccountId: "Ads ID",
+      ga4MeasurementId: "GA4 ID",
+      advertiserId: "Adv ID",
+      adminAccessToken: "Admin Token",
+      connected: "Connecté",
+      connecting: "Connexion",
+      disconnected: "Déconnecté",
+      errorStatus: "Erreur",
+      tiktok: {
+        step1: "Cliquez sur 'Se connecter avec TikTok' ci-dessous",
+        step2: "Autorisez l'application dans la fenêtre contextuelle",
+        step3: "Sélectionnez votre ID d'annonceur"
+      },
+      meta: {
+        step1: "Cliquez sur 'Se connecter avec Meta Ads' ci-dessous",
+        step2: "Autorisez l'application dans la fenêtre contextuelle",
+        step3: "Entrez votre ID de compte publicitaire (act_...)"
+      }
+    },
+    campaigns: {
+      title: "Gestion des Campagnes",
+      refreshAi: "Actualiser AI",
+      activeCampaigns: "Actives",
+      campaignName: "Nom",
+      platform: "Plateforme",
+      status: "Statut",
+      spend: "Dépense",
+      roas: "ROAS",
+      cpa: "CPA",
+      aiRecommendations: "Recs AI",
+      impact: "Impact",
+      applyAuto: "Appliquer",
+      appliedSuccess: "Succès",
+      noRecommendations: "Pas de recs",
+      impactHigh: "Haut",
+      impactMedium: "Moyen",
+      impactLow: "Bas",
+      searchPlaceholder: "Rechercher des campagnes...",
+      allPlatforms: "Toutes les plateformes",
+      allStatuses: "Tous les statuts",
+      sortBy: "Trier par",
+      sortOrder: "Ordre",
+      ascending: "Croissant",
+      descending: "Décroissant",
+      noCampaigns: "Aucune campagne trouvée correspondant à vos critères.",
+    },
     profitability: {
       title: "Rentabilité / Rapports Financiers",
       subtitle: "Analyse financière complète, rapports financiers et informations IA pour votre entreprise.",

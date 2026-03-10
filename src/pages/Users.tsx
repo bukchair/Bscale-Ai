@@ -15,12 +15,12 @@ interface UserProfile {
   photoURL?: string;
 }
 
-const roleLabels: Record<UserProfile['role'], { label: string, icon: React.ElementType, color: string, bg: string }> = {
-  admin: { label: 'יוצר המערכת', icon: Shield, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
-  agency: { label: 'בעל סוכנות', icon: UsersIcon, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  owner: { label: 'בעל חנות', icon: Building, color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
-  editor: { label: 'עורך', icon: Edit2, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-  viewer: { label: 'צופה', icon: Search, color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
+const roleLabels: Record<UserProfile['role'], { labelKey: string, icon: React.ElementType, color: string, bg: string }> = {
+  admin: { labelKey: 'users.roles.admin', icon: Shield, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
+  agency: { labelKey: 'users.roles.agency', icon: UsersIcon, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+  owner: { labelKey: 'users.roles.owner', icon: Building, color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
+  editor: { labelKey: 'users.roles.editor', icon: Edit2, color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+  viewer: { labelKey: 'users.roles.viewer', icon: Search, color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' },
 };
 
 export function Users() {
@@ -92,21 +92,21 @@ export function Users() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('nav.users')}</h1>
-          <p className="text-sm text-gray-500 mt-1">ניהול הרשאות, משתמשים וסוכנויות במערכת.</p>
+          <p className="text-sm text-gray-500 mt-1">{t('users.subtitle')}</p>
         </div>
         <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
           <UserPlus className="w-4 h-4" />
-          הוסף משתמש חדש
+          {t('users.addNewUser')}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
             <UsersIcon className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">סה"כ משתמשים</p>
+            <p className="text-sm text-gray-500 font-medium">{t('users.totalUsers')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
           </div>
         </div>
@@ -115,7 +115,7 @@ export function Users() {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">משתמשים פעילים</p>
+            <p className="text-sm text-gray-500 font-medium">{t('users.activeUsers')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export function Users() {
             <Building className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">סוכנויות</p>
+            <p className="text-sm text-gray-500 font-medium">{t('users.agencies')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.agencies}</p>
           </div>
         </div>
@@ -133,7 +133,7 @@ export function Users() {
             <Shield className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-gray-500 font-medium">מנהלי מערכת</p>
+            <p className="text-sm text-gray-500 font-medium">{t('users.admins')}</p>
             <p className="text-2xl font-bold text-gray-900">{stats.admins}</p>
           </div>
         </div>
@@ -145,7 +145,7 @@ export function Users() {
             <Search className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", dir === 'rtl' ? "right-3" : "left-3")} />
             <input 
               type="text" 
-              placeholder="חיפוש משתמשים..." 
+              placeholder={t('users.searchPlaceholder')} 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={cn(
@@ -159,7 +159,7 @@ export function Users() {
               onClick={() => setSelectedRole('all')}
               className={cn("px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors", selectedRole === 'all' ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
             >
-              הכל
+              {t('users.all')}
             </button>
             {Object.entries(roleLabels).map(([key, role]) => (
               <button 
@@ -167,7 +167,7 @@ export function Users() {
                 onClick={() => setSelectedRole(key)}
                 className={cn("px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors", selectedRole === key ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
               >
-                {role.label}
+                {t(role.labelKey)}
               </button>
             ))}
           </div>
@@ -177,11 +177,11 @@ export function Users() {
           <table className="w-full text-sm text-right">
             <thead className="bg-gray-50/50 text-gray-500 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 font-medium">משתמש</th>
-                <th className="px-6 py-4 font-medium">תפקיד</th>
-                <th className="px-6 py-4 font-medium">חנויות מנוהלות</th>
-                <th className="px-6 py-4 font-medium">סטטוס</th>
-                <th className="px-6 py-4 font-medium">פעילות אחרונה</th>
+                <th className="px-6 py-4 font-medium">{t('users.user')}</th>
+                <th className="px-6 py-4 font-medium">{t('users.role')}</th>
+                <th className="px-6 py-4 font-medium">{t('users.managedStores')}</th>
+                <th className="px-6 py-4 font-medium">{t('users.status')}</th>
+                <th className="px-6 py-4 font-medium">{t('users.lastActivity')}</th>
                 <th className="px-6 py-4 font-medium"></th>
               </tr>
             </thead>
@@ -219,7 +219,7 @@ export function Users() {
                         disabled={user.email === 'asher205@gmail.com'}
                       >
                         {Object.entries(roleLabels).map(([key, role]) => (
-                          <option key={key} value={key}>{role.label}</option>
+                          <option key={key} value={key}>{t(role.labelKey)}</option>
                         ))}
                       </select>
                     </td>
@@ -236,18 +236,18 @@ export function Users() {
                           </span>
                         )}
                         {(user.storeIds || []).length === 0 && (
-                          <span className="text-gray-400 text-xs italic">אין חנויות</span>
+                          <span className="text-gray-400 text-xs italic">{t('users.noStores')}</span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        פעיל
+                        {t('users.active')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500 text-xs font-medium">
-                      {new Date(user.createdAt).toLocaleDateString('he-IL')}
+                      {new Date(user.createdAt).toLocaleDateString(dir === 'rtl' ? 'he-IL' : 'en-US')}
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -271,8 +271,8 @@ export function Users() {
               <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                 <Search className="w-8 h-8 text-gray-400" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-1">לא נמצאו תוצאות</h3>
-              <p className="text-gray-500 text-sm">לא נמצאו משתמשים התואמים לחיפוש או לסינון הנוכחי.</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">{t('users.noResults')}</h3>
+              <p className="text-gray-500 text-sm">{t('users.noResultsDesc')}</p>
             </div>
           )}
         </div>
@@ -284,20 +284,20 @@ export function Users() {
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-600 mb-4">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">מחיקת משתמש</h3>
-            <p className="text-sm text-gray-500 mb-6">האם אתה בטוח שברצונך למחוק את המשתמש? פעולה זו אינה ניתנת לביטול.</p>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{t('users.deleteUser')}</h3>
+            <p className="text-sm text-gray-500 mb-6">{t('users.deleteUserConfirm')}</p>
             <div className="flex gap-3">
               <button 
                 onClick={() => setDeleteConfirmId(null)}
                 className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors"
               >
-                ביטול
+                {t('users.cancel')}
               </button>
               <button 
                 onClick={() => handleDeleteUser(deleteConfirmId)}
                 className="flex-1 px-4 py-2 bg-red-600 rounded-xl text-sm font-bold text-white hover:bg-red-700 transition-colors"
               >
-                מחק משתמש
+                {t('users.delete')}
               </button>
             </div>
           </div>

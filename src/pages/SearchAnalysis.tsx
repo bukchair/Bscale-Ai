@@ -25,17 +25,17 @@ export function SearchAnalysis() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('nav.searchAnalysis') || 'ניתוח חיפושים'}</h1>
-          <p className="text-sm text-gray-500 mt-1">נתח מונחי חיפוש ונהל מילות מפתח שליליות ב-Google Ads.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('nav.searchAnalysis')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('search.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors text-sm font-bold shadow-sm">
             <Filter className="w-4 h-4" />
-            סינונים
+            {t('search.filters')}
           </button>
           <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors text-sm font-bold shadow-sm">
             <Download className="w-4 h-4" />
-            ייצוא
+            {t('search.export')}
           </button>
         </div>
       </div>
@@ -48,35 +48,33 @@ export function SearchAnalysis() {
             <div className="w-10 h-10 bg-amber-400/20 rounded-xl flex items-center justify-center text-amber-300">
               <Zap className="w-5 h-5" />
             </div>
-            <h2 className="text-xl font-bold text-white">תובנות חיפוש מבוססות AI</h2>
+            <h2 className="text-xl font-bold text-white">{t('search.aiInsightsTitle')}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <p className="text-indigo-100 text-sm leading-relaxed">
-                המערכת ניתחה 1,432 מונחי חיפוש בערוצים הממומנים והאורגניים שלך. זיהינו <strong>₪440 בהוצאות מודעות מבוזבזות</strong> על מונחים לא רלוונטיים.
-              </p>
+              <p className="text-indigo-100 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: t('search.aiInsightsDesc') }} />
               <ul className="space-y-3">
                 <li className="flex items-start gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
                   <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-sm font-bold text-white block mb-1">מועמדים למילות מפתח שליליות</span>
-                    <span className="text-xs text-indigo-200">מונחים המכילים "חינם" או "זול" מביאים קליקים אך אפס המרות. הוספתם כשליליים תחסוך כ-₪200 בשבוע.</span>
+                    <span className="text-sm font-bold text-white block mb-1">{t('search.negativeCandidates')}</span>
+                    <span className="text-xs text-indigo-200">{t('search.negativeCandidatesDesc')}</span>
                   </div>
                 </li>
                 <li className="flex items-start gap-3 bg-white/5 p-3 rounded-xl border border-white/10">
                   <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="text-sm font-bold text-white block mb-1">הזדמנות SEO</span>
-                    <span className="text-xs text-indigo-200">ל-"איך להתחיל לרוץ" יש חשיפות אורגניות גבוהות (4.5k) אך CTR נמוך. בצע אופטימיזציה לתיאור המטא כדי ללכוד יותר תנועה.</span>
+                    <span className="text-sm font-bold text-white block mb-1">{t('search.seoOpportunity')}</span>
+                    <span className="text-xs text-indigo-200">{t('search.seoOpportunityDesc')}</span>
                   </div>
                 </li>
               </ul>
             </div>
             <div className="bg-black/20 rounded-xl p-6 border border-white/10 flex flex-col justify-center items-center text-center">
-              <p className="text-sm text-indigo-200 mb-2">חיסכון חודשי פוטנציאלי</p>
+              <p className="text-sm text-indigo-200 mb-2">{t('search.monthlySavings')}</p>
               <p className="text-4xl font-black text-emerald-400" dir="ltr">₪1,760</p>
               <button className="mt-6 px-6 py-2.5 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors text-sm w-full shadow-lg">
-                סקור והחל מילות מפתח שליליות
+                {t('search.reviewAndApply')}
               </button>
             </div>
           </div>
@@ -86,13 +84,13 @@ export function SearchAnalysis() {
       {/* Search Terms Table */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="text-lg font-bold text-gray-900">ביצועי מונחי חיפוש</h2>
+          <h2 className="text-lg font-bold text-gray-900">{t('search.performanceTitle')}</h2>
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button 
               onClick={() => setActiveTab('all')}
               className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
             >
-              כל המונחים
+              {t('search.allTerms')}
             </button>
             <button 
               onClick={() => setActiveTab('ads')}
@@ -104,13 +102,13 @@ export function SearchAnalysis() {
               onClick={() => setActiveTab('organic')}
               className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'organic' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
             >
-              אורגני (GSC)
+              {t('search.organicGsc')}
             </button>
             <button 
               onClick={() => setActiveTab('negative')}
               className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'negative' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
             >
-              מילות מפתח שליליות
+              {t('search.negativeKeywords')}
             </button>
           </div>
         </div>
@@ -118,9 +116,9 @@ export function SearchAnalysis() {
         {activeTab === 'negative' ? (
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-gray-900">ניהול מילות מפתח שליליות</h3>
+              <h3 className="text-lg font-bold text-gray-900">{t('search.manageNegatives')}</h3>
               <button className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-                הוסף מילה שלילית
+                {t('search.addNegative')}
               </button>
             </div>
             
@@ -128,11 +126,11 @@ export function SearchAnalysis() {
               <table className={cn("w-full text-sm", dir === 'rtl' ? "text-right" : "text-left")}>
                 <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-4 font-bold">מילה שלילית</th>
-                    <th className="px-6 py-4 font-bold">סוג התאמה</th>
-                    <th className="px-6 py-4 font-bold">קמפיין / קבוצה</th>
-                    <th className="px-6 py-4 font-bold">תאריך הוספה</th>
-                    <th className={cn("px-6 py-4 font-bold", dir === 'rtl' ? "text-left" : "text-right")}>פעולות</th>
+                    <th className="px-6 py-4 font-bold">{t('search.negativeKeyword')}</th>
+                    <th className="px-6 py-4 font-bold">{t('search.matchType')}</th>
+                    <th className="px-6 py-4 font-bold">{t('search.campaignGroup')}</th>
+                    <th className="px-6 py-4 font-bold">{t('search.addedDate')}</th>
+                    <th className={cn("px-6 py-4 font-bold", dir === 'rtl' ? "text-left" : "text-right")}>{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -148,7 +146,7 @@ export function SearchAnalysis() {
                       <td className="px-6 py-4 text-gray-500">{kw.addedDate}</td>
                       <td className={cn("px-6 py-4", dir === 'rtl' ? "text-left" : "text-right")}>
                         <button className="text-red-600 hover:text-red-800 font-bold text-sm">
-                          הסר
+                          {t('search.remove')}
                         </button>
                       </td>
                     </tr>
@@ -162,12 +160,12 @@ export function SearchAnalysis() {
             <table className={cn("w-full text-sm", dir === 'rtl' ? "text-right" : "text-left")}>
               <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 font-bold">מונח חיפוש</th>
-                  <th className="px-6 py-4 font-bold">מקור</th>
-                  <th className="px-6 py-4 font-bold">מדדים</th>
-                  <th className="px-6 py-4 font-bold">ביצועים</th>
-                  <th className="px-6 py-4 font-bold">סטטוס AI</th>
-                  <th className={cn("px-6 py-4 font-bold", dir === 'rtl' ? "text-left" : "text-right")}>פעולה</th>
+                  <th className="px-6 py-4 font-bold">{t('search.searchTerm')}</th>
+                  <th className="px-6 py-4 font-bold">{t('search.source')}</th>
+                  <th className="px-6 py-4 font-bold">{t('search.metrics')}</th>
+                  <th className="px-6 py-4 font-bold">{t('search.performance')}</th>
+                  <th className="px-6 py-4 font-bold">{t('search.aiStatus')}</th>
+                  <th className={cn("px-6 py-4 font-bold", dir === 'rtl' ? "text-left" : "text-right")}>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -190,13 +188,13 @@ export function SearchAnalysis() {
                     <td className="px-6 py-4">
                       {term.source === 'Google Ads' ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-gray-900 font-medium">{term.clicks} קליקים</span>
-                          <span className="text-gray-500 text-xs" dir="ltr">₪{term.cost} הוצאה</span>
+                          <span className="text-gray-900 font-medium">{term.clicks} {t('search.clicks')}</span>
+                          <span className="text-gray-500 text-xs" dir="ltr">₪{term.cost} {t('search.spend')}</span>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1">
-                          <span className="text-gray-900 font-medium">{term.impressions?.toLocaleString()} חשיפות</span>
-                          <span className="text-gray-500 text-xs">{term.clicks} קליקים</span>
+                          <span className="text-gray-900 font-medium">{term.impressions?.toLocaleString()} {t('search.impressions')}</span>
+                          <span className="text-gray-500 text-xs">{term.clicks} {t('search.clicks')}</span>
                         </div>
                       )}
                     </td>
@@ -204,12 +202,12 @@ export function SearchAnalysis() {
                       {term.source === 'Google Ads' ? (
                         <div className="flex flex-col gap-1">
                           <span className={cn("font-bold", term.roas > 0 ? "text-emerald-600" : "text-red-600")} dir="ltr">
-                            {term.roas > 0 ? `${term.roas}x ROAS` : '0 המרות'}
+                            {term.roas > 0 ? `${term.roas}x ROAS` : `0 ${t('search.conversions')}`}
                           </span>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1">
-                          <span className="text-gray-900 font-bold">מיקום: {term.position}</span>
+                          <span className="text-gray-900 font-bold">{t('search.position')}: {term.position}</span>
                         </div>
                       )}
                     </td>
@@ -225,21 +223,21 @@ export function SearchAnalysis() {
                         {term.status === 'negative_candidate' && <XCircle className="w-4 h-4" />}
                         {term.status === 'opportunity' && <TrendingUp className="w-4 h-4" />}
                         {(term.status === 'review' || term.status === 'improve') && <AlertTriangle className="w-4 h-4" />}
-                        {term.status === 'optimal' ? 'אופטימלי' :
-                         term.status === 'negative_candidate' ? 'מועמד לשלילי' :
-                         term.status === 'opportunity' ? 'הזדמנות' :
-                         term.status === 'review' ? 'לסקירה' :
-                         term.status === 'improve' ? 'לשיפור' : term.status}
+                        {term.status === 'optimal' ? t('search.statusOptimal') :
+                         term.status === 'negative_candidate' ? t('search.statusNegativeCandidate') :
+                         term.status === 'opportunity' ? t('search.statusOpportunity') :
+                         term.status === 'review' ? t('search.statusReview') :
+                         term.status === 'improve' ? t('search.statusImprove') : term.status}
                       </span>
                     </td>
                     <td className={cn("px-6 py-4", dir === 'rtl' ? "text-left" : "text-right")}>
                       {term.status === 'negative_candidate' ? (
                         <button className="text-red-600 hover:text-red-800 font-bold text-sm bg-red-50 px-3 py-1.5 rounded-lg transition-colors">
-                          הוסף כשלילי
+                          {t('search.addAsNegative')}
                         </button>
                       ) : (
                         <button className="text-indigo-600 hover:text-indigo-900 font-bold text-sm">
-                          צפה בפרטים
+                          {t('search.viewDetails')}
                         </button>
                       )}
                     </td>

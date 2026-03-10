@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
@@ -39,97 +40,118 @@ interface ConnectionsContextType {
 const initialConnections: Connection[] = [
   { 
     id: 'gemini', 
-    name: 'Google Gemini AI', 
+    name: 'integrations.platforms.gemini.name', 
     category: 'AI Engine', 
-    status: 'connected', 
-    score: 100,
-    description: 'The core AI engine powering recommendations, creative generation, and automated optimizations.' 
+    status: 'disconnected', 
+    description: 'integrations.platforms.gemini.desc' 
   },
   { 
     id: 'google', 
-    name: 'Google Ecosystem', 
+    name: 'integrations.platforms.google.name', 
     category: 'Google', 
-    status: 'connected', 
-    score: 85,
-    description: 'Connect all Google services at once. Includes Ads, Analytics 4, Search Console, and Gmail for reports.',
+    status: 'disconnected', 
+    description: 'integrations.platforms.google.desc',
     subConnections: [
-      { id: 'google_ads', name: 'Google Ads', status: 'connected', score: 90 },
-      { id: 'ga4', name: 'Google Analytics 4', status: 'connected', score: 85 },
-      { id: 'gsc', name: 'Search Console', status: 'connected', score: 80 },
-      { id: 'gmail', name: 'Gmail / Reports', status: 'connected', score: 85 },
+      { id: 'google_ads', name: 'Google Ads', status: 'disconnected' },
+      { id: 'ga4', name: 'Google Analytics 4', status: 'disconnected' },
+      { id: 'gsc', name: 'Search Console', status: 'disconnected' },
+      { id: 'gmail', name: 'Gmail / Reports', status: 'disconnected' },
     ]
   },
   { 
     id: 'meta', 
-    name: 'Meta (Ads, Pixel)', 
+    name: 'integrations.platforms.meta.name', 
     category: 'Social', 
-    status: 'connected', 
-    score: 92,
-    description: 'Manage Facebook and Instagram campaigns, sync audiences, and track pixel conversions.' 
+    status: 'disconnected', 
+    description: 'integrations.platforms.meta.desc' 
   },
   { 
     id: 'tiktok', 
-    name: 'TikTok Ads', 
+    name: 'integrations.platforms.tiktok.name', 
     category: 'Social', 
-    status: 'error',
-    description: 'Manage video campaigns on TikTok, track conversions and trends.' 
+    status: 'disconnected',
+    description: 'integrations.platforms.tiktok.desc' 
   },
   { 
     id: 'woocommerce', 
-    name: 'WooCommerce', 
+    name: 'integrations.platforms.woocommerce.name', 
     category: 'E-commerce', 
-    status: 'connected', 
-    score: 100,
-    description: 'Sync products, inventory, orders, and automatically update product descriptions and SEO.' 
+    status: 'disconnected', 
+    description: 'integrations.platforms.woocommerce.desc' 
   },
   { 
     id: 'shopify', 
-    name: 'Shopify', 
+    name: 'integrations.platforms.shopify.name', 
     category: 'E-commerce', 
     status: 'disconnected',
-    description: 'Connect your Shopify store to sync products, track sales, and optimize campaigns.' 
+    description: 'integrations.platforms.shopify.desc' 
   },
 ];
 
 const ConnectionsContext = createContext<ConnectionsContextType | undefined>(undefined);
 
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
-  const [connections, setConnections] = useState<Connection[]>(() => {
-    const saved = localStorage.getItem('connections');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved connections', e);
-      }
-    }
-    return initialConnections;
-  });
+  const [connections, setConnections] = useState<Connection[]>(initialConnections);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    localStorage.setItem('connections', JSON.stringify(connections));
-  }, [connections]);
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (user) {
+        const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
+        const unsubscribeSnapshot = onSnapshot(connectionsRef, (docSnap) => {
+          if (docSnap.exists()) {
+            setConnections(docSnap.data().items || initialConnections);
+          } else {
+            // Initialize with clean state if not exists
+            setDoc(connectionsRef, { items: initialConnections });
+            setConnections(initialConnections);
+          }
+          setIsLoading(false);
+        });
+        return () => unsubscribeSnapshot();
+      } else {
+        setConnections(initialConnections);
+        setIsLoading(false);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  const persistConnections = async (newConnections: Connection[]) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
+    try {
+      await setDoc(connectionsRef, { items: newConnections }, { merge: true });
+    } catch (err) {
+      console.error('Error persisting connections:', err);
+    }
+  };
 
   const toggleConnection = async (id: string, subId?: string) => {
-    setConnections(prev => prev.map(c => {
+    const newConnections = connections.map(c => {
       if (c.id === id) {
         if (subId && c.subConnections) {
           return {
             ...c,
             subConnections: c.subConnections.map(sc => 
-              sc.id === subId ? { ...sc, status: 'connecting' } : sc
+              sc.id === subId ? { ...sc, status: 'connecting' as ConnectionStatus } : sc
             )
           };
         }
-        return { ...c, status: 'connecting' };
+        return { ...c, status: 'connecting' as ConnectionStatus };
       }
       return c;
-    }));
+    });
+    
+    setConnections(newConnections);
     
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    setConnections(prev => prev.map(c => {
+    const finalConnections = connections.map(c => {
       if (c.id === id) {
         if (subId && c.subConnections) {
           const newSubConnections = c.subConnections.map(sc => {
@@ -137,21 +159,20 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
               const isSuccess = Math.random() > 0.2;
               return {
                 ...sc,
-                status: sc.status === 'connecting' ? (isSuccess ? 'connected' : 'error') : 'disconnected',
+                status: sc.status === 'connecting' ? (isSuccess ? 'connected' as ConnectionStatus : 'error' as ConnectionStatus) : 'disconnected' as ConnectionStatus,
                 score: isSuccess ? Math.floor(Math.random() * 20) + 80 : undefined
               };
             }
             return sc;
           });
           
-          // Update parent status based on sub-connections
-          const allConnected = newSubConnections.every(sc => sc.status === 'connected');
           const anyConnected = newSubConnections.some(sc => sc.status === 'connected');
+          const allConnected = newSubConnections.every(sc => sc.status === 'connected');
           
           return {
             ...c,
             subConnections: newSubConnections,
-            status: allConnected ? 'connected' : (anyConnected ? 'connected' : 'disconnected'),
+            status: allConnected ? 'connected' as ConnectionStatus : (anyConnected ? 'connected' as ConnectionStatus : 'disconnected' as ConnectionStatus),
             score: anyConnected ? Math.round(newSubConnections.filter(sc => sc.status === 'connected').reduce((acc, curr) => acc + (curr.score || 0), 0) / newSubConnections.filter(sc => sc.status === 'connected').length) : undefined
           };
         }
@@ -160,39 +181,47 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
           const isSuccess = Math.random() > 0.3;
           return { 
             ...c, 
-            status: isSuccess ? 'connected' : 'error',
+            status: isSuccess ? 'connected' as ConnectionStatus : 'error' as ConnectionStatus,
             score: isSuccess ? Math.floor(Math.random() * 20) + 80 : undefined
           };
         } else {
-          return { ...c, status: 'disconnected', score: undefined };
+          return { ...c, status: 'disconnected' as ConnectionStatus, score: undefined };
         }
       }
       return c;
-    }));
+    });
+
+    setConnections(finalConnections);
+    await persistConnections(finalConnections);
   };
 
   const updateConnectionSettings = async (id: string, settings: ConnectionSettings) => {
-    setConnections(prev => prev.map(c => {
+    const connectingConnections = connections.map(c => {
       if (c.id === id) {
-        return { ...c, status: 'connecting' };
+        return { ...c, status: 'connecting' as ConnectionStatus };
       }
       return c;
-    }));
+    });
+    
+    setConnections(connectingConnections);
     
     // Simulate API validation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    setConnections(prev => prev.map(c => {
+    const finalConnections = connections.map(c => {
       if (c.id === id) {
         return { 
           ...c, 
-          status: 'connected',
-          score: Math.floor(Math.random() * 10) + 90, // High score for valid settings
+          status: 'connected' as ConnectionStatus,
+          score: Math.floor(Math.random() * 10) + 90,
           settings: { ...c.settings, ...settings }
         };
       }
       return c;
-    }));
+    });
+
+    setConnections(finalConnections);
+    await persistConnections(finalConnections);
   };
 
   const testConnection = async (id: string): Promise<{ success: boolean; message: string }> => {
@@ -204,9 +233,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       const { storeUrl, wooKey, wooSecret } = connection.settings;
       try {
         await verifyWooCommerceConnection(storeUrl, wooKey, wooSecret);
-        setConnections(prev => prev.map(c => 
-          c.id === id ? { ...c, status: 'connected', score: 100 } : c
-        ));
+        const updatedConnections = connections.map(c => 
+          c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: 100 } : c
+        );
+        setConnections(updatedConnections);
+        await persistConnections(updatedConnections);
         return { 
           success: true, 
           message: `החיבור ל-WooCommerce אומת בהצלחה! הנתונים מסונכרנים.` 
@@ -225,9 +256,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const isSuccess = Math.random() > 0.1;
 
     if (isSuccess) {
-      setConnections(prev => prev.map(c => 
-        c.id === id ? { ...c, status: 'connected', score: Math.floor(Math.random() * 5) + 95 } : c
-      ));
+      const updatedConnections = connections.map(c => 
+        c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: Math.floor(Math.random() * 5) + 95 } : c
+      );
+      setConnections(updatedConnections);
+      await persistConnections(updatedConnections);
       return { 
         success: true, 
         message: `החיבור ל-${connection.name} אומת בהצלחה. נתוני API זמינים.` 

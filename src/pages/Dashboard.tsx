@@ -74,7 +74,7 @@ export function Dashboard() {
           <Zap className="w-5 h-5 text-amber-500" />
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.quickSmartActions')}</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickActions.map((action) => (
             <button key={action.id} className="bg-white dark:bg-[#111] p-5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all flex items-start gap-4 text-start group relative overflow-hidden">
               <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -110,7 +110,7 @@ export function Dashboard() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase tracking-wider">{t('dashboard.wooCommerceRevenue')}</p>
@@ -226,7 +226,7 @@ export function Dashboard() {
           
           <div className="h-72 mt-6">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
@@ -271,7 +271,7 @@ export function Dashboard() {
           </button>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
             <MousePointerClick className="w-6 h-6 text-blue-500 dark:text-blue-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
             <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">3,842</p>

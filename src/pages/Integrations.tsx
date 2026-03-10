@@ -3,6 +3,7 @@ import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, V
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const iconMap: Record<string, React.ElementType> = {
   'gemini': Sparkles,
@@ -23,6 +24,7 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 };
 
 export function Integrations() {
+  const { t, dir } = useLanguage();
   const { connections, toggleConnection, updateConnectionSettings, testConnection } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -32,6 +34,119 @@ export function Integrations() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const handleTikTokConnect = async () => {
+    try {
+      const response = await fetch('/api/auth/tiktok/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        url,
+        'tiktok_auth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (err) {
+      console.error("Failed to get TikTok auth URL:", err);
+      setToast({ message: "Failed to start TikTok authentication", type: 'error' });
+    }
+  };
+
+  const handleMetaConnect = async () => {
+    try {
+      const response = await fetch('/api/auth/meta/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        url,
+        'meta_auth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (err) {
+      console.error("Failed to get Meta auth URL:", err);
+      setToast({ message: "Failed to start Meta authentication", type: 'error' });
+    }
+  };
+
+  const handleGoogleConnect = async () => {
+    try {
+      const response = await fetch('/api/auth/google/url');
+      if (!response.ok) throw new Error('Failed to get auth URL');
+      const { url } = await response.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      window.open(
+        url,
+        'google_auth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (err) {
+      console.error("Failed to get Google auth URL:", err);
+      setToast({ message: "Failed to start Google authentication", type: 'error' });
+    }
+  };
+
+  React.useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Simple origin check for development and production
+      const isAllowedOrigin = event.origin.includes(window.location.hostname) || 
+                             event.origin.includes('localhost') ||
+                             event.origin.includes('.run.app');
+      
+      if (!isAllowedOrigin) return;
+
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'tiktok') {
+        const { data } = event.data;
+        // Update connection settings with the new token
+        handleSave('tiktok', { 
+          tiktokToken: data.access_token,
+        });
+        setToast({ message: "Successfully connected to TikTok Ads!", type: 'success' });
+      }
+
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'meta') {
+        const { data } = event.data;
+        // Update connection settings with the new token
+        handleSave('meta', { 
+          metaToken: data.access_token,
+        });
+        setToast({ message: "Successfully connected to Meta Ads!", type: 'success' });
+      }
+
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'google') {
+        const { tokens } = event.data;
+        // Update connection settings with the new tokens
+        handleSave('google', { 
+          googleAccessToken: tokens.access_token,
+          googleRefreshToken: tokens.refresh_token || '',
+          googleExpiry: (Date.now() + tokens.expires_in * 1000).toString(),
+        });
+        setToast({ message: "Successfully connected to Google Workspace!", type: 'success' });
+      }
+
+      if (event.data?.type === 'OAUTH_AUTH_ERROR') {
+        setToast({ message: event.data.error || "TikTok authentication failed", type: 'error' });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [formValues]);
 
   const handleExpand = (integration: Connection) => {
     if (expandedId === integration.id) {
@@ -47,17 +162,18 @@ export function Integrations() {
     setFormValues(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async (id: string) => {
+  const handleSave = async (id: string, overrideSettings?: Record<string, string>) => {
     setError(null);
     setSuccess(null);
+    const settingsToSave = overrideSettings || formValues;
     try {
       // Show a more realistic verification process
-      await updateConnectionSettings(id, formValues);
+      await updateConnectionSettings(id, settingsToSave);
       setExpandedId(null);
-      setSuccess(`החיבור ל-${connections.find(c => c.id === id)?.name} בוצע בהצלחה!`);
+      setSuccess(t('integrations.success', { name: connections.find(c => c.id === id)?.name || '' }));
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
-      setError({ id, message: 'מפתח ה-API או הפרטים שהוזנו אינם תקינים. אנא בדוק שוב.' });
+      setError({ id, message: t('integrations.error', { name: connections.find(c => c.id === id)?.name || '' }) });
     }
   };
 
@@ -80,8 +196,8 @@ export function Integrations() {
         setTimeout(() => setToast(null), 5000);
       }
     } catch (err) {
-      setError({ id, message: 'אירעה שגיאה במהלך בדיקת החיבור.' });
-      setToast({ message: 'אירעה שגיאה במהלך בדיקת החיבור.', type: 'error' });
+      setError({ id, message: t('common.error') });
+      setToast({ message: t('common.error'), type: 'error' });
       setTimeout(() => setToast(null), 5000);
     } finally {
       setTestingId(null);
@@ -93,7 +209,7 @@ export function Integrations() {
     try {
       await toggleConnection(id, subId);
     } catch (err) {
-      setError({ id, message: 'אירעה שגיאה לא צפויה במהלך ההתחברות.' });
+      setError({ id, message: t('common.error') });
     }
   };
 
@@ -112,7 +228,7 @@ export function Integrations() {
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
               <Settings2 className="w-4 h-4 text-gray-400" />
-              הגדרות חיבור - {integration.name}
+              {t('integrations.connectionSettings')} - {t(integration.name)}
             </h4>
             <button 
               onClick={() => setExpandedId(null)}
@@ -129,7 +245,7 @@ export function Integrations() {
               {integration.id === 'gemini' && (
                 <>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">API Key</label>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.apiKey')}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                         <Key className="h-3.5 w-3.5 text-gray-400" />
@@ -138,10 +254,10 @@ export function Integrations() {
                     </div>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">מודל ברירת מחדל</label>
-                    <select className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-xs" value={formValues.model || "Gemini 1.5 Pro (מומלץ)"} onChange={(e) => handleInputChange('model', e.target.value)}>
-                      <option>Gemini 1.5 Pro (מומלץ)</option>
-                      <option>Gemini 1.5 Flash (מהיר)</option>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.defaultModel')}</label>
+                    <select className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-xs" value={formValues.model || "Gemini 1.5 Pro"} onChange={(e) => handleInputChange('model', e.target.value)}>
+                      <option>Gemini 1.5 Pro</option>
+                      <option>Gemini 1.5 Flash</option>
                     </select>
                   </div>
                 </>
@@ -149,67 +265,110 @@ export function Integrations() {
 
               {integration.id === 'google' && (
                 <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Ads Account ID</label>
-                    <input type="text" placeholder="123-456-7890" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.adsId || (isConnected ? "987-654-3210" : "")} onChange={(e) => handleInputChange('adsId', e.target.value)} />
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={handleGoogleConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Megaphone className="w-4 h-4" />
+                      {isConnected ? "Reconnect Google Workspace" : "Connect with Google"}
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">GA4 Measurement ID</label>
-                    <input type="text" placeholder="G-XXXXXXXXXX" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4Id || (isConnected ? "G-A1B2C3D4E5" : "")} onChange={(e) => handleInputChange('ga4Id', e.target.value)} />
-                  </div>
+                  {isConnected && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adsAccountId')}</label>
+                        <input type="text" placeholder="123-456-7890" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.googleAdsId || ""} onChange={(e) => handleInputChange('googleAdsId', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4MeasurementId')}</label>
+                        <input type="text" placeholder="G-XXXXXXXXXX" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4Id || ""} onChange={(e) => handleInputChange('ga4Id', e.target.value)} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Google Access Token</label>
+                        <input type="password" placeholder="ya29..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.googleAccessToken || ""} readOnly />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
               {integration.id === 'meta' && (
                 <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Business ID</label>
-                    <input type="text" placeholder="123456789012345" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.bmId || (isConnected ? "109876543210987" : "")} onChange={(e) => handleInputChange('bmId', e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Pixel ID</label>
-                    <input type="text" placeholder="987654321098765" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.pixelId || (isConnected ? "567890123456789" : "")} onChange={(e) => handleInputChange('pixelId', e.target.value)} />
-                  </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Access Token</label>
-                    <input type="password" placeholder="EAAB..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.metaToken || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('metaToken', e.target.value)} />
+                    <button
+                      onClick={handleMetaConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Facebook className="w-4 h-4" />
+                      {isConnected ? "Reconnect Meta Ads" : "Connect with Meta Ads"}
+                    </button>
                   </div>
+                  {isConnected && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adsAccountId')}</label>
+                        <input type="text" placeholder="act_123456789" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.metaAdsId || ""} onChange={(e) => handleInputChange('metaAdsId', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.pixelId')}</label>
+                        <input type="text" placeholder="1234567890" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.pixelId || ""} onChange={(e) => handleInputChange('pixelId', e.target.value)} />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.accessToken')}</label>
+                        <input type="password" placeholder="EAAB..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.metaToken || ""} readOnly />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
               {integration.id === 'tiktok' && (
                 <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Advertiser ID</label>
-                    <input type="text" placeholder="7012345678901234567" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.tiktokAdvertiserId || (isConnected ? "7123456789012345678" : "")} onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)} />
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={handleTikTokConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg font-bold hover:bg-gray-900 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Video className="w-4 h-4" />
+                      {isConnected ? "Reconnect TikTok Ads" : "Connect with TikTok Ads"}
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Access Token</label>
-                    <input type="password" placeholder="act_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.tiktokToken || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('tiktokToken', e.target.value)} />
-                  </div>
+                  {isConnected && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
+                        <input type="text" placeholder="7012345678901234567" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.tiktokAdvertiserId || ""} onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.accessToken')}</label>
+                        <input type="password" placeholder="act_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.tiktokToken || ""} readOnly />
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
               {(integration.id === 'woocommerce' || integration.id === 'shopify') && (
                 <>
                   <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">כתובת החנות (URL)</label>
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.storeUrl')}</label>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <div className={cn("absolute inset-y-0 flex items-center pointer-events-none", dir === 'rtl' ? "right-2.5" : "left-2.5")}>
                         <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
                       </div>
-                      <input type="url" placeholder="https://mystore.co.il" className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.storeUrl || (isConnected ? "https://mystore.co.il" : "")} onChange={(e) => handleInputChange('storeUrl', e.target.value)} />
+                      <input type="url" placeholder="https://mystore.co.il" className={cn("w-full py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left", dir === 'rtl' ? "pr-9 pl-3" : "pl-9 pr-3")} dir="ltr" value={formValues.storeUrl || (isConnected ? "https://mystore.co.il" : "")} onChange={(e) => handleInputChange('storeUrl', e.target.value)} />
                     </div>
                   </div>
                   
                   {integration.id === 'woocommerce' && (
                     <>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Consumer Key</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.consumerKey')}</label>
                         <input type="text" placeholder="ck_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.wooKey || (isConnected ? "ck_1234567890" : "")} onChange={(e) => handleInputChange('wooKey', e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Consumer Secret</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.consumerSecret')}</label>
                         <input type="password" placeholder="cs_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.wooSecret || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('wooSecret', e.target.value)} />
                       </div>
                     </>
@@ -217,7 +376,7 @@ export function Integrations() {
 
                   {integration.id === 'shopify' && (
                     <div className="sm:col-span-2">
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Admin API Access Token</label>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adminAccessToken')}</label>
                       <input type="password" placeholder="shpat_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.shopifyToken || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('shopifyToken', e.target.value)} />
                     </div>
                   )}
@@ -233,7 +392,7 @@ export function Integrations() {
                   className="flex-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plug className="w-3.5 h-3.5" />}
-                  שמור והתחבר
+                  {t('integrations.saveAndConnect')}
                 </button>
               ) : (
                 <>
@@ -243,7 +402,7 @@ export function Integrations() {
                     className="flex-1 bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                    עדכן הגדרות
+                    {t('integrations.updateSettings')}
                   </button>
                   <button
                     onClick={() => handleTest(integration.id)}
@@ -251,7 +410,7 @@ export function Integrations() {
                     className="flex-1 bg-indigo-50 text-indigo-600 px-3 py-2 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {testingId === integration.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                    בדיקת חיבור
+                    {t('integrations.testConnection')}
                   </button>
                   <button
                     onClick={() => {
@@ -262,7 +421,7 @@ export function Integrations() {
                     className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    נתק
+                    {t('integrations.disconnect')}
                   </button>
                 </>
               )}
@@ -273,50 +432,50 @@ export function Integrations() {
             <div className="bg-amber-50 rounded-lg p-3 border border-amber-100 h-full">
               <h5 className="font-bold text-amber-900 mb-2 text-[10px] flex items-center gap-1.5 uppercase tracking-tight">
                 <HelpCircle className="w-3 h-3 text-amber-600" />
-                מדריך מהיר
+                {t('integrations.quickGuide')}
               </h5>
               
               <div className="text-[10px] text-amber-800/80 leading-tight">
                 {integration.id === 'gemini' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>כנס ל-<a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline">AI Studio</a></li>
-                    <li>צור <strong>API Key</strong></li>
-                    <li>הדבק בשדה משמאל</li>
+                    <li>{t('integrations.gemini.step1')} <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline">AI Studio</a></li>
+                    <li>{t('integrations.gemini.step2')}</li>
+                    <li>{t('integrations.gemini.step3')}</li>
                   </ul>
                 )}
                 {integration.id === 'google' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>מזהה Ads (10 ספרות)</li>
-                    <li>Measurement ID מ-GA4</li>
-                    <li>לחץ שמור לסיום</li>
+                    <li>{t('integrations.google.step1')}</li>
+                    <li>{t('integrations.google.step2')}</li>
+                    <li>{t('integrations.google.step3')}</li>
                   </ul>
                 )}
                 {integration.id === 'meta' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>צור <strong>System User</strong></li>
-                    <li>הקצה הרשאות לנכסים</li>
-                    <li>הפק <strong>Access Token</strong></li>
+                    <li>{t('integrations.meta.step1')}</li>
+                    <li>{t('integrations.meta.step2')}</li>
+                    <li>{t('integrations.meta.step3')}</li>
                   </ul>
                 )}
                 {integration.id === 'tiktok' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>כנס ל-Developer Portal</li>
-                    <li>צור אפליקציה ואשר</li>
-                    <li>העתק Token ו-ID</li>
+                    <li>{t('integrations.tiktok.step1')}</li>
+                    <li>{t('integrations.tiktok.step2')}</li>
+                    <li>{t('integrations.tiktok.step3')}</li>
                   </ul>
                 )}
                 {integration.id === 'woocommerce' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>Settings &gt; REST API</li>
-                    <li>צור Key (Read/Write)</li>
-                    <li>העתק מפתחות לכאן</li>
+                    <li>{t('integrations.woo.step1')}</li>
+                    <li>{t('integrations.woo.step2')}</li>
+                    <li>{t('integrations.woo.step3')}</li>
                   </ul>
                 )}
                 {integration.id === 'shopify' && (
                   <ul className="space-y-1.5 list-disc list-inside">
-                    <li>Settings &gt; Develop apps</li>
-                    <li>צור אפליקציה והתקן</li>
-                    <li>העתק <strong>Admin Token</strong></li>
+                    <li>{t('integrations.shopify.step1')}</li>
+                    <li>{t('integrations.shopify.step2')}</li>
+                    <li>{t('integrations.shopify.step3')}</li>
                   </ul>
                 )}
               </div>
@@ -357,22 +516,22 @@ export function Integrations() {
                 <Icon className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-[13px] font-bold text-gray-900 truncate tracking-tight">{integration.name}</h3>
+                <h3 className="text-[13px] font-bold text-gray-900 truncate tracking-tight">{t(integration.name)}</h3>
                 <div className="flex items-center gap-1.5">
                   {isConnected ? (
                     <span className="flex items-center text-[9px] font-bold text-emerald-600 uppercase tracking-tighter">
-                      <CheckCircle2 className="w-2.5 h-2.5 ml-0.5" /> מחובר
+                      <CheckCircle2 className={cn("w-2.5 h-2.5", dir === 'rtl' ? "ml-0.5" : "mr-0.5")} /> {t('integrations.connected')}
                     </span>
                   ) : isConnecting ? (
                     <span className="flex items-center text-[9px] font-bold text-blue-600 uppercase tracking-tighter">
-                      <Loader2 className="w-2.5 h-2.5 ml-0.5 animate-spin" /> מתחבר
+                      <Loader2 className={cn("w-2.5 h-2.5 animate-spin", dir === 'rtl' ? "ml-0.5" : "mr-0.5")} /> {t('integrations.connecting')}
                     </span>
                   ) : hasError ? (
                     <span className="flex items-center text-[9px] font-bold text-red-600 uppercase tracking-tighter">
-                      <AlertCircle className="w-2.5 h-2.5 ml-0.5" /> שגיאה
+                      <AlertCircle className={cn("w-2.5 h-2.5", dir === 'rtl' ? "ml-0.5" : "mr-0.5")} /> {t('integrations.errorStatus')}
                     </span>
                   ) : (
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">לא מחובר</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{t('integrations.disconnected')}</span>
                   )}
                 </div>
               </div>
@@ -419,7 +578,7 @@ export function Integrations() {
           <AnimatePresence>
             {isExpanded && (
               <div className="mt-2.5 pt-2.5 border-t border-gray-100">
-                <p className="text-[10px] text-gray-500 mb-2.5 leading-tight italic">{integration.description}</p>
+                <p className="text-[10px] text-gray-500 mb-2.5 leading-tight italic">{t(integration.description)}</p>
                 {renderIntegrationSettings(integration)}
               </div>
             )}
@@ -442,8 +601,8 @@ export function Integrations() {
             <Plug className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-lg font-black text-gray-900 leading-tight">חיבורים ואינטגרציות</h1>
-            <p className="text-[11px] text-gray-500 font-medium">נהל את החיבורים לפלטפורמות הפרסום והאנליטיקה שלך.</p>
+            <h1 className="text-lg font-black text-gray-900 leading-tight">{t('integrations.title')}</h1>
+            <p className="text-[11px] text-gray-500 font-medium">{t('integrations.subtitle')}</p>
           </div>
         </div>
         <button 
@@ -454,7 +613,7 @@ export function Integrations() {
           className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" />
-          בדוק את כל החיבורים
+          {t('integrations.testAll')}
         </button>
       </div>
       
@@ -479,7 +638,7 @@ export function Integrations() {
       {success && (
         <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-start justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500 ml-3" />
+            <CheckCircle2 className={cn("h-5 w-5 text-emerald-500", dir === 'rtl' ? "ml-3" : "mr-3")} />
             <p className="text-sm font-bold text-emerald-800">{success}</p>
           </div>
           <button onClick={() => setSuccess(null)} className="text-emerald-500 hover:text-emerald-700 p-1 hover:bg-emerald-100 rounded-lg transition-colors">
@@ -491,9 +650,9 @@ export function Integrations() {
       {error && (
         <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-start justify-between shadow-sm animate-in fade-in">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-500 ml-3" />
+            <AlertCircle className={cn("h-5 w-5 text-red-500", dir === 'rtl' ? "ml-3" : "mr-3")} />
             <div>
-              <h3 className="text-sm font-bold text-red-800">שגיאת התחברות ({connections.find(i => i.id === error.id)?.name})</h3>
+              <h3 className="text-sm font-bold text-red-800">{t('integrations.error', { name: connections.find(i => i.id === error.id)?.name || '' })}</h3>
               <p className="text-sm text-red-700 mt-1">{error.message}</p>
             </div>
           </div>
@@ -508,7 +667,7 @@ export function Integrations() {
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">AI Engine</h2>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">{t('integrations.aiEngine')}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {aiConnections.map(renderConnectionCard)}
@@ -520,7 +679,7 @@ export function Integrations() {
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Google Workspace</h2>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">{t('integrations.googleWorkspace')}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {googleConnections.map(renderConnectionCard)}
@@ -532,7 +691,7 @@ export function Integrations() {
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Social Media</h2>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">{t('integrations.socialMedia')}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {socialConnections.map(renderConnectionCard)}
@@ -544,7 +703,7 @@ export function Integrations() {
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-1 h-4 bg-indigo-600 rounded-full" />
-              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">E-commerce</h2>
+              <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">{t('integrations.ecommerce')}</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {ecommerceConnections.map(renderConnectionCard)}

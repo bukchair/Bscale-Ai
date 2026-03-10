@@ -21,9 +21,9 @@ const mockRecommendations: Recommendation[] = [
     id: '1',
     platform: 'cross',
     type: 'budget',
-    title: 'הקצאה מחדש של תקציב: מ-TikTok לריטרגטינג ב-Meta',
-    description: 'קמפיינים ב-TikTok מביאים תנועה רבה בראש המשפך אך עם מעט המרות. העברת 500₪ ביום לריטרגטינג ב-Meta תלכוד כוונת רכישה זו.',
-    impact: '+18% ROAS כולל',
+    title: 'ai.recs.budgetReallocation.title',
+    description: 'ai.recs.budgetReallocation.desc',
+    impact: '+18% ROAS',
     difficulty: 'easy',
     status: 'pending'
   },
@@ -31,9 +31,9 @@ const mockRecommendations: Recommendation[] = [
     id: '2',
     platform: 'google',
     type: 'bid',
-    title: 'הגדלת תקרת הצעות מחיר למילות מפתח מותג',
-    description: 'מתחרים עוקפים אותך בהצעות מחיר על מונחי מותג בהתאמה מדויקת. הגדלת ה-tCPA ב-15% בקמפיין "הגנת מותג" תשחזר את נתח החשיפות.',
-    impact: '+25% נפח המרות',
+    title: 'ai.recs.brandBid.title',
+    description: 'ai.recs.brandBid.desc',
+    impact: '+25% Conv. Vol',
     difficulty: 'easy',
     status: 'pending'
   },
@@ -41,8 +41,8 @@ const mockRecommendations: Recommendation[] = [
     id: '3',
     platform: 'meta',
     type: 'creative',
-    title: 'רענון קריאייטיב: "קולקציית אביב"',
-    description: 'זוהתה עייפות מודעות. ה-CTR ירד ב-32% ב-7 הימים האחרונים. צור וריאציות חדשות באמצעות מעבדת הקריאייטיב.',
+    title: 'ai.recs.creativeRefresh.title',
+    description: 'ai.recs.creativeRefresh.desc',
     impact: '-20% CPA',
     difficulty: 'medium',
     status: 'pending'
@@ -51,9 +51,9 @@ const mockRecommendations: Recommendation[] = [
     id: '4',
     platform: 'tiktok',
     type: 'targeting',
-    title: 'שינוי יעד ליצירת לידים',
-    description: 'קמפיינים למכירות ישירות ב-TikTok מציגים ביצועים חלשים (ROAS 1.2x). עבור ליצירת לידים כדי לאסוף אימיילים למשפך קבלת הפנים.',
-    impact: '-40% עלות לליד',
+    title: 'ai.recs.leadGen.title',
+    description: 'ai.recs.leadGen.desc',
+    impact: '-40% CPL',
     difficulty: 'medium',
     status: 'pending'
   }
@@ -97,7 +97,7 @@ export function AIRecommendations() {
       const newRecs = await generateAIRecommendations(geminiApiKey, context);
       setRecs(newRecs.map((r: any) => ({ ...r, status: 'pending' })));
     } catch (err) {
-      setError('אירעה שגיאה בטעינת המלצות מה-AI. וודא שמפתח ה-API תקין.');
+      setError(t('ai.errorLoading'));
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -121,8 +121,8 @@ export function AIRecommendations() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('nav.aiRecommendations') || 'המלצות AI'}</h1>
-          <p className="text-sm text-gray-500 mt-1">ניתוח חוצה פלטפורמות והצעות אופטימיזציה מבוססות בינה מלאכותית.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('nav.aiRecommendations')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('ai.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {geminiApiKey && (
@@ -132,12 +132,12 @@ export function AIRecommendations() {
               className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              רענן המלצות
+              {t('ai.refresh')}
             </button>
           )}
           <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
             <Zap className="w-4 h-4" />
-            החל את כל הניצחונות המהירים
+            {t('ai.applyAll')}
           </button>
         </div>
       </div>
@@ -157,13 +157,10 @@ export function AIRecommendations() {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-4">
             <Lightbulb className="w-6 h-6 text-amber-300" />
-            <h2 className="text-xl font-bold">ניתוח ביצועי AI</h2>
+            <h2 className="text-xl font-bold">{t('ai.analysisTitle')}</h2>
           </div>
           <p className="text-indigo-100 leading-relaxed mb-6 max-w-3xl">
-            בהתבסס על נתוני 30 הימים האחרונים ב-Google, Meta ו-TikTok, זיהינו מגמות מפתח: 
-            <strong className="text-white font-semibold"> Meta מביאה 40% מהתנועה בראש המשפך</strong>, אך 
-            <strong className="text-white font-semibold"> רשת החיפוש של Google לוכדת 65% מההמרות הסופיות</strong>. 
-            ל-TikTok יש את ה-CPA הנמוך ביותר למודעות למותג אך היא מתקשה במכירות ישירות.
+            {t('ai.analysisSummary')}
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -174,7 +171,7 @@ export function AIRecommendations() {
               </div>
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-xs text-indigo-200">ROAS ממוצע</p>
+                  <p className="text-xs text-indigo-200">{t('profitability.avgRoas')}</p>
                   <p className="text-xl font-bold text-emerald-400" dir="ltr">3.2x</p>
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
@@ -191,7 +188,7 @@ export function AIRecommendations() {
               </div>
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-xs text-indigo-200">ROAS ממוצע</p>
+                  <p className="text-xs text-indigo-200">{t('profitability.avgRoas')}</p>
                   <p className="text-xl font-bold text-emerald-400" dir="ltr">2.1x</p>
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
@@ -208,7 +205,7 @@ export function AIRecommendations() {
               </div>
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-xs text-indigo-200">ROAS ממוצע</p>
+                  <p className="text-xs text-indigo-200">{t('profitability.avgRoas')}</p>
                   <p className="text-xl font-bold text-amber-400" dir="ltr">1.2x</p>
                 </div>
                 <div className={dir === 'rtl' ? 'text-left' : 'text-right'}>
@@ -224,7 +221,7 @@ export function AIRecommendations() {
       {/* Recommendations List */}
       <div>
         <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          שיפורים מוצעים
+          {t('ai.proposedImprovements')}
           <span className="bg-indigo-100 text-indigo-700 text-xs py-0.5 px-2 rounded-full font-bold">
             {pendingRecs.length}
           </span>
@@ -244,35 +241,35 @@ export function AIRecommendations() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-base font-bold text-gray-900">{rec.title}</h4>
+                        <h4 className="text-base font-bold text-gray-900">{t(rec.title)}</h4>
                         <span className={cn(
                           "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full",
                           rec.difficulty === 'easy' ? "bg-emerald-100 text-emerald-700" :
                           rec.difficulty === 'medium' ? "bg-amber-100 text-amber-700" :
                           "bg-red-100 text-red-700"
                         )}>
-                          {rec.difficulty === 'easy' ? 'קל' : rec.difficulty === 'medium' ? 'בינוני' : 'קשה'}
+                          {rec.difficulty === 'easy' ? t('common.easy') : rec.difficulty === 'medium' ? t('common.medium') : t('common.hard')}
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 mb-3 max-w-3xl leading-relaxed">
-                        {rec.description}
+                        {t(rec.description)}
                       </p>
                       <div className="flex items-center gap-2 text-sm font-bold text-emerald-600 bg-emerald-50 w-fit px-2.5 py-1 rounded-md">
                         <TrendingUp className="w-4 h-4" />
-                        השפעה צפויה: <span dir="ltr">{rec.impact}</span>
+                        {t('ai.expectedImpact')}: <span dir="ltr">{rec.impact}</span>
                       </div>
                     </div>
                   </div>
                   
                   <div className="flex items-center gap-2 shrink-0 md:self-center mt-4 md:mt-0">
                     <button className="px-4 py-2 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
-                      התעלם
+                      {t('common.dismiss')}
                     </button>
                     <button 
                       onClick={() => handleApply(rec.id)}
                       className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors flex items-center gap-2"
                     >
-                      החל עכשיו
+                      {t('common.applyNow')}
                       {dir === 'rtl' ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
                     </button>
                   </div>
@@ -286,15 +283,15 @@ export function AIRecommendations() {
       {/* Applied History */}
       {appliedRecs.length > 0 && (
         <div className="pt-6">
-          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">הוחלו לאחרונה</h3>
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">{t('ai.recentlyApplied')}</h3>
           <div className="space-y-3">
             {appliedRecs.map((rec) => (
               <div key={rec.id} className="bg-gray-50 rounded-xl border border-gray-200 p-4 flex items-center justify-between opacity-75">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                   <div>
-                    <p className="text-sm font-bold text-gray-900 line-through decoration-gray-400">{rec.title}</p>
-                    <p className="text-xs text-gray-500">הוחל בהצלחה</p>
+                    <p className="text-sm font-bold text-gray-900 line-through decoration-gray-400">{t(rec.title)}</p>
+                    <p className="text-xs text-gray-500">{t('ai.appliedSuccessfully')}</p>
                   </div>
                 </div>
                 <span className="text-xs font-bold text-gray-500 bg-gray-200 px-2 py-1 rounded" dir="ltr">
