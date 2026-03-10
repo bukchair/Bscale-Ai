@@ -80,14 +80,22 @@ export function Integrations() {
   };
 
   const handleGoogleConnect = async () => {
-    console.log("Connecting to Google...");
     try {
       const response = await fetch('/api/auth/google/url');
-      console.log("Response status:", response.status);
-      if (!response.ok) throw new Error('Failed to get auth URL');
-      const text = await response.text();
-      console.log("Response text:", text);
-      const { url } = JSON.parse(text);
+      
+      // Log the full response for debugging
+      const responseText = await response.text();
+      console.log("Google Auth URL Response:", {
+        status: response.status,
+        ok: response.ok,
+        body: responseText
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get auth URL: ${response.status} ${responseText}`);
+      }
+      
+      const { url } = JSON.parse(responseText);
       
       const width = 600;
       const height = 700;
@@ -101,7 +109,7 @@ export function Integrations() {
       );
     } catch (err) {
       console.error("Failed to get Google auth URL:", err);
-      setToast({ message: "Failed to start Google authentication", type: 'error' });
+      setToast({ message: `Failed to start Google authentication: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
     }
   };
 

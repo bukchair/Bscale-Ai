@@ -15,10 +15,6 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   // API routes FIRST
-  app.use((req, res, next) => {
-    console.log(`Request: ${req.method} ${req.url}`);
-    next();
-  });
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
@@ -330,10 +326,8 @@ async function startServer() {
     }
   });
 
-  app.get("/api/auth/google/url", (req, res) => {
-    console.log("Google auth URL requested");
+  app.get(["/api/auth/google/url", "/api/auth/google/url/"], (req, res) => {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
-    console.log("Redirect URI:", redirectUri);
     const scopes = [
       "https://www.googleapis.com/auth/adwords",
       "https://www.googleapis.com/auth/analytics.readonly",
@@ -344,7 +338,6 @@ async function startServer() {
     ];
 
     if (!process.env.GOOGLE_CLIENT_ID) {
-      console.error("GOOGLE_CLIENT_ID is missing");
       return res.status(500).json({ message: "Google Client ID not configured" });
     }
 
