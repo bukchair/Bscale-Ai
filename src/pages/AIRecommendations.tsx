@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Lightbulb, TrendingUp, AlertTriangle, ArrowRight, ArrowLeft, CheckCircle2, BarChart2, Facebook, Video, Megaphone, Zap } from 'lucide-react';
+import { useConnections } from '../contexts/ConnectionsContext';
+import { generateAIRecommendations } from '../services/geminiService';
+import { Lightbulb, TrendingUp, AlertTriangle, ArrowRight, ArrowLeft, CheckCircle2, BarChart2, Facebook, Video, Megaphone, Zap, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface Recommendation {
@@ -73,7 +75,40 @@ const platformColors = {
 
 export function AIRecommendations() {
   const { t, dir } = useLanguage();
+  const { connections } = useConnections();
   const [recs, setRecs] = useState<Recommendation[]>(mockRecommendations);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const geminiConnection = connections.find(c => c.id === 'gemini');
+  const geminiApiKey = geminiConnection?.settings?.apiKey;
+
+  const fetchRealRecommendations = async () => {
+    if (!geminiApiKey) return;
+    
+    setIsLoading(true);
+    setError(null);
+    try {
+      const context = `
+        Current connected platforms: ${connections.filter(c => c.status === 'connected').map(c => c.name).join(', ')}.
+        Overall quality score: ${connections.reduce((acc, c) => acc + (c.score || 0), 0) / connections.length}.
+        The user is looking for ways to optimize their marketing spend and increase ROAS.
+      `;
+      const newRecs = await generateAIRecommendations(geminiApiKey, context);
+      setRecs(newRecs.map((r: any) => ({ ...r, status: 'pending' })));
+    } catch (err) {
+      setError('אירעה שגיאה בטעינת המלצות מה-AI. וודא שמפתח ה-API תקין.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (geminiApiKey && recs === mockRecommendations) {
+      fetchRealRecommendations();
+    }
+  }, [geminiApiKey]);
 
   const handleApply = (id: string) => {
     setRecs(recs.map(r => r.id === id ? { ...r, status: 'applied' } : r));
@@ -89,11 +124,30 @@ export function AIRecommendations() {
           <h1 className="text-2xl font-bold text-gray-900">{t('nav.aiRecommendations') || 'המלצות AI'}</h1>
           <p className="text-sm text-gray-500 mt-1">ניתוח חוצה פלטפורמות והצעות אופטימיזציה מבוססות בינה מלאכותית.</p>
         </div>
-        <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
-          <Zap className="w-4 h-4" />
-          החל את כל הניצחונות המהירים
-        </button>
+        <div className="flex items-center gap-2">
+          {geminiApiKey && (
+            <button 
+              onClick={fetchRealRecommendations}
+              disabled={isLoading}
+              className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              רענן המלצות
+            </button>
+          )}
+          <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
+            <Zap className="w-4 h-4" />
+            החל את כל הניצחונות המהירים
+          </button>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          {error}
+        </div>
+      )}
 
       {/* Cross-Platform Analysis Summary */}
       <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl shadow-lg p-6 text-white relative overflow-hidden">

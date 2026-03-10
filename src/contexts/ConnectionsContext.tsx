@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
 
@@ -91,7 +91,21 @@ const initialConnections: Connection[] = [
 const ConnectionsContext = createContext<ConnectionsContextType | undefined>(undefined);
 
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
-  const [connections, setConnections] = useState<Connection[]>(initialConnections);
+  const [connections, setConnections] = useState<Connection[]>(() => {
+    const saved = localStorage.getItem('connections');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved connections', e);
+      }
+    }
+    return initialConnections;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('connections', JSON.stringify(connections));
+  }, [connections]);
 
   const toggleConnection = async (id: string, subId?: string) => {
     setConnections(prev => prev.map(c => {

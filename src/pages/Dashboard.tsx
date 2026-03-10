@@ -1,23 +1,46 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange } from '../contexts/DateRangeContext';
-
-const growthData = [
-  { name: '1', revenue: 1200, spend: 400 },
-  { name: '2', revenue: 1900, spend: 600 },
-  { name: '3', revenue: 1500, spend: 500 },
-  { name: '4', revenue: 2200, spend: 800 },
-  { name: '5', revenue: 2800, spend: 900 },
-  { name: '6', revenue: 2400, spend: 700 },
-  { name: '7', revenue: 3100, spend: 1000 },
-];
+import { useConnections } from '../contexts/ConnectionsContext';
+import { generateDashboardData } from '../lib/dataUtils';
 
 export function Dashboard() {
   const { t, dir } = useLanguage();
   const { dateRange } = useDateRange();
+  const { connections } = useConnections();
+
+  const connectedPlatforms = connections.filter(c => c.status === 'connected');
+  const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
+  const isShopifyConnected = connections.find(c => c.id === 'shopify')?.status === 'connected';
+  const isStoreConnected = isWooConnected || isShopifyConnected;
+
+  // Generate dynamic data based on connected platforms' settings
+  const dashboardData = useMemo(() => {
+    // Collect all settings keys to create a unique seed
+    const seedStr = connectedPlatforms.map(c => 
+      Object.values(c.settings || {}).join('')
+    ).join('') || 'default';
+    
+    const data = generateDashboardData(seedStr);
+    
+    // If no store is connected, revenue is 0
+    if (!isStoreConnected) {
+      return {
+        ...data,
+        chartData: data.chartData.map(d => ({ ...d, revenue: 0 })),
+        totalRevenue: 0,
+        roas: '0.00',
+        netProfit: -data.totalSpend
+      };
+    }
+    
+    return data;
+  }, [connectedPlatforms, isStoreConnected]);
+
+  const { chartData, totalRevenue, totalSpend, roas, netProfit } = dashboardData;
 
   const quickActions = [
     { id: 'ai-recs', title: t('dashboard.viewAiRecs'), icon: Zap, color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', desc: t('dashboard.viewAiRecsDesc') },
@@ -71,7 +94,7 @@ export function Dashboard() {
           </div>
           <div className="text-end">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('dashboard.netProfit')}</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">₪10,200</p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">₪{netProfit.toLocaleString()}</p>
           </div>
         </div>
         
@@ -79,7 +102,7 @@ export function Dashboard() {
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase tracking-wider">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">₪15,100</p>
+            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">₪{totalRevenue.toLocaleString()}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
             </div>
@@ -88,7 +111,7 @@ export function Dashboard() {
           <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-red-800 dark:text-red-400 mb-2 uppercase tracking-wider">{t('dashboard.campaignSpend')}</p>
-            <p className="text-4xl font-black text-red-900 dark:text-red-50">₪4,900</p>
+            <p className="text-4xl font-black text-red-900 dark:text-red-50">₪{totalSpend.toLocaleString()}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>
@@ -98,7 +121,7 @@ export function Dashboard() {
           <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-xl border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <TrendingUp className={cn("absolute -bottom-4 w-24 h-24 text-indigo-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-indigo-800 dark:text-indigo-400 mb-2 uppercase tracking-wider">{t('dashboard.roas')}</p>
-            <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">3.08x</p>
+            <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">{roas}x</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">POAS: 1.8x</span>
@@ -191,7 +214,7 @@ export function Dashboard() {
           
           <div className="h-72 mt-6">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={growthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>

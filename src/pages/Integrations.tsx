@@ -28,12 +28,15 @@ export function Integrations() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
+  const [success, setSuccess] = useState<string | null>(null);
+
   const handleExpand = (integration: Connection) => {
     if (expandedId === integration.id) {
       setExpandedId(null);
     } else {
       setExpandedId(integration.id);
       setFormValues(integration.settings || {});
+      setSuccess(null);
     }
   };
 
@@ -43,11 +46,15 @@ export function Integrations() {
 
   const handleSave = async (id: string) => {
     setError(null);
+    setSuccess(null);
     try {
+      // Show a more realistic verification process
       await updateConnectionSettings(id, formValues);
       setExpandedId(null);
+      setSuccess(`החיבור ל-${connections.find(c => c.id === id)?.name} בוצע בהצלחה!`);
+      setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
-      setError({ id, message: 'אירעה שגיאה לא צפויה במהלך שמירת ההגדרות.' });
+      setError({ id, message: 'מפתח ה-API או הפרטים שהוזנו אינם תקינים. אנא בדוק שוב.' });
     }
   };
 
@@ -402,6 +409,18 @@ export function Integrations() {
           </div>
         </div>
       </div>
+
+      {success && (
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-start justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 ml-3" />
+            <p className="text-sm font-bold text-emerald-800">{success}</p>
+          </div>
+          <button onClick={() => setSuccess(null)} className="text-emerald-500 hover:text-emerald-700 p-1 hover:bg-emerald-100 rounded-lg transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 border border-red-200 p-4 rounded-xl flex items-start justify-between shadow-sm animate-in fade-in">
