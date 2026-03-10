@@ -15,6 +15,10 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   // API routes FIRST
+  app.use((req, res, next) => {
+    console.log(`Request: ${req.method} ${req.url}`);
+    next();
+  });
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
@@ -124,7 +128,7 @@ async function startServer() {
   // TikTok OAuth Routes
   app.get("/api/auth/tiktok/url", (req, res) => {
     const appId = process.env.TIKTOK_APP_ID;
-    const redirectUri = process.env.TIKTOK_REDIRECT_URI || `${process.env.APP_URL}/api/auth/tiktok/callback`;
+    const redirectUri = process.env.TIKTOK_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/tiktok/callback`;
     
     if (!appId) {
       return res.status(500).json({ message: "TikTok App ID not configured" });
@@ -225,7 +229,7 @@ async function startServer() {
   // Meta OAuth Routes
   app.get("/api/auth/meta/url", (req, res) => {
     const appId = process.env.META_APP_ID;
-    const redirectUri = process.env.META_REDIRECT_URI || `${process.env.APP_URL}/api/auth/meta/callback`;
+    const redirectUri = process.env.META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/meta/callback`;
     
     if (!appId) {
       return res.status(500).json({ message: "Meta App ID not configured" });
@@ -239,7 +243,7 @@ async function startServer() {
 
   app.get("/api/auth/meta/callback", async (req, res) => {
     const { code } = req.query;
-    const redirectUri = process.env.META_REDIRECT_URI || `${process.env.APP_URL}/api/auth/meta/callback`;
+    const redirectUri = process.env.META_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/meta/callback`;
     
     if (!code) {
       return res.send(`
@@ -327,7 +331,9 @@ async function startServer() {
   });
 
   app.get("/api/auth/google/url", (req, res) => {
+    console.log("Google auth URL requested");
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
+    console.log("Redirect URI:", redirectUri);
     const scopes = [
       "https://www.googleapis.com/auth/adwords",
       "https://www.googleapis.com/auth/analytics.readonly",
@@ -336,6 +342,11 @@ async function startServer() {
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email"
     ];
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.error("GOOGLE_CLIENT_ID is missing");
+      return res.status(500).json({ message: "Google Client ID not configured" });
+    }
 
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,

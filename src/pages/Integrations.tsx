@@ -80,10 +80,14 @@ export function Integrations() {
   };
 
   const handleGoogleConnect = async () => {
+    console.log("Connecting to Google...");
     try {
       const response = await fetch('/api/auth/google/url');
+      console.log("Response status:", response.status);
       if (!response.ok) throw new Error('Failed to get auth URL');
-      const { url } = await response.json();
+      const text = await response.text();
+      console.log("Response text:", text);
+      const { url } = JSON.parse(text);
       
       const width = 600;
       const height = 700;
