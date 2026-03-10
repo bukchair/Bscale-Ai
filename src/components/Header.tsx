@@ -17,6 +17,14 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { connections, overallQualityScore, connectedCount, totalCount } = useConnections();
   const [isConnectionsOpen, setIsConnectionsOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const notifications = [
+    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: '2h ago', icon: CheckCircle, color: 'text-emerald-500' },
+    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: '5h ago', icon: AlertTriangle, color: 'text-amber-500' },
+    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: '1d ago', icon: Search, color: 'text-indigo-500' },
+    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: '2d ago', icon: AlertTriangle, color: 'text-red-500' },
+  ];
 
   const handleDateClick = (range: DateRangeType) => {
     setDateRange(range);
@@ -154,10 +162,72 @@ export function Header({ onMenuClick }: HeaderProps) {
         <ThemeSwitcher />
         <LanguageSwitcher />
         
-        <button className="p-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 relative">
-          <Bell className="w-6 h-6" />
-          <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
-        </button>
+        <div className="relative">
+          <button 
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className={cn(
+              "p-2 rounded-lg transition-colors relative",
+              isNotificationsOpen ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+            )}
+          >
+            <Bell className="w-6 h-6" />
+            <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
+          </button>
+
+          {isNotificationsOpen && (
+            <div className={cn(
+              "absolute top-full mt-2 w-80 sm:w-96 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
+              dir === 'rtl' ? "left-0" : "right-0"
+            )}>
+              <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t('notifications.title')}</h4>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t('notifications.subtitle')}</p>
+                </div>
+                <button className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+                  {t('notifications.clearAll')}
+                </button>
+              </div>
+
+              <div className="max-h-[400px] overflow-y-auto">
+                {notifications.length > 0 ? (
+                  <div className="divide-y divide-gray-100 dark:divide-white/5">
+                    {notifications.map((notif) => (
+                      <button 
+                        key={notif.id}
+                        className="w-full p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-start"
+                      >
+                        <div className={cn("p-2 rounded-lg bg-gray-100 dark:bg-white/5 shrink-0", notif.color)}>
+                          <notif.icon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{notif.title}</p>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">{notif.time}</span>
+                          </div>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed line-clamp-2">
+                            {notif.desc}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <Bell className="w-8 h-8 text-gray-300 dark:text-gray-700 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('notifications.empty')}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 bg-gray-50 dark:bg-white/5 border-t border-gray-200 dark:border-white/10 text-center">
+                <button className="text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                  {t('common.viewAll')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

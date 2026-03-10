@@ -28,14 +28,29 @@ async function startServer() {
       const apiUrl = `${baseUrl}/wp-json/wc/v3/${endpoint || 'system_status'}`;
       const auth = Buffer.from(`${key}:${secret}`).toString('base64');
 
+      console.log(`Proxying request to: ${apiUrl}`);
+
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'BScale-AI-Proxy/1.0'
         }
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.warn("Received non-JSON response from WooCommerce:", text.substring(0, 200));
+        return res.status(response.status).json({ 
+          message: `The server returned a non-JSON response (${response.status}). This often happens if the URL is incorrect or a security plugin is blocking the request.`,
+          debug: text.substring(0, 100)
+        });
+      }
       
       if (!response.ok) {
         return res.status(response.status).json(data);

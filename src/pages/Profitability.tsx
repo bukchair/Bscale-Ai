@@ -6,13 +6,13 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { cn } from '../lib/utils';
 
 const financialData = [
-  { name: 'ינואר', revenue: 12000, spend: 4000, profit: 8000 },
-  { name: 'פברואר', revenue: 19000, spend: 6000, profit: 13000 },
-  { name: 'מרץ', revenue: 15000, spend: 5000, profit: 10000 },
-  { name: 'אפריל', revenue: 22000, spend: 8000, profit: 14000 },
-  { name: 'מאי', revenue: 28000, spend: 9000, profit: 19000 },
-  { name: 'יוני', revenue: 24000, spend: 7000, profit: 17000 },
-  { name: 'יולי', revenue: 31000, spend: 10000, profit: 21000 },
+  { name: 'Jan', revenue: 12000, spend: 4000, profit: 8000 },
+  { name: 'Feb', revenue: 19000, spend: 6000, profit: 13000 },
+  { name: 'Mar', revenue: 15000, spend: 5000, profit: 10000 },
+  { name: 'Apr', revenue: 22000, spend: 8000, profit: 14000 },
+  { name: 'May', revenue: 28000, spend: 9000, profit: 19000 },
+  { name: 'Jun', revenue: 24000, spend: 7000, profit: 17000 },
+  { name: 'Jul', revenue: 31000, spend: 10000, profit: 21000 },
 ];
 
 const platformData = [
@@ -30,22 +30,22 @@ export function Profitability() {
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('nav.profitability') || 'רווחיות / דוחות כספיים'}</h1>
-          <p className="text-sm text-gray-500 mt-1">ניתוח פיננסי מקיף, דוחות כספיים ותובנות AI לעסק שלך.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('profitability.title')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('profitability.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
             <Filter className="w-4 h-4" />
-            {t('common.filter') || 'סינון'}
+            {t('common.filter')}
           </button>
           <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium">
             <Download className="w-4 h-4" />
-            {t('common.export') || 'ייצוא דוח'}
+            {t('common.export') || 'Export Report'}
           </button>
         </div>
       </div>
 
-      {/* Top KPIs - Synced with Dashboard */}
+      {/* Top KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
           <div className="flex items-center justify-between mb-4">
@@ -56,7 +56,7 @@ export function Profitability() {
               <TrendingUp className="w-3 h-3" /> +12.5%
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">הכנסות (WooCommerce)</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.revenueWoo')}</p>
           <p className="text-3xl font-black text-gray-900">₪151,000</p>
         </div>
 
@@ -69,7 +69,7 @@ export function Profitability() {
               <TrendingDown className="w-3 h-3" /> -4.2%
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">הוצאות פרסום (Ads)</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.adSpend')}</p>
           <p className="text-3xl font-black text-gray-900">₪49,000</p>
         </div>
 
@@ -82,7 +82,7 @@ export function Profitability() {
               <TrendingUp className="w-3 h-3" /> +18.7%
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">רווח נקי</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.netProfit')}</p>
           <p className="text-3xl font-black text-gray-900">₪102,000</p>
         </div>
 
@@ -95,7 +95,7 @@ export function Profitability() {
               <TrendingUp className="w-3 h-3" /> +0.4
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-500 mb-1">ROAS ממוצע</p>
+          <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.avgRoas')}</p>
           <p className="text-3xl font-black text-gray-900" dir="ltr">3.08x</p>
         </div>
       </div>
@@ -108,32 +108,32 @@ export function Profitability() {
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">ניתוח AI והמלצות פיננסיות</h2>
-              <p className="text-sm text-gray-500">תובנות חכמות לשיפור הרווחיות וייעול התקציב</p>
+              <h2 className="text-lg font-bold text-gray-900">{t('profitability.aiAnalysisTitle')}</h2>
+              <p className="text-sm text-gray-500">{t('profitability.aiAnalysisSubtitle')}</p>
             </div>
           </div>
         </div>
         <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <h3 className="font-bold text-gray-900 mb-2">סיכום ביצועים</h3>
+              <h3 className="font-bold text-gray-900 mb-2">{t('profitability.performanceSummary')}</h3>
               <p className="text-sm text-gray-600 leading-relaxed">
-                הרווח הנקי שלך במגמת עלייה עקבית. ניתוח הנתונים מראה כי קמפייני החיפוש ב-Google Ads מניבים את ההחזר הגבוה ביותר (ROAS 4.2x), בעוד שקמפייני הוידאו ב-TikTok דורשים אופטימיזציה של עלויות (CPA גבוה ב-20% מהממוצע).
+                {t('profitability.performanceSummaryDesc')}
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-emerald-900">הזדמנות צמיחה</p>
-                  <p className="text-xs text-emerald-700">הגדלת תקציב ב-15% לקמפיין "Best Sellers" עשויה להניב תוספת רווח של ₪8,500.</p>
+                  <p className="text-sm font-bold text-emerald-900">{t('profitability.growthOpportunity')}</p>
+                  <p className="text-xs text-emerald-700">{t('profitability.growthOpportunityDesc')}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
                 <Activity className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-amber-900">התראת יעילות</p>
-                  <p className="text-xs text-amber-700">3 קמפיינים ב-Meta Ads פועלים מתחת ליעד ה-ROAS. מומלץ לעדכן קריאייטיב.</p>
+                  <p className="text-sm font-bold text-amber-900">{t('profitability.efficiencyAlert')}</p>
+                  <p className="text-xs text-amber-700">{t('profitability.efficiencyAlertDesc')}</p>
                 </div>
               </div>
             </div>
@@ -141,12 +141,12 @@ export function Profitability() {
           <div className="bg-indigo-600 rounded-xl p-6 text-white flex flex-col justify-between relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
             <div>
-              <p className="text-indigo-100 text-sm font-medium mb-1">פוטנציאל שיפור רווח</p>
+              <p className="text-indigo-100 text-sm font-medium mb-1">{t('profitability.profitImprovementPotential')}</p>
               <p className="text-4xl font-black" dir="ltr">+₪12,500</p>
-              <p className="text-indigo-200 text-xs mt-2">על בסיס יישום כל המלצות ה-AI</p>
+              <p className="text-indigo-200 text-xs mt-2">{t('profitability.basedOnAi')}</p>
             </div>
             <button className="mt-6 w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-all shadow-lg active:scale-95">
-              החל המלצות עכשיו
+              {t('profitability.applyRecommendations')}
             </button>
           </div>
         </div>
@@ -156,27 +156,27 @@ export function Profitability() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">פירוט דוחות כספיים</h2>
-            <p className="text-sm text-gray-500">פילוח נתונים לפי תקופה, פלטפורמה וקמפיין</p>
+            <h2 className="text-lg font-bold text-gray-900">{t('profitability.detailedReports')}</h2>
+            <p className="text-sm text-gray-500">{t('profitability.detailedReportsSubtitle')}</p>
           </div>
           <div className="flex bg-gray-100 p-1 rounded-xl">
             <button 
               onClick={() => setReportType('period')}
               className={cn("px-4 py-2 text-sm font-bold rounded-lg transition-all", reportType === 'period' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
             >
-              תקופה
+              {t('profitability.period')}
             </button>
             <button 
               onClick={() => setReportType('platforms')}
               className={cn("px-4 py-2 text-sm font-bold rounded-lg transition-all", reportType === 'platforms' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
             >
-              פלטפורמות
+              {t('profitability.platforms')}
             </button>
             <button 
               onClick={() => setReportType('campaigns')}
               className={cn("px-4 py-2 text-sm font-bold rounded-lg transition-all", reportType === 'campaigns' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
             >
-              קמפיינים
+              {t('profitability.campaigns')}
             </button>
           </div>
         </div>
@@ -205,21 +205,21 @@ export function Profitability() {
                       itemStyle={{ fontSize: '12px', fontWeight: 600 }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                    <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" name="הכנסות (₪)" />
-                    <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpnd)" name="הוצאות (₪)" />
+                    <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" name={`${t('profitability.revenue')} (₪)`} />
+                    <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpnd)" name={`${t('profitability.spend')} (₪)`} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
               
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-right">
+                <table className={cn("w-full text-sm", dir === 'rtl' ? "text-right" : "text-left")}>
                   <thead>
                     <tr className="text-gray-400 border-b border-gray-100">
-                      <th className="pb-4 font-medium">חודש</th>
-                      <th className="pb-4 font-medium">הכנסות</th>
-                      <th className="pb-4 font-medium">הוצאות פרסום</th>
-                      <th className="pb-4 font-medium">רווח גולמי</th>
-                      <th className="pb-4 font-medium">ROAS</th>
+                      <th className="pb-4 font-medium">{t('profitability.month')}</th>
+                      <th className="pb-4 font-medium">{t('profitability.revenue')}</th>
+                      <th className="pb-4 font-medium">{t('profitability.spend')}</th>
+                      <th className="pb-4 font-medium">{t('profitability.grossProfit')}</th>
+                      <th className="pb-4 font-medium">{t('profitability.roas')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -247,12 +247,12 @@ export function Profitability() {
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} />
                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                    <Bar dataKey="spend" fill="#6366F1" radius={[6, 6, 0, 0]} name="הוצאות (₪)" maxBarSize={40} />
+                    <Bar dataKey="spend" fill="#6366F1" radius={[6, 6, 0, 0]} name={`${t('profitability.spend')} (₪)`} maxBarSize={40} />
                   </RechartsBarChart>
                 </ResponsiveContainer>
               </div>
               <div className="space-y-4">
-                <h3 className="font-bold text-gray-900">ביצועים לפי פלטפורמה</h3>
+                <h3 className="font-bold text-gray-900">{t('profitability.performanceByPlatform')}</h3>
                 {platformData.map((platform, i) => (
                   <div key={i} className="p-4 bg-gray-50 rounded-xl flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -261,10 +261,10 @@ export function Profitability() {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900">{platform.name}</p>
-                        <p className="text-xs text-gray-500">הוצאה: ₪{platform.spend.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">{t('profitability.spend')}: ₪{platform.spend.toLocaleString()}</p>
                       </div>
                     </div>
-                    <div className="text-left">
+                    <div className={dir === 'rtl' ? "text-left" : "text-right"}>
                       <p className="text-sm font-bold text-emerald-600" dir="ltr">{platform.roas}x ROAS</p>
                       <div className="w-24 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
                         <div 
@@ -285,9 +285,9 @@ export function Profitability() {
                 <BarChart3 className="w-8 h-8" />
               </div>
               <div>
-                <p className="font-bold text-gray-900">נתוני קמפיינים בטעינה</p>
+                <p className="font-bold text-gray-900">{t('profitability.loadingCampaigns')}</p>
                 <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                  אנחנו מסנכרנים את נתוני הקמפיינים מכל הפלטפורמות המחוברות. זה עשוי לקחת מספר רגעים.
+                  {t('profitability.loadingCampaignsDesc')}
                 </p>
               </div>
             </div>
