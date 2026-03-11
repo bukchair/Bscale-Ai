@@ -3,6 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Search, AlertTriangle, TrendingUp, TrendingDown, Filter, Download, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
+import { useDateRange } from '../contexts/DateRangeContext';
 import { fetchGSCData } from '../services/googleService';
 
 const mockSearchTerms = [
@@ -16,6 +17,7 @@ const mockSearchTerms = [
 export function SearchAnalysis() {
   const { t, dir } = useLanguage();
   const { connections } = useConnections();
+  const { resolvedRange } = useDateRange();
   const [activeTab, setActiveTab] = useState<'all' | 'ads' | 'organic' | 'negative'>('all');
   const [searchTerms, setSearchTerms] = useState<any[]>(mockSearchTerms);
   const [negativeKeywords, setNegativeKeywords] = useState([
@@ -36,7 +38,7 @@ export function SearchAnalysis() {
 
     const loadGscTerms = async () => {
       try {
-        const gscData = await fetchGSCData(accessToken, siteUrl);
+        const gscData = await fetchGSCData(accessToken, siteUrl, resolvedRange);
         const organicTerms = (gscData.rows || []).map((row: any) => {
           const impressions = Number(row.impressions || 0);
           const clicks = Number(row.clicks || 0);
@@ -69,7 +71,7 @@ export function SearchAnalysis() {
     };
 
     loadGscTerms();
-  }, [connections]);
+  }, [connections, resolvedRange.endDate, resolvedRange.startDate]);
 
   const handleExport = () => {
     const rows = searchTerms

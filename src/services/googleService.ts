@@ -14,8 +14,22 @@ export async function fetchGoogleAdAccounts(accessToken: string) {
   return data.discovered?.googleAdsId ? [data.discovered.googleAdsId] : [];
 }
 
-export async function fetchGoogleCampaigns(accessToken: string, customerId: string, loginCustomerId?: string) {
-  const response = await fetch(`/api/google/ads/campaigns?customer_id=${customerId}${loginCustomerId ? `&login_customer_id=${loginCustomerId}` : ''}`, {
+export async function fetchGoogleCampaigns(
+  accessToken: string,
+  customerId: string,
+  loginCustomerId?: string,
+  dateRange?: DateRangeParams
+) {
+  const search = new URLSearchParams({ customer_id: customerId });
+  if (loginCustomerId) {
+    search.set('login_customer_id', loginCustomerId);
+  }
+  if (dateRange) {
+    search.set('start_date', dateRange.startDate);
+    search.set('end_date', dateRange.endDate);
+  }
+
+  const response = await fetch(`/api/google/ads/campaigns?${search.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
@@ -62,8 +76,14 @@ export async function sendGmailNotification(accessToken: string, to: string, sub
   return response.json();
 }
 
-export async function fetchGA4Report(accessToken: string, propertyId: string) {
-  const response = await fetch(`/api/google/analytics/report?property_id=${propertyId}`, {
+export async function fetchGA4Report(accessToken: string, propertyId: string, dateRange?: DateRangeParams) {
+  const search = new URLSearchParams({ property_id: propertyId });
+  if (dateRange) {
+    search.set('start_date', dateRange.startDate);
+    search.set('end_date', dateRange.endDate);
+  }
+
+  const response = await fetch(`/api/google/analytics/report?${search.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
@@ -109,8 +129,25 @@ export interface GA4LiveData {
   trafficSources: { name: string; users: number; percent: number }[];
 }
 
-export async function fetchGA4LiveData(accessToken: string, propertyId: string): Promise<GA4LiveData> {
-  const response = await fetch(`/api/google/analytics/live?property_id=${encodeURIComponent(propertyId)}`, {
+export interface DateRangeParams {
+  startDate: string;
+  endDate: string;
+}
+
+export async function fetchGA4LiveData(
+  accessToken: string,
+  propertyId: string,
+  dateRange?: DateRangeParams
+): Promise<GA4LiveData> {
+  const search = new URLSearchParams({
+    property_id: propertyId,
+  });
+  if (dateRange) {
+    search.set('start_date', dateRange.startDate);
+    search.set('end_date', dateRange.endDate);
+  }
+
+  const response = await fetch(`/api/google/analytics/live?${search.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
@@ -124,8 +161,16 @@ export async function fetchGA4LiveData(accessToken: string, propertyId: string):
   return response.json();
 }
 
-export async function fetchGSCData(accessToken: string, siteUrl: string) {
-  const response = await fetch(`/api/google/search-console/query?site_url=${encodeURIComponent(siteUrl)}`, {
+export async function fetchGSCData(accessToken: string, siteUrl: string, dateRange?: DateRangeParams) {
+  const search = new URLSearchParams({
+    site_url: siteUrl,
+  });
+  if (dateRange) {
+    search.set('start_date', dateRange.startDate);
+    search.set('end_date', dateRange.endDate);
+  }
+
+  const response = await fetch(`/api/google/search-console/query?${search.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

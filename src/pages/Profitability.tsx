@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useDateRange } from '../contexts/DateRangeContext';
+import { getRangeLengthInDays, useDateRange } from '../contexts/DateRangeContext';
 import { DollarSign, TrendingUp, TrendingDown, Activity, Download, Filter, Zap, BarChart3, PieChart, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
 import { cn } from '../lib/utils';
@@ -25,17 +25,47 @@ const platformData = [
 export function Profitability() {
   const { t, dir } = useLanguage();
   const { navigateTo } = useAppNavigation();
-  const { dateRange } = useDateRange();
+  const { dateRange, resolvedRange } = useDateRange();
   const [reportType, setReportType] = useState<'period' | 'campaigns' | 'platforms'>('period');
   const [showTopPerformersOnly, setShowTopPerformersOnly] = useState(false);
 
+  const dateWindowSize = useMemo(() => {
+    if (dateRange === 'today') return 1;
+    if (dateRange === '7days') return 2;
+    if (dateRange === '30days') return financialData.length;
+
+    const customDays = getRangeLengthInDays(resolvedRange);
+    if (customDays <= 1) return 1;
+    if (customDays <= 7) return 2;
+    return financialData.length;
+  }, [dateRange, resolvedRange.endDate, resolvedRange.startDate]);
+
+  const periodFinancialData = useMemo(
+    () => financialData.slice(-dateWindowSize),
+    [dateWindowSize]
+  );
+
+  const periodRatio = periodFinancialData.length / financialData.length;
+  const periodPlatformData = useMemo(
+    () => platformData.map((platform) => ({
+      ...platform,
+      spend: Math.max(100, Math.round(platform.spend * periodRatio)),
+    })),
+    [periodRatio]
+  );
+
   const filteredFinancialData = showTopPerformersOnly
-    ? financialData.filter((row) => (row.revenue / row.spend) >= 2.5)
-    : financialData;
+    ? periodFinancialData.filter((row) => (row.revenue / row.spend) >= 2.5)
+    : periodFinancialData;
 
   const filteredPlatformData = showTopPerformersOnly
-    ? platformData.filter((platform) => platform.roas >= 2.5)
-    : platformData;
+    ? periodPlatformData.filter((platform) => platform.roas >= 2.5)
+    : periodPlatformData;
+
+  const totalRevenue = periodFinancialData.reduce((sum, row) => sum + row.revenue, 0);
+  const totalSpend = periodFinancialData.reduce((sum, row) => sum + row.spend, 0);
+  const netProfit = totalRevenue - totalSpend;
+  const avgRoas = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '0.00';
 
   const handleExportReport = () => {
     const rows =
@@ -101,7 +131,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.revenueWoo')}</p>
-          <p className="text-3xl font-black text-gray-900">₪151,000</p>
+          <p className="text-3xl font-black text-gray-900">₪{totalRevenue.toLocaleString()}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -114,7 +144,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.adSpend')}</p>
-          <p className="text-3xl font-black text-gray-900">₪49,000</p>
+          <p className="text-3xl font-black text-gray-900">₪{totalSpend.toLocaleString()}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -127,7 +157,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.netProfit')}</p>
-          <p className="text-3xl font-black text-gray-900">₪102,000</p>
+          <p className="text-3xl font-black text-gray-900">₪{netProfit.toLocaleString()}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -140,7 +170,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.avgRoas')}</p>
-          <p className="text-3xl font-black text-gray-900" dir="ltr">3.08x</p>
+          <p className="text-3xl font-black text-gray-900" dir="ltr">{avgRoas}x</p>
         </div>
       </div>
 

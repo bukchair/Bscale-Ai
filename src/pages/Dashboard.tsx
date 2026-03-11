@@ -13,7 +13,7 @@ import { useAppNavigation } from '../contexts/AppNavigationContext';
 export function Dashboard() {
   const { t, dir } = useLanguage();
   const { navigateTo } = useAppNavigation();
-  const { dateRange } = useDateRange();
+  const { dateRange, resolvedRange } = useDateRange();
   const { connections } = useConnections();
   const currentUser = auth.currentUser;
   const [ga4LiveData, setGa4LiveData] = useState<GA4LiveData | null>(null);
@@ -27,9 +27,10 @@ export function Dashboard() {
   // Generate dynamic data based on connected platforms' settings
   const dashboardData = useMemo(() => {
     // Collect all settings keys to create a unique seed
-    const seedStr = connectedPlatforms.map(c => 
+    const baseSeed = connectedPlatforms.map(c =>
       Object.values(c.settings || {}).join('')
     ).join('') || 'default';
+    const seedStr = `${baseSeed}:${resolvedRange.startDate}:${resolvedRange.endDate}`;
     
     const data = generateDashboardData(seedStr);
     
@@ -45,7 +46,7 @@ export function Dashboard() {
     }
     
     return data;
-  }, [connectedPlatforms, isStoreConnected]);
+  }, [connectedPlatforms, isStoreConnected, resolvedRange.endDate, resolvedRange.startDate]);
 
   const { chartData, totalRevenue, totalSpend, roas, netProfit } = dashboardData;
 
@@ -66,7 +67,7 @@ export function Dashboard() {
     const loadGoogleData = async () => {
       try {
         if (propertyId) {
-          const ga4Data = await fetchGA4LiveData(accessToken, propertyId);
+          const ga4Data = await fetchGA4LiveData(accessToken, propertyId, resolvedRange);
           if (!isCancelled) {
             setGa4LiveData(ga4Data);
           }
@@ -80,7 +81,7 @@ export function Dashboard() {
 
       try {
         if (siteUrl) {
-          const gscData = await fetchGSCData(accessToken, siteUrl);
+          const gscData = await fetchGSCData(accessToken, siteUrl, resolvedRange);
           const rows = gscData.rows || [];
           const clicks = rows.reduce((sum: number, row: any) => sum + Number(row.clicks || 0), 0);
           const impressions = rows.reduce((sum: number, row: any) => sum + Number(row.impressions || 0), 0);
@@ -107,12 +108,15 @@ export function Dashboard() {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [connections]);
+  }, [connections, resolvedRange.endDate, resolvedRange.startDate]);
 
   const topPages = ga4LiveData?.topPages?.length
     ? ga4LiveData.topPages.map((page) => ({
         name: page.name === '/' ? t('dashboard.homePage') : page.name,
-        percent: ga4LiveData.activeUsers > 0 ? Math.max(1, Math.round((page.users / ga4LiveData.activeUsers) * 100)) : 0
+        percent: (() => {
+          const totalTopPageUsers = ga4LiveData.topPages.reduce((sum, item) => sum + item.users, 0);
+          return totalTopPageUsers > 0 ? Math.max(1, Math.round((page.users / totalTopPageUsers) * 100)) : 0;
+        })()
       }))
     : [
         { name: t('dashboard.homePage'), percent: 41 },
@@ -142,7 +146,7 @@ export function Dashboard() {
     dateRange === 'today' ? t('dashboard.today') :
     dateRange === '7days' ? t('dashboard.last7Days') :
     dateRange === '30days' ? t('dashboard.last30Days') :
-    t('dashboard.customRange');
+    `${t('dashboard.customRange')} (${resolvedRange.startDate} - ${resolvedRange.endDate})`;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">

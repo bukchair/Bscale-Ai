@@ -23,6 +23,32 @@ async function startServer() {
     return error instanceof Error ? error.message : fallback;
   };
 
+  const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+  const formatDate = (date: Date) => date.toISOString().split("T")[0];
+  const addDays = (date: Date, days: number) => {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+  };
+  const getDateRangeFromQuery = (req: express.Request, defaultDays = 30) => {
+    const startDateQuery = req.query.start_date;
+    const endDateQuery = req.query.end_date;
+    const startDate = typeof startDateQuery === "string" && DATE_PATTERN.test(startDateQuery) ? startDateQuery : null;
+    const endDate = typeof endDateQuery === "string" && DATE_PATTERN.test(endDateQuery) ? endDateQuery : null;
+
+    if (startDate && endDate) {
+      return startDate <= endDate
+        ? { startDate, endDate }
+        : { startDate: endDate, endDate: startDate };
+    }
+
+    const today = new Date();
+    return {
+      startDate: formatDate(addDays(today, -(defaultDays - 1))),
+      endDate: formatDate(today),
+    };
+  };
+
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -481,6 +507,7 @@ async function startServer() {
   app.get("/api/google/ads/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const customerId = req.query.customer_id;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !customerId) {
       return res.status(400).json({ message: "Missing access token or customer ID" });
@@ -488,6 +515,7 @@ async function startServer() {
 
     try {
       const formattedCustomerId = String(customerId).replace(/-/g, "");
+      const dateFilter = `AND segments.date BETWEEN '${startDate}' AND '${endDate}'`;
       const response = await axios.post(
         `https://googleads.googleapis.com/v17/customers/${formattedCustomerId}/googleAds:search`,
         {
@@ -501,6 +529,7 @@ async function startServer() {
               metrics.absolute_top_impression_percentage
             FROM campaign 
             WHERE campaign.status != 'REMOVED'
+            ${dateFilter}
           `
         },
         {
@@ -521,6 +550,7 @@ async function startServer() {
   app.get("/api/google/analytics/live", async (req, res) => {
     const accessToken = getBearerToken(req);
     const propertyId = req.query.property_id;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !propertyId) {
       return res.status(400).json({ message: "Missing access token or property ID" });
@@ -530,25 +560,28 @@ async function startServer() {
     const realtimeUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runRealtimeReport`;
     const reportUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`;
     const headers = { Authorization: `Bearer ${accessToken}` };
+    const dateRanges = [{ startDate, endDate }];
 
     try {
       const [activeNowRes, totalUsersRes, topPagesRes, sourcesRes] = await Promise.all([
         axios.post(realtimeUrl, { metrics: [{ name: "activeUsers" }] }, { headers }),
         axios.post(reportUrl, {
-          dateRanges: [{ startDate: "30daysAgo", endDate: "today" }],
+          dateRanges,
           metrics: [{ name: "totalUsers" }]
         }, { headers }),
-        axios.post(realtimeUrl, {
+        axios.post(reportUrl, {
+          dateRanges,
           dimensions: [{ name: "unifiedPagePathScreen" }],
-          metrics: [{ name: "activeUsers" }],
+          metrics: [{ name: "totalUsers" }],
           limit: 3,
-          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }]
+          orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }]
         }, { headers }),
-        axios.post(realtimeUrl, {
+        axios.post(reportUrl, {
+          dateRanges,
           dimensions: [{ name: "sessionDefaultChannelGroup" }],
-          metrics: [{ name: "activeUsers" }],
+          metrics: [{ name: "sessions" }],
           limit: 5,
-          orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }]
+          orderBys: [{ metric: { metricName: "sessions" }, desc: true }]
         }, { headers })
       ]);
 
@@ -629,16 +662,18 @@ async function startServer() {
   app.get("/api/google/analytics/report", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const propertyId = req.query.property_id;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !propertyId) {
       return res.status(400).json({ message: "Missing access token or property ID" });
     }
 
     try {
+      const normalizedPropertyId = String(propertyId).replace("properties/", "");
       const response = await axios.post(
-        `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+        `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`,
         {
-          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+          dateRanges: [{ startDate, endDate }],
           dimensions: [{ name: 'date' }],
           metrics: [
             { name: 'activeUsers' },
@@ -663,6 +698,8 @@ async function startServer() {
   app.get("/api/google/search-console/query", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const siteUrl = req.query.site_url;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
+    const rowLimit = Number(req.query.row_limit);
 
     if (!accessToken || !siteUrl) {
       return res.status(400).json({ message: "Missing access token or site URL" });
@@ -673,10 +710,10 @@ async function startServer() {
       const response = await axios.post(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
         {
-          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0],
+          startDate,
+          endDate,
           dimensions: ['query'],
-          rowLimit: 10
+          rowLimit: Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : 10
         },
         {
           headers: {
