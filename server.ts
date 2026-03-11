@@ -436,6 +436,33 @@ async function startServer() {
     }
   });
 
+  app.post("/api/auth/google/refresh", express.json(), async (req, res) => {
+    const { refresh_token } = req.body || {};
+    if (!refresh_token) {
+      return res.status(400).json({ message: "Missing refresh_token" });
+    }
+
+    try {
+      const params = new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID || "",
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+        grant_type: "refresh_token",
+        refresh_token,
+      });
+
+      const response = await axios.post("https://oauth2.googleapis.com/token", params.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
+
+      res.json(response.data);
+    } catch (error) {
+      console.error("Google token refresh error:", (error as any)?.response?.data || (error as any)?.message || error);
+      res.status(500).json({ message: getAxiosErrorMessage(error, "Failed to refresh Google token") });
+    }
+  });
+
   app.get("/api/google/discover", async (req, res) => {
     const accessToken = getBearerToken(req);
     if (!accessToken) {

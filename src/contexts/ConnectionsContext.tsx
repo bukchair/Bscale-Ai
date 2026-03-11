@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
-import { fetchGoogleAdAccounts } from '../services/googleService';
+import { fetchGoogleAdAccounts, refreshGoogleAccessToken } from '../services/googleService';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
 
@@ -264,12 +264,80 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }
 
     // Special logic for Google real verification
-    if (id === 'google' && connection.settings?.googleAccessToken) {
+    if (id === 'google') {
+      let accessToken = connection.settings?.googleAccessToken || '';
+      const refreshToken = connection.settings?.googleRefreshToken;
+      const expiry = Number(connection.settings?.googleExpiry || 0);
+
+      if (!accessToken && !refreshToken) {
+        return { success: false, message: 'חסר Google access token. יש לבצע חיבור מחדש ל-Google.' };
+      }
+
+      const persistGoogleTokens = async (token: string, expiresInSec: number) => {
+        const updatedConnections = connections.map(c =>
+          c.id === 'google'
+            ? {
+                ...c,
+                settings: {
+                  ...(c.settings || {}),
+                  googleAccessToken: token,
+                  googleExpiry: String(Date.now() + expiresInSec * 1000),
+                },
+              }
+            : c
+        );
+        setConnections(updatedConnections);
+        await persistConnections(updatedConnections);
+      };
+
+      const markGoogleConnected = async () => {
+        const updatedConnections = connections.map(c =>
+          c.id === 'google'
+            ? { ...c, status: 'connected' as ConnectionStatus, score: 100 }
+            : c
+        );
+        setConnections(updatedConnections);
+        await persistConnections(updatedConnections);
+      };
+
       try {
-        await fetchGoogleAdAccounts(connection.settings.googleAccessToken);
+        const shouldRefresh = !!refreshToken && (!!expiry && Date.now() > expiry - 60_000);
+        if (shouldRefresh) {
+          const refreshed = await refreshGoogleAccessToken(refreshToken);
+          accessToken = refreshed.access_token;
+          await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
+        }
+
+        if (!accessToken && refreshToken) {
+          const refreshed = await refreshGoogleAccessToken(refreshToken);
+          accessToken = refreshed.access_token;
+          await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
+        }
+
+        await fetchGoogleAdAccounts(accessToken);
+        await markGoogleConnected();
         return { success: true, message: 'החיבור ל-Google אומת בהצלחה.' };
       } catch (err) {
-        return { success: false, message: 'נכשל אימות החיבור ל-Google.' };
+        try {
+          if (refreshToken) {
+            const refreshed = await refreshGoogleAccessToken(refreshToken);
+            accessToken = refreshed.access_token;
+            await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
+            await fetchGoogleAdAccounts(accessToken);
+            await markGoogleConnected();
+            return { success: true, message: 'החיבור ל-Google אומת בהצלחה לאחר רענון טוקן.' };
+          }
+        } catch (refreshErr) {
+          return {
+            success: false,
+            message: `נכשל אימות החיבור ל-Google: ${refreshErr instanceof Error ? refreshErr.message : 'שגיאה לא ידועה'}`,
+          };
+        }
+
+        return {
+          success: false,
+          message: `נכשל אימות החיבור ל-Google: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`,
+        };
       }
     }
 

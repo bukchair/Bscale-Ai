@@ -14,6 +14,23 @@ export async function fetchGoogleAdAccounts(accessToken: string) {
   return data.discovered?.googleAdsId ? [data.discovered.googleAdsId] : [];
 }
 
+export async function refreshGoogleAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number; token_type?: string; scope?: string }> {
+  const response = await fetch('/api/auth/google/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to refresh Google access token');
+  }
+
+  return response.json();
+}
+
 export async function fetchGoogleCampaigns(
   accessToken: string,
   customerId: string,
