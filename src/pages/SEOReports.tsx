@@ -29,6 +29,7 @@ export function SEOReports() {
   const { navigateTo } = useAppNavigation();
   const [activeTab, setActiveTab] = useState<'overview' | 'keywords' | 'pages' | 'products'>('overview');
   const [optimizingId, setOptimizingId] = useState<number | null>(null);
+  const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [optimizedProducts, setOptimizedProducts] = useState<Record<number, any>>({});
   const [products, setProducts] = useState([
     { id: 1, name: 'נעלי ריצה Nike Air Zoom', shortDesc: 'נעלי ריצה נוחות.', longDesc: 'נעלי ריצה מקצועיות עם סוליה בולמת זעזועים. מתאימות לריצות ארוכות.', image: 'https://picsum.photos/seed/nike/100/100', seoScore: 65, issues: ['תיאור קצר מדי', 'חסר Alt-Text לתמונה', 'כותרת לא מכילה מילות מפתח'] },
@@ -92,6 +93,29 @@ export function SEOReports() {
           : p
       )
     );
+    navigateTo('products');
+  };
+
+  const handleAnalyzeAllProducts = async () => {
+    setActiveTab('products');
+    setIsAnalyzingAll(true);
+    try {
+      const entries = await Promise.all(
+        products.map(async (product) => {
+          const res = await optimizeProductSEO(product.name, product.longDesc);
+          return [product.id, res] as const;
+        })
+      );
+
+      setOptimizedProducts((prev) => ({
+        ...prev,
+        ...Object.fromEntries(entries),
+      }));
+    } catch (error) {
+      console.error("Failed to analyze all products", error);
+    } finally {
+      setIsAnalyzingAll(false);
+    }
   };
 
   return (
@@ -303,11 +327,12 @@ export function SEOReports() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-gray-900">אופטימיזציית מוצרים (AI)</h3>
                 <button
-                  onClick={() => setActiveTab('products')}
-                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2"
+                  onClick={handleAnalyzeAllProducts}
+                  disabled={isAnalyzingAll}
+                  className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <Zap className="w-4 h-4" />
-                  נתח את כל המוצרים
+                  {isAnalyzingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                  {isAnalyzingAll ? 'מנתח מוצרים...' : 'נתח את כל המוצרים'}
                 </button>
               </div>
               

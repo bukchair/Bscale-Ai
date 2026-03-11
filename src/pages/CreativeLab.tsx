@@ -3,6 +3,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Sparkles, Image as ImageIcon, Type, Send, Wand2, Layout, Plus, Loader2, Download, ShoppingCart, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateCreativeCopy } from '../lib/gemini';
+import { useAppNavigation } from '../contexts/AppNavigationContext';
+import { useConnections } from '../contexts/ConnectionsContext';
 
 const mockProducts = [
   { id: 1, name: 'נעלי ריצה מקצועיות', shortDesc: 'נעלי ריצה נוחות.', longDesc: 'נעלי ריצה מקצועיות עם סוליה בולמת זעזועים. מתאימות לריצות ארוכות.', price: '₪450' },
@@ -12,6 +14,8 @@ const mockProducts = [
 
 export function CreativeLab() {
   const { t, dir } = useLanguage();
+  const { navigateTo } = useAppNavigation();
+  const { connections } = useConnections();
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'image' | 'copy' | 'video'>('image');
@@ -19,6 +23,7 @@ export function CreativeLab() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '9:16' | '16:9'>('1:1');
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     const prefilledProduct = localStorage.getItem('creativeLab:selectedProduct');
@@ -59,6 +64,38 @@ export function CreativeLab() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(objectUrl);
+  };
+
+  const showToast = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 2500);
+  };
+
+  const handlePublishToMeta = () => {
+    const isMetaConnected = connections.find((c) => c.id === 'meta')?.status === 'connected';
+    if (!isMetaConnected) {
+      showToast('יש לחבר קודם את Meta Ads כדי לפרסם.');
+      navigateTo('connections');
+      return;
+    }
+
+    showToast('הקריאייטיב נשלח לאישורים ואוטומציות.');
+    navigateTo('approvals-automations');
+  };
+
+  const handleGenerateStoryboard = () => {
+    if (!generatedContent?.script?.length) {
+      showToast('אין תסריט זמין ליצירת סטוריבורד.');
+      return;
+    }
+
+    const storyboard = generatedContent.script
+      .map((scene: any, idx: number) =>
+        `Scene ${idx + 1}\nTime: ${scene.time}\nVisual: ${scene.visual}\nAudio: ${scene.audio}\n`
+      )
+      .join('\n');
+    handleDownloadTextFile(storyboard, 'storyboard.txt');
+    showToast('סטוריבורד נוצר והורד בהצלחה.');
   };
 
   const handleGenerate = async () => {
@@ -123,6 +160,12 @@ export function CreativeLab() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      {toast && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-bold">
+          {toast}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t('nav.creativeLab')}</h1>
@@ -304,7 +347,7 @@ export function CreativeLab() {
                       <Download className="w-4 h-4" /> הורדה
                     </button>
                     <button
-                      onClick={() => window.alert('מוכן לפרסום ב-Meta')}
+                      onClick={handlePublishToMeta}
                       className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
                     >
                       <Send className="w-4 h-4" /> פרסם ב-Meta
@@ -344,7 +387,7 @@ export function CreativeLab() {
                           <Type className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => window.alert('נשלח לפרסום')}
+                          onClick={handlePublishToMeta}
                           className="p-1.5 bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200 transition-colors"
                           title="פרסם"
                         >
@@ -398,7 +441,7 @@ export function CreativeLab() {
                     <Download className="w-4 h-4" /> הורד תסריט
                   </button>
                   <button
-                    onClick={() => window.alert('סטוריבורד נוצר בהצלחה')}
+                    onClick={handleGenerateStoryboard}
                     className="flex-1 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors text-sm flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-4 h-4" /> צור סטוריבורד

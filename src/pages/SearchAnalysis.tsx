@@ -20,6 +20,7 @@ export function SearchAnalysis() {
   const { resolvedRange } = useDateRange();
   const [activeTab, setActiveTab] = useState<'all' | 'ads' | 'organic' | 'negative'>('all');
   const [searchTerms, setSearchTerms] = useState<any[]>(mockSearchTerms);
+  const [selectedTerm, setSelectedTerm] = useState<any | null>(null);
   const [negativeKeywords, setNegativeKeywords] = useState([
     { id: 1, term: 'חינם', matchType: 'רחב', campaign: 'כל הקמפיינים', addedDate: '2024-03-01' },
     { id: 2, term: 'דרושים', matchType: 'ביטוי', campaign: 'נעלי גברים', addedDate: '2024-03-05' },
@@ -368,7 +369,7 @@ export function SearchAnalysis() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => window.alert(`${term.term}\n${term.source}`)}
+                          onClick={() => setSelectedTerm(term)}
                           className="text-indigo-600 hover:text-indigo-900 font-bold text-sm"
                         >
                           {t('search.viewDetails')}
@@ -382,6 +383,35 @@ export function SearchAnalysis() {
           </div>
         )}
       </div>
+
+      {selectedTerm && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-2xl border border-gray-200 shadow-2xl p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedTerm.term}</h3>
+            <p className="text-sm text-gray-500 mb-4">{selectedTerm.source}</p>
+            <div className="space-y-2 text-sm text-gray-700">
+              <p><span className="font-bold">{t('search.clicks')}:</span> {selectedTerm.clicks ?? 0}</p>
+              {selectedTerm.impressions !== undefined && (
+                <p><span className="font-bold">{t('search.impressions')}:</span> {selectedTerm.impressions.toLocaleString()}</p>
+              )}
+              {selectedTerm.position !== undefined && (
+                <p><span className="font-bold">{t('search.position')}:</span> {selectedTerm.position}</p>
+              )}
+              {selectedTerm.cost !== undefined && (
+                <p dir="ltr"><span className="font-bold">{t('search.spend')}:</span> ₪{selectedTerm.cost}</p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setSelectedTerm(null)}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
