@@ -147,7 +147,7 @@ export function SearchAnalysis() {
               onClick={() => setActiveTab('ads')}
               className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'ads' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
             >
-              Google Ads
+              {t('search.googleAds')}
             </button>
             <button 
               onClick={() => setActiveTab('organic')}

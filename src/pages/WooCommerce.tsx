@@ -323,7 +323,7 @@ export function WooCommerce() {
                           {t('woocommerce.updateInWooCommerce')}
                         </button>
                         <button 
-                          onClick={() => alert("Ad creation from product not implemented yet.")}
+                          onClick={() => alert(t('woocommerce.createAdNotImplemented'))}
                           className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
                         >
                           <Zap className="w-4 h-4" />

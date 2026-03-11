@@ -40,7 +40,7 @@ export function Integrations() {
   const handleTikTokConnect = async () => {
     try {
       const response = await fetch(`/api/auth/tiktok/url`);
-      if (!response.ok) throw new Error('Failed to get auth URL');
+      if (!response.ok) throw new Error(t('integrations.oauth.getAuthUrlFailed'));
       const { url } = await response.json();
       
       const width = 600;
@@ -55,14 +55,14 @@ export function Integrations() {
       );
     } catch (err) {
       console.error("Failed to get TikTok auth URL:", err);
-      setToast({ message: "Failed to start TikTok authentication", type: 'error' });
+      setToast({ message: t('integrations.oauth.tiktokStartFailed'), type: 'error' });
     }
   };
 
   const handleMetaConnect = async () => {
     try {
       const response = await fetch(`/api/auth/meta/url`);
-      if (!response.ok) throw new Error('Failed to get auth URL');
+      if (!response.ok) throw new Error(t('integrations.oauth.getAuthUrlFailed'));
       const { url } = await response.json();
       
       const width = 600;
@@ -77,7 +77,7 @@ export function Integrations() {
       );
     } catch (err) {
       console.error("Failed to get Meta auth URL:", err);
-      setToast({ message: "Failed to start Meta authentication", type: 'error' });
+      setToast({ message: t('integrations.oauth.metaStartFailed'), type: 'error' });
     }
   };
 
@@ -86,7 +86,7 @@ export function Integrations() {
       const response = await fetch(`/api/auth/google/url`);
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Failed to get auth URL: ${response.status} ${text}`);
+        throw new Error(`${t('integrations.oauth.getAuthUrlFailed')}: ${response.status} ${text}`);
       }
       const { url } = await response.json();
       
@@ -102,7 +102,7 @@ export function Integrations() {
       );
     } catch (err) {
       console.error("Failed to get Google auth URL:", err);
-      setToast({ message: `Failed to start Google authentication: ${err instanceof Error ? err.message : 'Unknown error'}`, type: 'error' });
+      setToast({ message: `${t('integrations.oauth.googleStartFailed')}: ${err instanceof Error ? err.message : t('common.error')}`, type: 'error' });
     }
   };
 
@@ -121,7 +121,7 @@ export function Integrations() {
     const googleConn = connections.find(c => c.id === 'google');
     const accessToken = formValues.googleAccessToken || googleConn?.settings?.googleAccessToken;
     if (!accessToken) {
-      setToast({ message: "Google access token is missing. Please reconnect Google first.", type: 'error' });
+      setToast({ message: t('integrations.oauth.googleTokenMissing'), type: 'error' });
       return;
     }
 
@@ -131,10 +131,10 @@ export function Integrations() {
       const mergedSettings = { ...formValues, ...discoveredSettings };
       setFormValues(mergedSettings);
       await handleSave('google', mergedSettings);
-      setToast({ message: "Google resources scanned and synced successfully.", type: 'success' });
+      setToast({ message: t('integrations.oauth.googleScanSuccess'), type: 'success' });
     } catch (err) {
       console.error("Google discovery failed:", err);
-      setToast({ message: "Failed to scan Google resources. Please try again.", type: 'error' });
+      setToast({ message: t('integrations.oauth.googleScanFailed'), type: 'error' });
     } finally {
       setDiscoveringGoogle(false);
     }
@@ -156,7 +156,7 @@ export function Integrations() {
         handleSave('tiktok', { 
           tiktokToken: data.access_token,
         });
-        setToast({ message: "Successfully connected to TikTok Ads!", type: 'success' });
+        setToast({ message: t('integrations.oauth.tiktokConnected'), type: 'success' });
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'meta') {
@@ -165,7 +165,7 @@ export function Integrations() {
         handleSave('meta', { 
           metaToken: data.access_token,
         });
-        setToast({ message: "Successfully connected to Meta Ads!", type: 'success' });
+        setToast({ message: t('integrations.oauth.metaConnected'), type: 'success' });
       }
 
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'google') {
@@ -180,16 +180,16 @@ export function Integrations() {
         try {
           const discoveredSettings = await getDiscoveredGoogleSettings(tokens.access_token);
           await handleSave('google', { ...tokenSettings, ...discoveredSettings });
-          setToast({ message: "Successfully connected to Google Workspace and synced resources!", type: 'success' });
+          setToast({ message: t('integrations.oauth.googleConnectedAndSynced'), type: 'success' });
         } catch (err) {
           console.error("Google discovery during OAuth failed:", err);
           await handleSave('google', tokenSettings);
-          setToast({ message: "Connected to Google Workspace, but resource scan failed. You can run scan manually.", type: 'error' });
+          setToast({ message: t('integrations.oauth.googleConnectedScanFailed'), type: 'error' });
         }
       }
 
       if (event.data?.type === 'OAUTH_AUTH_ERROR') {
-        setToast({ message: event.data.error || "TikTok authentication failed", type: 'error' });
+        setToast({ message: event.data.error || t('integrations.oauth.authFailed'), type: 'error' });
       }
     };
 
@@ -219,10 +219,10 @@ export function Integrations() {
       // Show a more realistic verification process
       await updateConnectionSettings(id, settingsToSave);
       setExpandedId(null);
-      setSuccess(t('integrations.success', { name: connections.find(c => c.id === id)?.name || '' }));
+      setSuccess(t('integrations.success', { name: t(connections.find(c => c.id === id)?.name || '') }));
       setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
-      setError({ id, message: t('integrations.error', { name: connections.find(c => c.id === id)?.name || '' }) });
+      setError({ id, message: t('integrations.error', { name: t(connections.find(c => c.id === id)?.name || '') }) });
     }
   };
 
@@ -269,13 +269,13 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            Open Google AI Studio API keys:{' '}
+            {t('integrations.guides.gemini.step1')}{' '}
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className={linkClass}>
               aistudio.google.com/app/apikey
             </a>
           </li>
-          <li>Create a new API key and copy it.</li>
-          <li>Paste the key in API Key field and click Save & Connect.</li>
+          <li>{t('integrations.guides.gemini.step2')}</li>
+          <li>{t('integrations.guides.gemini.step3')}</li>
         </ul>
       );
     }
@@ -284,22 +284,22 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            Connect Google in popup, then click <b>Scan Google resources</b> to auto-fill IDs.
+            {t('integrations.guides.google.step1')}
           </li>
           <li>
-            Google Ads Customer ID (10 digits):{' '}
+            {t('integrations.guides.google.step2')}{' '}
             <a href="https://ads.google.com/aw/settings/account" target="_blank" rel="noreferrer" className={linkClass}>
               ads.google.com/aw/settings/account
             </a>
           </li>
           <li>
-            GA4 Property ID (Admin):{' '}
+            {t('integrations.guides.google.step3')}{' '}
             <a href="https://analytics.google.com/analytics/web/#/admin" target="_blank" rel="noreferrer" className={linkClass}>
               analytics.google.com/#/admin
             </a>
           </li>
           <li>
-            Search Console Site URL:{' '}
+            {t('integrations.guides.google.step4')}{' '}
             <a href="https://search.google.com/search-console" target="_blank" rel="noreferrer" className={linkClass}>
               search.google.com/search-console
             </a>
@@ -312,22 +312,22 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            Click Connect with Meta Ads and approve permissions.
+            {t('integrations.guides.meta.step1')}
           </li>
           <li>
-            Ads Account ID (act_...):{' '}
+            {t('integrations.guides.meta.step2')}{' '}
             <a href="https://adsmanager.facebook.com/" target="_blank" rel="noreferrer" className={linkClass}>
               adsmanager.facebook.com
             </a>
           </li>
           <li>
-            Business settings & assets:{' '}
+            {t('integrations.guides.meta.step3')}{' '}
             <a href="https://business.facebook.com/settings" target="_blank" rel="noreferrer" className={linkClass}>
               business.facebook.com/settings
             </a>
           </li>
           <li>
-            Pixel ID (Events Manager):{' '}
+            {t('integrations.guides.meta.step4')}{' '}
             <a href="https://business.facebook.com/events_manager2/list/pixel" target="_blank" rel="noreferrer" className={linkClass}>
               business.facebook.com/events_manager2/list/pixel
             </a>
@@ -340,19 +340,17 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            Click Connect with TikTok Ads and complete OAuth approval.
+            {t('integrations.guides.tiktok.step1')}
           </li>
           <li>
-            Log in to TikTok Ads Manager:{' '}
+            {t('integrations.guides.tiktok.step2')}{' '}
             <a href="https://ads.tiktok.com/" target="_blank" rel="noreferrer" className={linkClass}>
               ads.tiktok.com
             </a>
           </li>
+          <li>{t('integrations.guides.tiktok.step3')}</li>
           <li>
-            Copy your Advertiser ID from account settings and paste it here.
-          </li>
-          <li>
-            TikTok Marketing API docs:{' '}
+            {t('integrations.guides.tiktok.step4')}{' '}
             <a href="https://ads.tiktok.com/marketing_api/docs" target="_blank" rel="noreferrer" className={linkClass}>
               ads.tiktok.com/marketing_api/docs
             </a>
@@ -365,18 +363,14 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            In WordPress admin go to WooCommerce API keys page:{' '}
+            {t('integrations.guides.woocommerce.step1')}{' '}
             <a href="https://woocommerce.com/document/woocommerce-rest-api/" target="_blank" rel="noreferrer" className={linkClass}>
-              WooCommerce REST API guide
+              {t('integrations.guides.woocommerce.docsLabel')}
             </a>
           </li>
-          <li>Create a key with Read/Write permissions.</li>
-          <li>
-            Paste Store URL, Consumer Key and Consumer Secret, then test connection.
-          </li>
-          <li>
-            Direct path format: <code>/wp-admin/admin.php?page=wc-settings&tab=advanced&section=keys</code>
-          </li>
+          <li>{t('integrations.guides.woocommerce.step2')}</li>
+          <li>{t('integrations.guides.woocommerce.step3')}</li>
+          <li>{t('integrations.guides.woocommerce.step4')}</li>
         </ul>
       );
     }
@@ -385,16 +379,14 @@ export function Integrations() {
       return (
         <ul className="space-y-1.5 list-disc list-inside">
           <li>
-            Open Shopify Admin settings:{' '}
+            {t('integrations.guides.shopify.step1')}{' '}
             <a href="https://admin.shopify.com/" target="_blank" rel="noreferrer" className={linkClass}>
               admin.shopify.com
             </a>
           </li>
-          <li>
-            Go to Apps and sales channels {'>'} Develop apps {'>'} create/select app.
-          </li>
-          <li>Enable needed Admin API scopes and install the app.</li>
-          <li>Copy Admin API access token and paste it in this form.</li>
+          <li>{t('integrations.guides.shopify.step2')}</li>
+          <li>{t('integrations.guides.shopify.step3')}</li>
+          <li>{t('integrations.guides.shopify.step4')}</li>
         </ul>
       );
     }
@@ -460,7 +452,7 @@ export function Integrations() {
                       className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Megaphone className="w-4 h-4" />
-                      {isConnected ? "Reconnect Google Workspace" : "Connect with Google"}
+                      {isConnected ? t('integrations.reconnectGoogle') : t('integrations.connectGoogle')}
                     </button>
                   </div>
                   {isConnected && (
@@ -471,7 +463,7 @@ export function Integrations() {
                         className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 py-2 rounded-lg font-bold hover:bg-indigo-100 transition-all border border-indigo-100 disabled:opacity-60"
                       >
                         {discoveringGoogle ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                        {discoveringGoogle ? "Scanning Google resources..." : "Scan Google resources"}
+                        {discoveringGoogle ? t('integrations.scanGoogleInProgress') : t('integrations.scanGoogle')}
                       </button>
                     </div>
                   )}
@@ -482,15 +474,15 @@ export function Integrations() {
                         <input type="text" placeholder="123-456-7890" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.googleAdsId || ""} onChange={(e) => handleInputChange('googleAdsId', e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4MeasurementId')}</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4PropertyId')}</label>
                         <input type="text" placeholder="123456789 (property ID)" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4PropertyId || formValues.ga4Id || ""} onChange={(e) => handleInputChange('ga4PropertyId', e.target.value)} />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Search Console Site URL</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.searchConsoleSiteUrl')}</label>
                         <input type="text" placeholder="sc-domain:example.com or https://example.com/" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.gscSiteUrl || ""} onChange={(e) => handleInputChange('gscSiteUrl', e.target.value)} />
                       </div>
                       <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Google Access Token</label>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.googleAccessToken')}</label>
                         <input type="password" placeholder="ya29..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.googleAccessToken || ""} readOnly />
                       </div>
                     </>
@@ -506,7 +498,7 @@ export function Integrations() {
                       className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Facebook className="w-4 h-4" />
-                      {isConnected ? "Reconnect Meta Ads" : "Connect with Meta Ads"}
+                      {isConnected ? t('integrations.reconnectMeta') : t('integrations.connectMeta')}
                     </button>
                   </div>
                   {isConnected && (
@@ -536,7 +528,7 @@ export function Integrations() {
                       className="w-full flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg font-bold hover:bg-gray-900 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Video className="w-4 h-4" />
-                      {isConnected ? "Reconnect TikTok Ads" : "Connect with TikTok Ads"}
+                      {isConnected ? t('integrations.reconnectTikTok') : t('integrations.connectTikTok')}
                     </button>
                   </div>
                   {isConnected && (
@@ -816,7 +808,7 @@ export function Integrations() {
           <div className="flex items-center">
             <AlertCircle className={cn("h-5 w-5 text-red-500", dir === 'rtl' ? "ml-3" : "mr-3")} />
             <div>
-              <h3 className="text-sm font-bold text-red-800">{t('integrations.error', { name: connections.find(i => i.id === error.id)?.name || '' })}</h3>
+              <h3 className="text-sm font-bold text-red-800">{t('integrations.error', { name: t(connections.find(i => i.id === error.id)?.name || '') })}</h3>
               <p className="text-sm text-red-700 mt-1">{error.message}</p>
             </div>
           </div>

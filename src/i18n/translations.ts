@@ -80,7 +80,9 @@ export const translations = {
       fixSeoIssues: "Fix SEO Issues",
       fixSeoIssuesDesc: "Missing alt text on 2 products",
       welcome: "Welcome back",
-      welcomeSubtitle: "Here's what's happening with your business today."
+      welcomeSubtitle: "Here's what's happening with your business today.",
+      platformsGoogleMetaTikTok: "Google, Meta, TikTok",
+      poasLabel: "POAS: {value}"
     },
     landing: {
       login: "Login",
@@ -130,6 +132,7 @@ export const translations = {
       welcome: "Welcome to BScale AI",
       subtitle: "Connect to start growing your business",
       google: "Continue with Google",
+      googleError: "There was an error signing in with Google.",
       or: "Or continue with email",
       email: "Email Address",
       password: "Password",
@@ -156,6 +159,10 @@ export const translations = {
       subtitle: "Stay informed about your account and system changes.",
       empty: "No new updates",
       clearAll: "Clear all",
+      time: {
+        hoursAgo: "{count}h ago",
+        daysAgo: "{count}d ago"
+      },
       items: {
         ai_ready: "AI Analysis Complete",
         ai_ready_desc: "Your campaign analysis for the last 7 days is ready for review.",
@@ -188,9 +195,24 @@ export const translations = {
       businessId: "Business ID",
       pixelId: "Pixel ID",
       adsAccountId: "Ads Account ID",
-      ga4MeasurementId: "GA4 Measurement ID",
+      ga4MeasurementId: "GA4 Property ID",
+      ga4PropertyId: "GA4 Property ID",
+      searchConsoleSiteUrl: "Search Console Site URL",
+      googleAccessToken: "Google Access Token",
       advertiserId: "Advertiser ID",
       adminAccessToken: "Admin API Access Token",
+      connectGoogle: "Connect with Google",
+      reconnectGoogle: "Reconnect Google Workspace",
+      connectMeta: "Connect with Meta Ads",
+      reconnectMeta: "Reconnect Meta Ads",
+      connectTikTok: "Connect with TikTok Ads",
+      reconnectTikTok: "Reconnect TikTok Ads",
+      scanGoogle: "Scan Google resources",
+      scanGoogleInProgress: "Scanning Google resources...",
+      aiEngine: "AI Engine",
+      googleWorkspace: "Google Workspace",
+      socialMedia: "Social Media",
+      ecommerce: "E-commerce",
       connected: "Connected",
       connecting: "Connecting",
       disconnected: "Disconnected",
@@ -250,6 +272,58 @@ export const translations = {
         step1: "Settings > Develop apps",
         step2: "Create and install app",
         step3: "Copy Admin Token"
+      },
+      oauth: {
+        getAuthUrlFailed: "Failed to get authentication URL",
+        tiktokStartFailed: "Failed to start TikTok authentication",
+        metaStartFailed: "Failed to start Meta authentication",
+        googleStartFailed: "Failed to start Google authentication",
+        googleTokenMissing: "Google access token is missing. Please reconnect Google first.",
+        googleScanSuccess: "Google resources scanned and synced successfully.",
+        googleScanFailed: "Failed to scan Google resources. Please try again.",
+        tiktokConnected: "Successfully connected to TikTok Ads!",
+        metaConnected: "Successfully connected to Meta Ads!",
+        googleConnectedAndSynced: "Successfully connected to Google Workspace and synced resources!",
+        googleConnectedScanFailed: "Connected to Google Workspace, but resource scan failed. You can run scan manually.",
+        authFailed: "Authentication failed"
+      },
+      guides: {
+        gemini: {
+          step1: "Open Google AI Studio API keys:",
+          step2: "Create a new API key and copy it.",
+          step3: "Paste the key in API Key field and click Save & Connect."
+        },
+        google: {
+          step1: "Connect Google in popup, then click Scan Google resources to auto-fill IDs.",
+          step2: "Google Ads Customer ID (10 digits):",
+          step3: "GA4 Property ID (Admin):",
+          step4: "Search Console Site URL:"
+        },
+        meta: {
+          step1: "Click Connect with Meta Ads and approve permissions.",
+          step2: "Ads Account ID (act_...):",
+          step3: "Business settings and assets:",
+          step4: "Pixel ID (Events Manager):"
+        },
+        tiktok: {
+          step1: "Click Connect with TikTok Ads and complete OAuth approval.",
+          step2: "Log in to TikTok Ads Manager:",
+          step3: "Copy your Advertiser ID from account settings and paste it here.",
+          step4: "TikTok Marketing API docs:"
+        },
+        woocommerce: {
+          step1: "In WordPress admin, go to WooCommerce API keys page:",
+          step2: "Create a key with Read/Write permissions.",
+          step3: "Paste Store URL, Consumer Key and Consumer Secret, then test connection.",
+          step4: "Direct path format: /wp-admin/admin.php?page=wc-settings&tab=advanced&section=keys",
+          docsLabel: "WooCommerce REST API guide"
+        },
+        shopify: {
+          step1: "Open Shopify Admin settings:",
+          step2: "Go to Apps and sales channels > Develop apps > create/select app.",
+          step3: "Enable needed Admin API scopes and install the app.",
+          step4: "Copy Admin API access token and paste it in this form."
+        }
       }
     },
     campaigns: {
@@ -283,12 +357,31 @@ export const translations = {
       subtitle: "Cross-platform analysis and AI-driven optimization suggestions.",
       refresh: "Refresh Recommendations",
       applyAll: "Apply All Quick Wins",
+      errorLoading: "Failed to load AI recommendations. Please try again.",
       analysisTitle: "AI Performance Analysis",
       analysisSummary: "Based on the last 30 days of data across Google, Meta, and TikTok, we identified key trends: Meta drives 40% of top-funnel traffic, but Google Search captures 65% of final conversions. TikTok has the lowest CPA for brand awareness but struggles with direct sales.",
       proposedImprovements: "Proposed Improvements",
       expectedImpact: "Expected Impact",
       recentlyApplied: "Recently Applied",
-      appliedSuccessfully: "Applied Successfully"
+      appliedSuccessfully: "Applied Successfully",
+      recs: {
+        budgetReallocation: {
+          title: "Budget reallocation between channels",
+          desc: "Shift budget from low-return campaigns to channels with stronger recent ROAS signals."
+        },
+        brandBid: {
+          title: "Optimize brand campaign bids",
+          desc: "Increase efficiency by adjusting branded keyword bids based on conversion probability."
+        },
+        creativeRefresh: {
+          title: "Refresh top Meta creatives",
+          desc: "Rotate ad creatives with lower engagement and test new hooks for higher CTR."
+        },
+        leadGen: {
+          title: "Refine TikTok targeting clusters",
+          desc: "Narrow audience groups to reduce CPL and focus delivery on high-intent segments."
+        }
+      }
     },
     budget: {
       subtitle: "Cross-platform budget management and AI optimizations.",
@@ -426,6 +519,7 @@ export const translations = {
       active: "Active",
       subtitle: "Manage your product catalog and perform AI-based optimization.",
       refreshProducts: "Refresh Products",
+      searchProducts: "Search products...",
       productList: "Product List",
       loadingProducts: "Loading products...",
       noProducts: "No products found",
@@ -452,6 +546,7 @@ export const translations = {
       improvedFullDescription: 'Improved Full Description',
       updateInWooCommerce: 'Update Product in WooCommerce',
       createAd: 'Create Ad from Product',
+      createAdNotImplemented: 'Ad creation from product is not implemented yet.',
       updateSuccess: 'Product updated successfully!',
       updateFailed: 'Failed to update product.',
     },
@@ -469,6 +564,7 @@ export const translations = {
       reviewAndApply: 'Review and Apply Negative Keywords',
       performanceTitle: 'Search Term Performance',
       allTerms: 'All Terms',
+      googleAds: 'Google Ads',
       organicGsc: 'Organic (GSC)',
       negativeKeywords: 'Negative Keywords',
       manageNegatives: 'Manage Negative Keywords',
@@ -508,6 +604,9 @@ export const translations = {
       status: "Status",
       date: "Date",
       all: "All",
+      user: "User",
+      filter: "Filter",
+      export: "Export",
       viewAll: "View All",
       easy: "Easy",
       medium: "Medium",
@@ -597,7 +696,9 @@ export const translations = {
       fixSeoIssues: "תקן בעיות SEO",
       fixSeoIssuesDesc: "חסר טקסט חלופי ב-2 מוצרים",
       welcome: "ברוך שובך",
-      welcomeSubtitle: "הנה מה שקורה בעסק שלך היום."
+      welcomeSubtitle: "הנה מה שקורה בעסק שלך היום.",
+      platformsGoogleMetaTikTok: "Google, Meta, TikTok",
+      poasLabel: "POAS: {value}"
     },
     landing: {
       login: "התחברות למערכת",
@@ -647,6 +748,7 @@ export const translations = {
       welcome: "ברוכים הבאים ל-BScale AI",
       subtitle: "התחבר כדי להתחיל להצמיח את העסק שלך",
       google: "המשך עם Google",
+      googleError: "אירעה שגיאה בהתחברות עם Google.",
       or: "או המשך עם אימייל",
       email: "כתובת אימייל",
       password: "סיסמה",
@@ -673,6 +775,10 @@ export const translations = {
       subtitle: "הישאר מעודכן לגבי החשבון שלך ושינויים במערכת.",
       empty: "אין עדכונים חדשים",
       clearAll: "נקה הכל",
+      time: {
+        hoursAgo: "לפני {count} שעות",
+        daysAgo: "לפני {count} ימים"
+      },
       items: {
         ai_ready: "ניתוח AI הושלם",
         ai_ready_desc: "ניתוח הקמפיינים שלך ל-7 הימים האחרונים מוכן לבדיקה.",
@@ -705,9 +811,24 @@ export const translations = {
       businessId: "Business ID",
       pixelId: "Pixel ID",
       adsAccountId: "Ads Account ID",
-      ga4MeasurementId: "GA4 Measurement ID",
+      ga4MeasurementId: "GA4 Property ID",
+      ga4PropertyId: "GA4 Property ID",
+      searchConsoleSiteUrl: "Search Console Site URL",
+      googleAccessToken: "Google Access Token",
       advertiserId: "Advertiser ID",
       adminAccessToken: "Admin API Access Token",
+      connectGoogle: "התחבר עם Google",
+      reconnectGoogle: "חבר מחדש את Google Workspace",
+      connectMeta: "התחבר עם Meta Ads",
+      reconnectMeta: "חבר מחדש את Meta Ads",
+      connectTikTok: "התחבר עם TikTok Ads",
+      reconnectTikTok: "חבר מחדש את TikTok Ads",
+      scanGoogle: "סרוק משאבי Google",
+      scanGoogleInProgress: "סורק משאבי Google...",
+      aiEngine: "מנוע AI",
+      googleWorkspace: "Google Workspace",
+      socialMedia: "רשתות חברתיות",
+      ecommerce: "מסחר אלקטרוני",
       connected: "מחובר",
       connecting: "מתחבר",
       disconnected: "לא מחובר",
@@ -767,6 +888,58 @@ export const translations = {
         step1: "Settings > Develop apps",
         step2: "צור אפליקציה והתקן",
         step3: "העתק Admin Token"
+      },
+      oauth: {
+        getAuthUrlFailed: "נכשל קבלת קישור האימות",
+        tiktokStartFailed: "נכשל התחלת אימות TikTok",
+        metaStartFailed: "נכשל התחלת אימות Meta",
+        googleStartFailed: "נכשל התחלת אימות Google",
+        googleTokenMissing: "חסר Google access token. יש להתחבר מחדש ל-Google.",
+        googleScanSuccess: "סריקת משאבי Google הושלמה בהצלחה.",
+        googleScanFailed: "נכשלה סריקת משאבי Google. נסה שוב.",
+        tiktokConnected: "החיבור ל-TikTok Ads בוצע בהצלחה!",
+        metaConnected: "החיבור ל-Meta Ads בוצע בהצלחה!",
+        googleConnectedAndSynced: "החיבור ל-Google Workspace הושלם והמשאבים סונכרנו!",
+        googleConnectedScanFailed: "החיבור ל-Google הושלם, אך סריקת המשאבים נכשלה. ניתן להריץ סריקה ידנית.",
+        authFailed: "האימות נכשל"
+      },
+      guides: {
+        gemini: {
+          step1: "פתח את מסך API keys ב-Google AI Studio:",
+          step2: "צור מפתח API חדש והעתק אותו.",
+          step3: "הדבק את המפתח בשדה API Key ולחץ שמור והתחבר."
+        },
+        google: {
+          step1: "התחבר ל-Google בחלון הקופץ, ואז לחץ על סרוק משאבי Google למילוי מזהים אוטומטי.",
+          step2: "מזהה לקוח Google Ads (10 ספרות):",
+          step3: "מזהה נכס GA4 (Admin):",
+          step4: "כתובת אתר ב-Search Console:"
+        },
+        meta: {
+          step1: "לחץ התחבר עם Meta Ads ואשר הרשאות.",
+          step2: "מזהה חשבון מודעות (act_...):",
+          step3: "הגדרות עסק ונכסים:",
+          step4: "מזהה פיקסל (Events Manager):"
+        },
+        tiktok: {
+          step1: "לחץ התחבר עם TikTok Ads והשלם אימות OAuth.",
+          step2: "התחבר ל-TikTok Ads Manager:",
+          step3: "העתק את Advertiser ID מההגדרות והדבק כאן.",
+          step4: "תיעוד TikTok Marketing API:"
+        },
+        woocommerce: {
+          step1: "בממשק WordPress פתח את עמוד מפתחות WooCommerce API:",
+          step2: "צור מפתח עם הרשאות Read/Write.",
+          step3: "הדבק Store URL, Consumer Key ו-Consumer Secret, ואז בדוק חיבור.",
+          step4: "נתיב ישיר: /wp-admin/admin.php?page=wc-settings&tab=advanced&section=keys",
+          docsLabel: "מדריך WooCommerce REST API"
+        },
+        shopify: {
+          step1: "פתח את הגדרות Shopify Admin:",
+          step2: "עבור אל Apps and sales channels > Develop apps > צור/בחר אפליקציה.",
+          step3: "הפעל הרשאות Admin API נדרשות והתקן את האפליקציה.",
+          step4: "העתק את Admin API access token והדבק בטופס."
+        }
       }
     },
     campaigns: {
@@ -800,12 +973,31 @@ export const translations = {
       subtitle: "ניתוח חוצה פלטפורמות והצעות אופטימיזציה מבוססות בינה מלאכותית.",
       refresh: "רענן המלצות",
       applyAll: "החל את כל הניצחונות המהירות",
+      errorLoading: "נכשלה טעינת המלצות AI. נסה שוב.",
       analysisTitle: "ניתוח ביצועי AI",
       analysisSummary: "בהתבסס על נתוני 30 הימים האחרונים ב-Google, Meta ו-TikTok, זיהינו מגמות מפתח: Meta מביאה 40% מהתנועה בראש המשפך, אך רשת החיפוש של Google לוכדת 65% מההמרות הסופיות. ל-TikTok יש את ה-CPA הנמוך ביותר למודעות למותג אך היא מתקשה במכירות ישירות.",
       proposedImprovements: "שיפורים מוצעים",
       expectedImpact: "השפעה צפויה",
       recentlyApplied: "הוחלו לאחרונה",
-      appliedSuccessfully: "הוחל בהצלחה"
+      appliedSuccessfully: "הוחל בהצלחה",
+      recs: {
+        budgetReallocation: {
+          title: "הקצאה מחדש של תקציב בין ערוצים",
+          desc: "העבר תקציב מקמפיינים חלשים לערוצים עם ROAS גבוה יותר בתקופה האחרונה."
+        },
+        brandBid: {
+          title: "אופטימיזציית הצעות מחיר לקמפיין מותג",
+          desc: "שפר יעילות על ידי התאמת הצעות מחיר למילות מפתח ממותגות לפי סבירות המרה."
+        },
+        creativeRefresh: {
+          title: "רענון קריאייטיבים מובילים ב-Meta",
+          desc: "החלף מודעות עם מעורבות נמוכה ובדוק זוויות חדשות לשיפור CTR."
+        },
+        leadGen: {
+          title: "דיוק סגמנטים ב-TikTok",
+          desc: "צמצם קבוצות קהל כדי להפחית CPL ולהתמקד בקהלים בעלי כוונת רכישה גבוהה."
+        }
+      }
     },
     budget: {
       subtitle: "ניהול תקציבים חוצה פלטפורמות והחלת אופטימיזציות AI.",
@@ -943,6 +1135,7 @@ export const translations = {
       active: "פעיל",
       subtitle: "נהל את קטלוג המוצרים שלך ובצע אופטימיזציה מבוססת AI.",
       refreshProducts: "רענן מוצרים",
+      searchProducts: "חיפוש מוצרים...",
       productList: "רשימת מוצרים",
       loadingProducts: "טוען מוצרים...",
       noProducts: "לא נמצאו מוצרים",
@@ -968,6 +1161,10 @@ export const translations = {
       keywords: 'מילות מפתח',
       improvedFullDescription: 'תיאור מלא משופר',
       updateInWooCommerce: 'עדכן מוצר ב-WooCommerce',
+      createAd: 'צור מודעה מהמוצר',
+      createAdNotImplemented: 'יצירת מודעה מהמוצר עדיין לא מיושמת.',
+      updateSuccess: 'המוצר עודכן בהצלחה!',
+      updateFailed: 'עדכון המוצר נכשל.',
     },
     search: {
       subtitle: 'נתח מונחי חיפוש ונהל מילות מפתח שליליות ב-Google Ads.',
@@ -983,6 +1180,7 @@ export const translations = {
       reviewAndApply: 'סקור והחל מילות מפתח שליליות',
       performanceTitle: 'ביצועי מונחי חיפוש',
       allTerms: 'כל המונחים',
+      googleAds: 'Google Ads',
       organicGsc: 'אורגני (GSC)',
       negativeKeywords: 'מילות מפתח שליליות',
       manageNegatives: 'ניהול מילות מפתח שליליות',
@@ -1022,6 +1220,9 @@ export const translations = {
       status: "סטטוס",
       date: "תאריך",
       all: "הכל",
+      user: "משתמש",
+      filter: "סינון",
+      export: "ייצוא",
       viewAll: "צפה בהכל",
       easy: "קל",
       medium: "בינוני",

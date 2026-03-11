@@ -6,7 +6,7 @@ export type Language = 'en' | 'he' | 'ru' | 'pt' | 'fr';
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
   dir: 'rtl' | 'ltr';
 }
 
@@ -25,20 +25,30 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const t = (key: string) => {
+  const resolveKey = (lang: Language, key: string): string | undefined => {
     const keys = key.split('.');
-    const currentTranslations = translations[language as keyof typeof translations];
-    if (!currentTranslations) return key;
+    const currentTranslations = translations[lang as keyof typeof translations];
+    if (!currentTranslations) return undefined;
     
     let value: any = currentTranslations;
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
-        return key; // fallback
+        return undefined;
       }
     }
-    return typeof value === 'string' ? value : key;
+    return typeof value === 'string' ? value : undefined;
+  };
+
+  const t = (key: string, params?: Record<string, string | number>) => {
+    const template = resolveKey(language, key) ?? resolveKey('en', key) ?? key;
+    if (!params) return template;
+
+    return template.replace(/\{(\w+)\}/g, (_, token: string) => {
+      const value = params[token];
+      return value === undefined || value === null ? `{${token}}` : String(value);
+    });
   };
 
   const dir = language === 'he' ? 'rtl' : 'ltr';

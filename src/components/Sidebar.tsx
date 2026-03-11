@@ -36,6 +36,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
   const { t } = useLanguage();
   const currentUser = auth.currentUser;
   const isAdmin = userProfile?.role === 'admin';
+  const roleKey = userProfile?.role ? `users.roles.${userProfile.role}` : null;
+  const translatedRole = roleKey ? t(roleKey) : '';
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -72,7 +74,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
       ]
     },
     {
-      title: t('nav.approvalsAutomations') || 'Approvals / Automations',
+      title: t('nav.approvalsAutomations'),
       items: [
         { id: 'approvals-automations', label: t('nav.approvalsAutomations'), icon: ShieldAlert },
         { id: 'connections', label: t('nav.connections'), icon: Plug },
@@ -108,7 +110,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
                 <span className="text-xl font-black text-gray-900 dark:text-white tracking-tight">{t('app.name')}</span>
               </div>
               <span className="text-[8px] font-bold text-indigo-500 dark:text-indigo-400 uppercase tracking-[0.2em] ps-10 -mt-1 opacity-80">
-                AI Powered Engine
+                {t('app.slogan')}
               </span>
             </div>
             <button onClick={() => setIsOpen(false)} className="lg:hidden">
@@ -172,10 +174,10 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
             </div>
             <div className="flex-1 min-w-0 text-start">
               <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">
-                {currentUser?.displayName || 'User'}
+                {currentUser?.displayName || t('common.user')}
               </p>
               <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
-                {userProfile?.role || 'User'}
+                {translatedRole && translatedRole !== roleKey ? translatedRole : (userProfile?.role || t('common.user'))}
               </p>
             </div>
             <button 

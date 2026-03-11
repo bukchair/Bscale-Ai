@@ -285,12 +285,12 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       await persistConnections(updatedConnections);
       return { 
         success: true, 
-        message: `החיבור ל-${connection.name} אומת בהצלחה. נתוני API זמינים.` 
+        message: `החיבור אומת בהצלחה. נתוני API זמינים.` 
       };
     } else {
       return { 
         success: false, 
-        message: `נכשל אימות החיבור ל-${connection.name}. אנא בדוק את הגדרות ה-API.` 
+        message: `נכשל אימות החיבור. אנא בדוק את הגדרות ה-API.` 
       };
     }
   };

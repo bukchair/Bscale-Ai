@@ -147,7 +147,7 @@ export function Dashboard() {
       {/* Personalized Welcome */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
-          {t('dashboard.welcome')}, {currentUser?.displayName?.split(' ')[0] || 'User'}! 👋
+          {t('dashboard.welcome')}, {currentUser?.displayName?.split(' ')[0] || t('common.user')}! 👋
         </h1>
         <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">
           {t('dashboard.welcomeSubtitle')}
@@ -212,7 +212,7 @@ export function Dashboard() {
             <p className="text-4xl font-black text-red-900 dark:text-red-50">₪{totalSpend.toLocaleString()}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
-              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>
+              <span className="text-xs text-red-600 dark:text-red-400 font-medium">{t('dashboard.platformsGoogleMetaTikTok')}</span>
             </div>
           </div>
           
@@ -222,7 +222,7 @@ export function Dashboard() {
             <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">{roas}x</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
-              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">POAS: 1.8x</span>
+              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{t('dashboard.poasLabel', { value: '1.8x' })}</span>
             </div>
           </div>
         </div>

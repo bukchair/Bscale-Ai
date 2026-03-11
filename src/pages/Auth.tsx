@@ -23,7 +23,7 @@ export function Auth({ onLogin }: AuthProps) {
       // App.tsx will handle the redirect/state change via onAuthStateChanged
     } catch (err: any) {
       console.error("Google Login Error:", err);
-      setError(err.message || "אירעה שגיאה בהתחברות עם גוגל.");
+      setError(err.message || t('auth.googleError'));
     } finally {
       setIsLoading(false);
     }

@@ -20,10 +20,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const notifications = [
-    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: '2h ago', icon: CheckCircle, color: 'text-emerald-500' },
-    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: '5h ago', icon: AlertTriangle, color: 'text-amber-500' },
-    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: '1d ago', icon: Search, color: 'text-indigo-500' },
-    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: '2d ago', icon: AlertTriangle, color: 'text-red-500' },
+    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: t('notifications.time.hoursAgo', { count: 2 }), icon: CheckCircle, color: 'text-emerald-500' },
+    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: t('notifications.time.hoursAgo', { count: 5 }), icon: AlertTriangle, color: 'text-amber-500' },
+    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: t('notifications.time.daysAgo', { count: 1 }), icon: Search, color: 'text-indigo-500' },
+    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: t('notifications.time.daysAgo', { count: 2 }), icon: AlertTriangle, color: 'text-red-500' },
   ];
 
   const handleDateClick = (range: DateRangeType) => {
@@ -127,7 +127,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
                           <div className={cn("w-1.5 h-1.5 rounded-full", conn.status === 'connected' ? 'bg-emerald-500' : conn.status === 'error' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600')} />
-                          <span className="text-gray-700 dark:text-gray-300 font-bold truncate max-w-[140px]" title={conn.name}>{conn.name}</span>
+                          <span className="text-gray-700 dark:text-gray-300 font-bold truncate max-w-[140px]" title={t(conn.name)}>{t(conn.name)}</span>
                         </div>
                         {conn.status === 'error' ? (
                           <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
