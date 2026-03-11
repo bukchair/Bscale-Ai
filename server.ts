@@ -531,6 +531,31 @@ async function startServer() {
     res.json({ discovered, warnings });
   });
 
+  app.get("/api/google/validate", async (req, res) => {
+    const accessToken = getBearerToken(req);
+    if (!accessToken) {
+      return res.status(400).json({ message: "Missing access token" });
+    }
+
+    try {
+      const userInfoRes = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      res.json({
+        valid: true,
+        account: {
+          sub: userInfoRes.data?.sub,
+          email: userInfoRes.data?.email,
+          name: userInfoRes.data?.name,
+          picture: userInfoRes.data?.picture,
+        }
+      });
+    } catch (error) {
+      res.status(401).json({ message: getAxiosErrorMessage(error, "Invalid Google token") });
+    }
+  });
+
   app.get("/api/google/ads/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const customerId = req.query.customer_id;

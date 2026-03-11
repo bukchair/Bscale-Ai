@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
-import { fetchGoogleAdAccounts, refreshGoogleAccessToken } from '../services/googleService';
+import { fetchGoogleDiscovery, refreshGoogleAccessToken, validateGoogleAccessToken } from '../services/googleService';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
 
@@ -314,8 +314,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
           await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
         }
 
-        await fetchGoogleAdAccounts(accessToken);
+        await validateGoogleAccessToken(accessToken);
         await markGoogleConnected();
+        // Discovery failures should not block auth validation.
+        try {
+          await fetchGoogleDiscovery(accessToken);
+        } catch (discoveryErr) {
+          console.warn('Google discovery warning during test:', discoveryErr);
+        }
         return { success: true, message: 'החיבור ל-Google אומת בהצלחה.' };
       } catch (err) {
         try {
@@ -323,8 +329,13 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
             const refreshed = await refreshGoogleAccessToken(refreshToken);
             accessToken = refreshed.access_token;
             await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
-            await fetchGoogleAdAccounts(accessToken);
+            await validateGoogleAccessToken(accessToken);
             await markGoogleConnected();
+            try {
+              await fetchGoogleDiscovery(accessToken);
+            } catch (discoveryErr) {
+              console.warn('Google discovery warning after refresh:', discoveryErr);
+            }
             return { success: true, message: 'החיבור ל-Google אומת בהצלחה לאחר רענון טוקן.' };
           }
         } catch (refreshErr) {

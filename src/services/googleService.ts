@@ -31,6 +31,21 @@ export async function refreshGoogleAccessToken(refreshToken: string): Promise<{ 
   return response.json();
 }
 
+export async function validateGoogleAccessToken(accessToken: string): Promise<{ valid: boolean; account?: { email?: string; name?: string } }> {
+  const response = await fetch('/api/google/validate', {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Google token validation failed');
+  }
+
+  return response.json();
+}
+
 export async function fetchGoogleCampaigns(
   accessToken: string,
   customerId: string,
