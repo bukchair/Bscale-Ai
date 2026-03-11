@@ -174,7 +174,7 @@ export function Landing({ onEnter, onOpenPrivacy }: LandingProps) {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 p-3">
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-300">{t('landing.unifiedKpiRevenue')}</p>
                     <p className="text-lg font-black text-emerald-700 dark:text-emerald-300">₪{totalRevenue.toLocaleString()}</p>

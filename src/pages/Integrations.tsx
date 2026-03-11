@@ -807,7 +807,7 @@ export function Integrations() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto pb-8">
-      <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-600 shrink-0">
             <Plug className="w-5 h-5" />
@@ -822,7 +822,7 @@ export function Integrations() {
             const connected = connections.filter(c => c.status === 'connected');
             connected.forEach(c => handleTest(c.id));
           }}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-2"
+          className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm flex items-center justify-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" />
           {t('integrations.testAll')}
@@ -837,7 +837,7 @@ export function Integrations() {
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: 20, x: '-50%' }}
             className={cn(
-              "fixed bottom-8 left-1/2 z-[100] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 min-w-[300px] border",
+              "fixed bottom-4 sm:bottom-8 left-1/2 z-[100] px-4 sm:px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 w-[calc(100vw-1rem)] sm:w-auto sm:min-w-[300px] max-w-[560px] border",
               toast.type === 'success' ? "bg-emerald-600 border-emerald-500 text-white" : "bg-red-600 border-red-500 text-white"
             )}
           >

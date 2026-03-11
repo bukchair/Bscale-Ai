@@ -205,31 +205,33 @@ export function SearchAnalysis() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="text-lg font-bold text-gray-900">{t('search.performanceTitle')}</h2>
-          <div className="flex bg-gray-100 p-1 rounded-xl">
-            <button 
-              onClick={() => setActiveTab('all')}
-              className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
-            >
-              {t('search.allTerms')}
-            </button>
-            <button 
-              onClick={() => setActiveTab('ads')}
-              className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'ads' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
-            >
-              {t('search.googleAds')}
-            </button>
-            <button 
-              onClick={() => setActiveTab('organic')}
-              className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'organic' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
-            >
-              {t('search.organicGsc')}
-            </button>
-            <button 
-              onClick={() => setActiveTab('negative')}
-              className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors", activeTab === 'negative' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
-            >
-              {t('search.negativeKeywords')}
-            </button>
+          <div className="w-full sm:w-auto overflow-x-auto">
+            <div className="flex min-w-max bg-gray-100 p-1 rounded-xl">
+              <button 
+                onClick={() => setActiveTab('all')}
+                className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors whitespace-nowrap", activeTab === 'all' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
+              >
+                {t('search.allTerms')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('ads')}
+                className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors whitespace-nowrap", activeTab === 'ads' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
+              >
+                {t('search.googleAds')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('organic')}
+                className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors whitespace-nowrap", activeTab === 'organic' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
+              >
+                {t('search.organicGsc')}
+              </button>
+              <button 
+                onClick={() => setActiveTab('negative')}
+                className={cn("px-4 py-1.5 text-sm font-bold rounded-lg transition-colors whitespace-nowrap", activeTab === 'negative' ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900")}
+              >
+                {t('search.negativeKeywords')}
+              </button>
+            </div>
           </div>
         </div>
         

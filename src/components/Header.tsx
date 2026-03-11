@@ -19,6 +19,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { connections, overallQualityScore, connectedCount, totalCount } = useConnections();
   const [isConnectionsOpen, setIsConnectionsOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isMobileDateMenuOpen, setIsMobileDateMenuOpen] = useState(false);
+  const [isMobileConnectionsOpen, setIsMobileConnectionsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<number[]>([]);
   const toInputDate = (value: Date | null) => {
@@ -46,6 +48,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   const handleDateClick = (range: DateRangeType) => {
     setDateRange(range);
+    setIsMobileDateMenuOpen(false);
     if (range === 'custom') {
       setIsDatePickerOpen(true);
     } else {
@@ -53,8 +56,14 @@ export function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
+  const mobileDateLabel =
+    dateRange === 'today' ? t('dashboard.today') :
+    dateRange === '7days' ? t('dashboard.last7Days') :
+    dateRange === '30days' ? t('dashboard.last30Days') :
+    t('dashboard.customRange');
+
   return (
-    <header className="bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 transition-colors duration-300">
+    <header className="relative bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="flex items-center flex-1">
         <button
           onClick={onMenuClick}
@@ -62,6 +71,29 @@ export function Header({ onMenuClick }: HeaderProps) {
         >
           <Menu className="w-6 h-6" />
         </button>
+
+        <div className="sm:hidden flex items-center gap-2">
+          <button
+            onClick={() => {
+              setIsMobileDateMenuOpen((prev) => !prev);
+              setIsMobileConnectionsOpen(false);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-[#1a1a1a] text-[11px] font-bold text-gray-700 dark:text-gray-300"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span className="max-w-[90px] truncate">{mobileDateLabel}</span>
+          </button>
+          <button
+            onClick={() => {
+              setIsMobileConnectionsOpen((prev) => !prev);
+              setIsMobileDateMenuOpen(false);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-[#1a1a1a] text-[11px] font-bold text-gray-700 dark:text-gray-300"
+          >
+            <span dir="ltr">{connectedCount}/{totalCount}</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
         
         <div className="hidden sm:flex items-center gap-2 relative">
           <div className="flex items-center bg-gray-100 dark:bg-[#1a1a1a] rounded-lg p-1">
@@ -182,7 +214,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <ThemeSwitcher />
         <LanguageSwitcher />
         
@@ -200,7 +232,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
           {isNotificationsOpen && (
             <div className={cn(
-              "absolute top-full mt-2 w-80 sm:w-96 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
+              "absolute top-full mt-2 w-[calc(100vw-1rem)] max-w-96 sm:w-96 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
               dir === 'rtl' ? "left-0" : "right-0"
             )}>
               <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
@@ -263,6 +295,82 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
       </div>
+
+      {isMobileDateMenuOpen && (
+        <div className="sm:hidden absolute top-full mt-2 left-2 right-2 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-3 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleDateClick('today')}
+              className={cn("px-3 py-2 text-xs font-bold rounded-lg", dateRange === 'today' ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300")}
+            >
+              {t('dashboard.today')}
+            </button>
+            <button
+              onClick={() => handleDateClick('7days')}
+              className={cn("px-3 py-2 text-xs font-bold rounded-lg", dateRange === '7days' ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300")}
+            >
+              {t('dashboard.last7Days')}
+            </button>
+            <button
+              onClick={() => handleDateClick('30days')}
+              className={cn("px-3 py-2 text-xs font-bold rounded-lg", dateRange === '30days' ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300")}
+            >
+              {t('dashboard.last30Days')}
+            </button>
+            <button
+              onClick={() => handleDateClick('custom')}
+              className={cn("px-3 py-2 text-xs font-bold rounded-lg", dateRange === 'custom' ? "bg-indigo-600 text-white" : "bg-gray-100 dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300")}
+            >
+              {t('dashboard.customRange')}
+            </button>
+          </div>
+          {dateRange === 'custom' && (
+            <div className="grid grid-cols-1 gap-2">
+              <input
+                type="date"
+                className="text-sm border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm"
+                value={toInputDate(customRange.start)}
+                onChange={(e) => setCustomRange({ ...customRange, start: e.target.value ? new Date(`${e.target.value}T12:00:00`) : null })}
+              />
+              <input
+                type="date"
+                className="text-sm border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm"
+                value={toInputDate(customRange.end)}
+                onChange={(e) => setCustomRange({ ...customRange, end: e.target.value ? new Date(`${e.target.value}T12:00:00`) : null })}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isMobileConnectionsOpen && (
+        <div className="sm:hidden absolute top-full mt-2 left-2 right-2 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-3">
+          <div className="space-y-2 mb-3 max-h-56 overflow-y-auto">
+            {connections.map((conn) => (
+              <div key={conn.id} className="flex items-center justify-between text-xs">
+                <span className="font-bold text-gray-700 dark:text-gray-300 truncate max-w-[65%]">{t(conn.name)}</span>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                  conn.status === 'connected' ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" :
+                  conn.status === 'error' ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300" :
+                  "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300"
+                )}>
+                  {conn.status === 'connected' ? t('integrations.connected') : conn.status === 'error' ? t('integrations.errorStatus') : t('integrations.disconnected')}
+                </span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => {
+              navigateTo('connections');
+              setIsMobileConnectionsOpen(false);
+            }}
+            className="w-full py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            {t('dashboard.manageConnections')}
+          </button>
+        </div>
+      )}
     </header>
   );
 }
