@@ -363,6 +363,7 @@ async function startServer() {
 
   app.get(["/api/auth/google/url", "/api/auth/google/url/"], (req, res) => {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
+    const forceAccountSelection = String(req.query.select_account || "") === "1";
     const scopes = [
       "https://www.googleapis.com/auth/adwords",
       "https://www.googleapis.com/auth/analytics.readonly",
@@ -382,7 +383,7 @@ async function startServer() {
       response_type: "code",
       scope: scopes.join(" "),
       access_type: "offline",
-      prompt: "consent"
+      prompt: forceAccountSelection ? "select_account consent" : "consent"
     });
 
     res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });

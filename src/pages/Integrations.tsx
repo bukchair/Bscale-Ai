@@ -92,9 +92,9 @@ export function Integrations() {
     }
   };
 
-  const handleGoogleConnect = async () => {
+  const handleGoogleConnect = async (selectDifferentAccount = false) => {
     try {
-      const response = await fetch(`/api/auth/google/url`);
+      const response = await fetch(`/api/auth/google/url?select_account=${selectDifferentAccount ? '1' : '0'}`);
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`${t('integrations.oauth.getAuthUrlFailed')}: ${response.status} ${text}`);
@@ -498,11 +498,20 @@ export function Integrations() {
                 <>
                   <div className="sm:col-span-2">
                     <button
-                      onClick={handleGoogleConnect}
+                      onClick={() => handleGoogleConnect(false)}
                       className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Megaphone className="w-4 h-4" />
                       {isConnected ? t('integrations.reconnectGoogle') : t('integrations.connectGoogle')}
+                    </button>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={() => handleGoogleConnect(true)}
+                      className="w-full flex items-center justify-center gap-2 bg-white border border-blue-200 text-blue-700 py-2 rounded-lg font-bold hover:bg-blue-50 transition-all"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      {t('integrations.connectGoogleDifferent')}
                     </button>
                   </div>
                   {isConnected && (
