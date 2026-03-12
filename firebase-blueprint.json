@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the BScale AI platform",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { 
+          "type": "string", 
+          "enum": ["admin", "agency", "owner", "editor", "viewer"],
+          "description": "User role for RBAC"
+        },
+        "agencyId": { "type": "string", "description": "ID of the agency this user belongs to, if any" },
+        "storeIds": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "Stores this user has access to"
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role", "createdAt"]
+    },
+    "Store": {
+      "title": "Store",
+      "description": "An e-commerce store managed by the platform",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "agencyId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "ownerId", "createdAt"]
+    },
+    "Connection": {
+      "title": "Connection",
+      "description": "Integration connection status for a store",
+      "type": "object",
+      "properties": {
+        "storeId": { "type": "string" },
+        "platform": { 
+          "type": "string",
+          "enum": ["google", "meta", "tiktok", "woocommerce", "shopify"]
+        },
+        "status": { 
+          "type": "string",
+          "enum": ["connected", "disconnected", "error"]
+        },
+        "qualityScore": { "type": "number", "description": "0-100 score" },
+        "lastSync": { "type": "string", "format": "date-time" },
+        "details": { "type": "object", "description": "Platform specific details (e.g. sub-services for Google)" }
+      },
+      "required": ["storeId", "platform", "status"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "Audit log of user actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "storeId": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "storeId", "userId", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and roles"
+    },
+    "/stores/{storeId}": {
+      "schema": { "$ref": "#/entities/Store" },
+      "description": "Stores managed by users/agencies"
+    },
+    "/stores/{storeId}/connections/{connectionId}": {
+      "schema": { "$ref": "#/entities/Connection" },
+      "description": "Connections for a specific store"
+    },
+    "/stores/{storeId}/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Activity logs for a specific store"
+    }
+  }
+}

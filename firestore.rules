@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "asher205@gmail.com" && request.auth.token.email_verified == true);
+    }
+    
+    function isAgency() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agency';
+    }
+    
+    function hasStoreAccess(storeId) {
+      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
+      return isAdmin() || 
+             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
+             (storeId in user.storeIds);
+    }
+    
+    function hasStoreEditAccess(storeId) {
+      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
+      return isAdmin() || 
+             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
+             (storeId in user.storeIds && user.role in ['owner', 'editor']);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'role', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.role in ['admin', 'agency', 'owner', 'editor', 'viewer'] &&
+             data.createdAt is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin() || isAgency();
+      
+      // Only admins can create admins/agencies. Users can create themselves as 'owner' initially.
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == 'owner') || isAdmin());
+                    
+      // Only admins can change roles. Users can update their own name.
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid) || isAdmin());
+                    
+      allow delete: if isAdmin();
+
+      match /settings/{settingId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+    
+    match /stores/{storeId} {
+      allow read: if hasStoreAccess(storeId);
+      allow create: if isAuthenticated() && (isAdmin() || isAgency() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner');
+      allow update: if hasStoreEditAccess(storeId);
+      allow delete: if isAdmin() || (isAgency() && resource.data.agencyId == request.auth.uid) || resource.data.ownerId == request.auth.uid;
+      
+      match /connections/{connectionId} {
+        allow read: if hasStoreAccess(storeId);
+        allow write: if hasStoreEditAccess(storeId);
+      }
+      
+      match /activityLogs/{logId} {
+        allow read: if hasStoreAccess(storeId);
+        allow create: if hasStoreEditAccess(storeId);
+        allow update, delete: if false; // Logs are immutable
+      }
+    }
+  }
+}
