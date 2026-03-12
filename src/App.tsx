@@ -9,6 +9,7 @@ import { Header } from './components/Header';
 import { Dashboard } from './pages/Dashboard';
 import { Profitability } from './pages/Profitability';
 import { Budget } from './pages/Budget';
+import { Campaigns } from './pages/Campaigns';
 import { AIRecommendations } from './pages/AIRecommendations';
 import { SearchAnalysis } from './pages/SearchAnalysis';
 import { SEOReports } from './pages/SEOReports';
@@ -75,6 +76,8 @@ export default function App() {
         return <Profitability />;
       case 'budget':
         return <Budget />;
+      case 'campaigns':
+        return <Campaigns />;
       case 'ai-recommendations':
         return <AIRecommendations />;
       case 'search-analysis':

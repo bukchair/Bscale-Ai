@@ -58,7 +58,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
     {
       title: t('nav.aiCampaigns'),
       items: [
-        { id: 'ai-recommendations', label: t('nav.aiRecommendations'), icon: Megaphone },
+        { id: 'campaigns', label: t('nav.campaigns'), icon: Megaphone },
+        { id: 'ai-recommendations', label: t('nav.aiRecommendations'), icon: Activity },
         { id: 'search-analysis', label: t('nav.searchAnalysis'), icon: Search },
       ]
     },
