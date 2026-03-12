@@ -877,6 +877,8 @@ export const translations = {
         stepConnectBelow: "לחץ על כפתור החיבור למטה"
       }
     },
+    campaigns: {
+      title: "ניהול קמפיינים ואופטימיזציה",
       refreshAi: "רענן המלצות AI",
       activeCampaigns: "קמפיינים פעילים",
       campaignName: "שם קמפיין",
