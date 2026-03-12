@@ -33,6 +33,7 @@ interface ConnectionsContextType {
   connections: Connection[];
   toggleConnection: (id: string, subId?: string) => Promise<void>;
   updateConnectionSettings: (id: string, settings: ConnectionSettings) => Promise<void>;
+  clearConnectionSettings: (id: string) => Promise<void>;
   testConnection: (id: string) => Promise<{ success: boolean; message: string }>;
   overallQualityScore: number;
   connectedCount: number;
@@ -226,6 +227,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     await persistConnections(finalConnections);
   };
 
+  const clearConnectionSettings = async (id: string) => {
+    const next = connections.map((c) =>
+      c.id === id ? { ...c, status: 'disconnected' as ConnectionStatus, score: undefined, settings: {} } : c
+    );
+    setConnections(next);
+    await persistConnections(next);
+  };
+
   const testConnection = async (id: string): Promise<{ success: boolean; message: string }> => {
     const connection = connections.find(c => c.id === id);
     if (!connection) return { success: false, message: 'חיבור לא נמצא' };
@@ -308,6 +317,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       connections, 
       toggleConnection, 
       updateConnectionSettings,
+      clearConnectionSettings,
       testConnection,
       overallQualityScore, 
       connectedCount, 

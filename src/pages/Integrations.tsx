@@ -25,7 +25,7 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 
 export function Integrations() {
   const { t, dir } = useLanguage();
-  const { connections, toggleConnection, updateConnectionSettings, testConnection } = useConnections();
+  const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, testConnection } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -384,6 +384,24 @@ export function Integrations() {
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.consumerSecret')}</label>
                         <input type="password" placeholder="cs_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.wooSecret || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('wooSecret', e.target.value)} />
                       </div>
+                      {isConnected && (
+                        <div className="sm:col-span-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm(t('integrations.wooResetConfirm') || 'למחוק את החיבור ל-WooCommerce ולהגדיר מחדש?')) {
+                                await clearConnectionSettings('woocommerce');
+                                setFormValues((prev) => ({ ...prev, storeUrl: '', wooKey: '', wooSecret: '' }));
+                                setToast({ message: t('integrations.wooResetDone') || 'החיבור נוקה. הזן פרטים חדשים למעלה.', type: 'success' });
+                              }
+                            }}
+                            className="w-full py-2 rounded-lg text-xs font-bold border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {t('integrations.wooResetConnection') || 'מחק חיבור והגדר מחדש'}
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
 

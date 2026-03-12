@@ -196,6 +196,9 @@ export const translations = {
       connecting: "Connecting",
       disconnected: "Disconnected",
       errorStatus: "Error",
+      wooResetConnection: "Reset connection and reconfigure",
+      wooResetConfirm: "Delete WooCommerce connection and enter new credentials?",
+      wooResetDone: "Connection cleared. Enter new details above.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
@@ -714,6 +717,9 @@ export const translations = {
       connecting: "מתחבר",
       disconnected: "לא מחובר",
       errorStatus: "שגיאה",
+      wooResetConnection: "מחק חיבור והגדר מחדש",
+      wooResetConfirm: "למחוק את החיבור ל-WooCommerce ולהזין פרטים חדשים?",
+      wooResetDone: "החיבור נוקה. הזן פרטים חדשים למעלה.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
