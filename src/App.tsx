@@ -16,7 +16,7 @@ import { SEOReports } from './pages/SEOReports';
 import { Audiences } from './pages/Audiences';
 import { CreativeLab } from './pages/CreativeLab';
 import { Automations } from './pages/Automations';
-import { Orders } from './pages\Orders';
+import { Orders } from './pages/Orders';
 import { Integrations } from './pages/Integrations';
 import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
