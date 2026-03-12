@@ -24,6 +24,7 @@ import { Auth } from './pages/Auth';
 import { SubscriptionRequired } from './pages/SubscriptionRequired';
 import { WooCommerce } from './pages/WooCommerce';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { Guide } from './pages/Guide';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useLanguage } from './contexts/LanguageContext';
 import { auth, onAuthStateChanged, syncUserProfile } from './lib/firebase';
@@ -85,9 +86,12 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [scrollToPricing, setScrollToPricing] = useState(false);
 
-  // Public privacy policy page – זמין בלי התחברות
+  // Public static pages – זמינים בלי התחברות
   if (path === '/privacy-policy') {
     return <PrivacyPolicy />;
+  }
+  if (path === '/guide') {
+    return <Guide />;
   }
 
   useEffect(() => {
