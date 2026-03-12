@@ -30,7 +30,7 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 export function Integrations({ userProfile }: { userProfile?: { role?: string } | null }) {
   const isAdmin = userProfile?.role === 'admin';
   const { t, dir } = useLanguage();
-  const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, resetAllConnections, testConnection } = useConnections();
+  const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, resetAllConnections, testConnection, migrateAiConnectionsFromUser } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -39,6 +39,17 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
   const [success, setSuccess] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const handleMigrateAi = async () => {
+    try {
+      const result = await migrateAiConnectionsFromUser();
+      setToast({ message: result.message, type: result.success ? 'success' : 'error' });
+    } catch (err) {
+      setToast({ message: t('common.error'), type: 'error' });
+    } finally {
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
 
   const handleTikTokConnect = async () => {
     try {
@@ -88,7 +99,8 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
 
   const handleGoogleConnect = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/google/url`);
+      const base = (typeof import.meta.env.VITE_APP_URL === 'string' && import.meta.env.VITE_APP_URL) || '';
+      const response = await fetch(`${base}/api/auth/google/url`);
       
       // Log the full response for debugging
       const responseText = await response.text();
@@ -159,7 +171,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
           googleRefreshToken: tokens.refresh_token || '',
           googleExpiry: (Date.now() + tokens.expires_in * 1000).toString(),
         });
-        setToast({ message: "Successfully connected to Google Workspace!", type: 'success' });
+        setToast({ message: t('integrations.googleEcosystemConnected'), type: 'success' });
         setTimeout(() => setToast(null), 3000);
       }
 
@@ -267,6 +279,17 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
                 )}
               </p>
               <p className="text-xs text-gray-500">{t('integrations.aiAdminOnly')}</p>
+              {isAdmin ? (
+                <button
+                  onClick={handleMigrateAi}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {t('integrations.aiSharedWithAll')}
+                </button>
+              ) : (
+                <p className="text-xs text-indigo-600 mt-1">{t('integrations.aiSharedWithAll')}</p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -370,7 +393,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
                       className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Megaphone className="w-4 h-4" />
-                      {isConnected ? "Reconnect Google Workspace" : "Connect with Google"}
+                      {isConnected ? t('integrations.reconnectGoogleEcosystem') : t('integrations.connectGoogleEcosystem')}
                     </button>
                   </div>
                   {isConnected && (

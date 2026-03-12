@@ -219,11 +219,15 @@ export const translations = {
       wooResetConfirm: "Delete WooCommerce connection and enter new credentials?",
       wooResetDone: "Connection cleared. Enter new details above.",
       aiAdminOnly: "Only admins can edit AI provider settings. You can see connection status only.",
+      aiSharedWithAll: "Gemini, OpenAI and Claude connections are shared with all users on the site.",
       sharedForAllUsers: "Shared for all users (configured by admin).",
       resetAll: "Reset all connections",
       resetAllConfirm: "Reset all connections to default? All saved credentials will be cleared.",
       resetAllDone: "All connections have been reset. You can configure them again.",
-      googleReconnectHint: "If the token expired or was revoked, click \"Reconnect Google Workspace\" to sign in again.",
+      googleReconnectHint: "If the token expired or was revoked, click \"Re-integrate Google Ecosystem\" to sign in again.",
+      connectGoogleEcosystem: "Connect Google Ecosystem",
+      reconnectGoogleEcosystem: "Re-integrate Google Ecosystem",
+      googleEcosystemConnected: "Successfully connected to Google Ecosystem!",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
@@ -792,11 +796,15 @@ export const translations = {
       wooResetConfirm: "למחוק את החיבור ל-WooCommerce ולהזין פרטים חדשים?",
       wooResetDone: "החיבור נוקה. הזן פרטים חדשים למעלה.",
       aiAdminOnly: "רק מנהלים יכולים לערוך הגדרות ספקי AI. כאן מוצג רק סטטוס החיבור.",
+      aiSharedWithAll: "חיבורי Gemini, OpenAI ו-Claude משותפים לכל המשתמשים באתר.",
       sharedForAllUsers: "משותף לכלל המשתמשים (מוגדר על ידי מנהל).",
       resetAll: "איפוס כל החיבורים",
       resetAllConfirm: "לאפס את כל החיבורים לברירת מחדל? כל ההגדרות השמורות יימחקו.",
       resetAllDone: "כל החיבורים אופסו. אפשר להגדיר אותם מחדש.",
-      googleReconnectHint: "אם הטוקן פג תוקף או בוטל, לחץ על \"התחבר מחדש עם Google\" כדי להיכנס שוב.",
+      googleReconnectHint: "אם הטוקן פג תוקף או בוטל, לחץ על \"שילוב מחדש של Google Ecosystem\" כדי להיכנס שוב.",
+      connectGoogleEcosystem: "חבר Google Ecosystem",
+      reconnectGoogleEcosystem: "שילוב מחדש של Google Ecosystem",
+      googleEcosystemConnected: "החיבור ל-Google Ecosystem הושלם בהצלחה!",
       platforms: {
         gemini: {
           name: "Google Gemini AI",

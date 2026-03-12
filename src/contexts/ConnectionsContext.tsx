@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
@@ -39,10 +39,12 @@ interface ConnectionsContextType {
   overallQualityScore: number;
   connectedCount: number;
   totalCount: number;
+  migrateAiConnectionsFromUser: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AI_CONNECTION_IDS = ['gemini', 'openai', 'claude'] as const;
 const PLATFORM_CONNECTION_IDS = ['google', 'meta', 'tiktok', 'woocommerce', 'shopify'] as const;
+// AI connections are stored in appSettings/connections and shared with all users (read by everyone, write by admin only).
 
 const initialConnections: Connection[] = [
   { 
@@ -308,6 +310,45 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     await persistUserConnections(platformPart);
   };
 
+  const migrateAiConnectionsFromUser = async (): Promise<{ success: boolean; message: string }> => {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, message: 'User not authenticated' };
+    }
+
+    const userConnectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
+    const globalAiRef = doc(db, 'appSettings', 'connections');
+
+    const [userSnap, globalSnap] = await Promise.all([getDoc(userConnectionsRef), getDoc(globalAiRef)]);
+
+    if (!userSnap.exists()) {
+      return { success: false, message: 'No user connections document found to migrate from.' };
+    }
+
+    const userItems = (userSnap.data().items || []) as Connection[];
+    const aiFromUser = userItems.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+
+    if (aiFromUser.length === 0) {
+      return { success: false, message: 'No Gemini / OpenAI / Claude connections found on the current user.' };
+    }
+
+    const existingGlobalItems = globalSnap.exists() ? ((globalSnap.data().items || []) as Connection[]) : [];
+    const byId = new Map<string, Connection>();
+    existingGlobalItems.forEach((c) => {
+      if (AI_CONNECTION_IDS.includes(c.id as any)) {
+        byId.set(c.id, c);
+      }
+    });
+    aiFromUser.forEach((c) => {
+      byId.set(c.id, c);
+    });
+
+    const merged = Array.from(byId.values());
+    await setDoc(globalAiRef, { items: merged }, { merge: true });
+
+    return { success: true, message: 'AI connections migrated from your user settings to appSettings (shared for all users).' };
+  };
+
   const testConnection = async (id: string): Promise<{ success: boolean; message: string }> => {
     const connection = connections.find(c => c.id === id);
     if (!connection) return { success: false, message: 'חיבור לא נמצא' };
@@ -352,7 +393,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         return { success: true, message: 'החיבור ל-Google אומת בהצלחה.' };
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'שגיאה לא ידועה';
-        return { success: false, message: `נכשל אימות החיבור ל-Google. ${msg}` };
+        const isDeveloperTokenMissing = /developer token not configured/i.test(msg);
+        const displayMsg = isDeveloperTokenMissing
+          ? 'חיבור Google Ads דורש הגדרת Developer Token בשרת (משתנה GOOGLE_ADS_DEVELOPER_TOKEN). אנא פנה למנהל המערכת או הוסף את המפתח ב-Vercel.'
+          : `נכשל אימות החיבור ל-Google. ${msg}`;
+        return { success: false, message: displayMsg };
       }
     }
 
@@ -394,6 +439,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       clearConnectionSettings,
       resetAllConnections,
       testConnection,
+      migrateAiConnectionsFromUser,
       overallQualityScore, 
       connectedCount, 
       totalCount 

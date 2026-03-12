@@ -8,11 +8,32 @@ import { auth } from '../lib/firebase';
 import { saveAdToFirestore, getSavedAds, type SavedAd } from '../lib/firebase';
 import { fetchWooCommerceProducts } from '../services/woocommerceService';
 
-const mockProductsFallback = [
-  { id: 1, name: 'נעלי ריצה מקצועיות', shortDesc: 'נעלי ריצה נוחות.', longDesc: 'נעלי ריצה מקצועיות עם סוליה בולמת זעזועים.', price: '₪450' },
-  { id: 2, name: 'שעון חכם ספורט', shortDesc: 'שעון חכם למעקב.', longDesc: 'שעון חכם עם מד דופק, GPS ומעקב שינה.', price: '₪890' },
-  { id: 3, name: 'אוזניות אלחוטיות', shortDesc: 'אוזניות בלוטוס.', longDesc: 'אוזניות אלחוטיות עם סינון רעשים וסוללה ל-24 שעות.', price: '₪350' },
+type CreativeProduct = {
+  id: number;
+  name: string;
+  shortDesc: string;
+  longDesc: string;
+  price: string;
+  imageUrl?: string | null;
+  galleryUrls?: string[];
+};
+
+const mockProductsFallback: CreativeProduct[] = [
+  { id: 1, name: 'נעלי ריצה מקצועיות', shortDesc: 'נעלי ריצה נוחות.', longDesc: 'נעלי ריצה מקצועיות עם סוליה בולמת זעזועים.', price: '₪450', imageUrl: null },
+  { id: 2, name: 'שעון חכם ספורט', shortDesc: 'שעון חכם למעקב.', longDesc: 'שעון חכם עם מד דופק, GPS ומעקב שינה.', price: '₪890', imageUrl: null },
+  { id: 3, name: 'אוזניות אלחוטיות', shortDesc: 'אוזניות בלוטוס.', longDesc: 'אוזניות אלחוטיות עם סינון רעשים וסוללה ל-24 שעות.', price: '₪350', imageUrl: null },
 ];
+
+function stripHtmlToText(html: string | undefined | null): string {
+  if (!html) return '';
+  // Basic fallback without DOM (for safety in non-browser environments)
+  const noTags = html.replace(/<[^>]+>/g, ' ');
+  if (typeof document === 'undefined') return noTags.replace(/\s+/g, ' ').trim();
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const text = (div.textContent || div.innerText || '').replace(/\s+/g, ' ').trim();
+  return text || noTags.replace(/\s+/g, ' ').trim();
+}
 
 export function CreativeLab() {
   const { t, dir } = useLanguage();
@@ -21,9 +42,9 @@ export function CreativeLab() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'image' | 'copy' | 'video'>('image');
   const [generatedContent, setGeneratedContent] = useState<any>(null);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<CreativeProduct | null>(null);
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
-  const [products, setProducts] = useState<Array<{ id: number; name: string; shortDesc: string; longDesc: string; price: string }>>(mockProductsFallback);
+  const [products, setProducts] = useState<CreativeProduct[]>(mockProductsFallback);
   const [productsLoading, setProductsLoading] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '9:16' | '16:9'>('1:1');
   const [toast, setToast] = useState<string | null>(null);
@@ -50,13 +71,20 @@ export function CreativeLab() {
     fetchWooCommerceProducts(storeUrl, wooKey, wooSecret)
       .then((list) => {
         setProducts(
-          list.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            shortDesc: p.short_description || '',
-            longDesc: p.description || '',
-            price: `₪${p.price}`,
-          }))
+          list.map((p: any) => {
+            const images: string[] = Array.isArray(p.images)
+              ? p.images.map((img: any) => img?.src).filter(Boolean)
+              : [];
+            return {
+              id: p.id,
+              name: stripHtmlToText(p.name),
+              shortDesc: stripHtmlToText(p.short_description),
+              longDesc: stripHtmlToText(p.description),
+              price: p.price ? `₪${p.price}` : '',
+              imageUrl: images[0] || null,
+              galleryUrls: images.slice(1, 4),
+            } as CreativeProduct;
+          })
         );
       })
       .catch(() => setProducts(mockProductsFallback))
@@ -216,46 +244,43 @@ export function CreativeLab() {
       return;
     }
 
-    // Mock generation delay for image and video
-    setTimeout(() => {
+    if (activeTab === 'image') {
+      // Use real product image when available, with graceful fallback
+      const mainUrl =
+        selectedProduct?.imageUrl ||
+        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800&h=800';
+      const variations =
+        selectedProduct?.galleryUrls && selectedProduct.galleryUrls.length > 0
+          ? selectedProduct.galleryUrls
+          : [
+              'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=200&h=200',
+              'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=200&h=200',
+              'https://images.unsplash.com/photo-1514989940723-e8e51635b782?auto=format&fit=crop&q=80&w=200&h=200'
+            ];
+      setGeneratedContent({
+        type: 'image',
+        url: mainUrl,
+        variations
+      });
       setIsGenerating(false);
-      if (activeTab === 'image') {
-        setGeneratedContent({
-          type: 'image',
-          url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800&h=800',
-          variations: [
-            'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=200&h=200',
-            'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=200&h=200',
-            'https://images.unsplash.com/photo-1514989940723-e8e51635b782?auto=format&fit=crop&q=80&w=200&h=200'
-          ]
-        });
-      } else if (activeTab === 'copy') {
-        setGeneratedContent({
-          type: 'copy',
-          options: [
-            {
-              headline: "שחרר את הפוטנציאל שלך. ה-Ultra Boost החדשות.",
-              primaryText: "חווה החזר אנרגיה חסר משקל בכל צעד. מעוצב לרצים שדורשים את הטוב ביותר.",
-              description: "קנה את הקולקציה החדשה היום וקבל משלוח חינם בהזמנות מעל 100 ₪."
-            },
-            {
-              headline: "רוץ מהר יותר. רוץ רחוק יותר.",
-              primaryText: "הכר את השיא האישי החדש שלך. ה-Ultra Boost מציגות את הריפוד הרספונסיבי ביותר שלנו אי פעם.",
-              description: "זמין ב-5 צבעים חדשים. מצא את ההתאמה המושלמת שלך."
-            }
-          ]
-        });
-      } else {
+      return;
+    }
+
+    // For now, keep a simple scripted demo for video
+    if (activeTab === 'video') {
+      setTimeout(() => {
         setGeneratedContent({
           type: 'video',
           script: [
-            { time: "0:00-0:05", visual: "צילום תקריב של נעליים פוגעות בקרקע בהילוך איטי", audio: "כל צעד הוא התחלה חדשה." },
-            { time: "0:05-0:15", visual: "רץ ברחובות העיר בשעת זריחה", audio: "כשכולם ישנים, אתה כבר בדרך לשיא הבא שלך." },
-            { time: "0:15-0:30", visual: "לוגו החברה וקריאה לפעולה", audio: "Ultra Boost. הנוחות שאתה צריך לביצועים שאתה רוצה. קנה עכשיו." }
+            { time: "0:00-0:05", visual: "צילום תקריב של המוצר בתאורה דרמטית", audio: "כל רגע הוא הזדמנות לסיפור חדש." },
+            { time: "0:05-0:15", visual: "לקוח משתמש במוצר בסביבה יומיומית", audio: "כשאתה בוחר איכות, כל יום מרגיש אחרת." },
+            { time: "0:15-0:30", visual: "לוגו המותג וקריאה לפעולה", audio: "BScale AI. תן למודעות שלך לעבוד חכם יותר. קנה עכשיו." }
           ]
         });
-      }
-    }, 2000);
+        setIsGenerating(false);
+      }, 2000);
+      return;
+    }
   };
 
   return (

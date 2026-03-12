@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -6,6 +6,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
+import { fetchGA4Report, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
+import { fetchMetaCampaigns } from '../services/metaService';
+import { fetchTikTokCampaigns } from '../services/tiktokService';
+import { fetchWooCommerceRevenue } from '../services/woocommerceService';
 import { auth } from '../lib/firebase';
 
 export function Dashboard() {
@@ -19,8 +23,8 @@ export function Dashboard() {
   const isShopifyConnected = connections.find(c => c.id === 'shopify')?.status === 'connected';
   const isStoreConnected = isWooConnected || isShopifyConnected;
 
-  // Generate dynamic data based on connected platforms and selected date range
-  const dashboardData = useMemo(() => {
+  // Fallback synthetic data based on connections and selected date range
+  const fallbackData = useMemo(() => {
     const seedStr = connectedPlatforms.map(c => 
       Object.values(c.settings || {}).join('')
     ).join('') || 'default';
@@ -40,7 +44,191 @@ export function Dashboard() {
     return data;
   }, [connectedPlatforms, isStoreConnected, dateRange]);
 
-  const { chartData, totalRevenue, totalSpend, roas, netProfit } = dashboardData;
+  const [chartData, setChartData] = useState(fallbackData.chartData);
+  const [totalRevenue, setTotalRevenue] = useState(fallbackData.totalRevenue);
+  const [totalSpend, setTotalSpend] = useState(fallbackData.totalSpend);
+  const [roas, setRoas] = useState(fallbackData.roas);
+  const [netProfit, setNetProfit] = useState(fallbackData.netProfit);
+
+  const [ga4Stats, setGa4Stats] = useState<{ activeNow: number; totalUsers: number }>({
+    activeNow: 42,
+    totalUsers: 1247
+  });
+
+  const [gscStats, setGscStats] = useState<{ clicks: number; impressions: number; avgPosition: number; ctr: number }>({
+    clicks: 3842,
+    impressions: 48200,
+    avgPosition: 14.3,
+    ctr: 7.97
+  });
+
+  // Sync fallback data when dependencies change
+  useEffect(() => {
+    setChartData(fallbackData.chartData);
+    setTotalRevenue(fallbackData.totalRevenue);
+    setTotalSpend(fallbackData.totalSpend);
+    setRoas(fallbackData.roas);
+    setNetProfit(fallbackData.netProfit);
+  }, [fallbackData]);
+
+  // Load real metrics from WooCommerce, Google (GA4, GSC, Ads), Meta and TikTok when connections exist
+  useEffect(() => {
+    let cancelled = false;
+
+    const moneyFromString = (value: string | number | undefined): number => {
+      if (typeof value === 'number') return value;
+      if (!value) return 0;
+      const n = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+      return isNaN(n) ? 0 : n;
+    };
+
+    async function load() {
+      if (!connectedPlatforms.length) return;
+
+      const woo = connections.find(c => c.id === 'woocommerce' && c.status === 'connected');
+      const google = connections.find(c => c.id === 'google' && c.status === 'connected');
+      const meta = connections.find(c => c.id === 'meta' && c.status === 'connected');
+      const tiktok = connections.find(c => c.id === 'tiktok' && c.status === 'connected');
+
+      let realRevenue = 0;
+      let realSpend = 0;
+
+      // WooCommerce revenue (monthly)
+      if (woo?.settings?.storeUrl && woo.settings.wooKey && woo.settings.wooSecret) {
+        const revenue = await fetchWooCommerceRevenue(woo.settings.storeUrl, woo.settings.wooKey, woo.settings.wooSecret);
+        realRevenue = revenue || realRevenue;
+      }
+
+      // Google: GA4 + Ads + GSC
+      if (google?.settings?.googleAccessToken) {
+        const token = google.settings.googleAccessToken;
+
+        // GA4 report
+        if (google.settings.ga4Id) {
+          try {
+            const report = await fetchGA4Report(token, google.settings.ga4Id);
+            const rows = Array.isArray(report.rows) ? report.rows : [];
+            let totalUsers = 0;
+            let totalRevFromGa4 = 0;
+            rows.forEach((r: any) => {
+              const metrics = r.metricValues || r.metrics || [];
+              const activeUsers = moneyFromString(metrics[0]?.value);
+              const totalRevenueMetric = moneyFromString(metrics[3]?.value);
+              totalUsers += activeUsers;
+              totalRevFromGa4 += totalRevenueMetric;
+            });
+            const activeNow = rows.length ? moneyFromString(rows[rows.length - 1]?.metricValues?.[0]?.value) : 0;
+            if (!cancelled) {
+              setGa4Stats({
+                activeNow,
+                totalUsers
+              });
+            }
+            if (totalRevFromGa4 > 0) {
+              realRevenue = totalRevFromGa4;
+            }
+          } catch (e) {
+            console.warn('Failed to load GA4 report', e);
+          }
+        }
+
+        // Google Ads campaigns spend
+        if (google.settings.googleAdsId) {
+          try {
+            const googleCampaigns = await fetchGoogleCampaigns(token, google.settings.googleAdsId, google.settings.loginCustomerId);
+            const spendFromGoogle = googleCampaigns.reduce((sum: number, c: any) => sum + moneyFromString(c.spend), 0);
+            realSpend += spendFromGoogle;
+          } catch (e) {
+            console.warn('Failed to load Google Ads campaigns', e);
+          }
+        }
+
+        // GSC data
+        if (google.settings.siteUrl) {
+          try {
+            const gsc = await fetchGSCData(token, google.settings.siteUrl);
+            const rows = Array.isArray(gsc.rows) ? gsc.rows : [];
+            let clicks = 0;
+            let impressions = 0;
+            let positionSum = 0;
+            rows.forEach((r: any) => {
+              clicks += Number(r.clicks || 0);
+              impressions += Number(r.impressions || 0);
+              positionSum += Number(r.position || 0);
+            });
+            const avgPosition = rows.length ? positionSum / rows.length : 0;
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+            if (!cancelled) {
+              setGscStats({
+                clicks,
+                impressions,
+                avgPosition,
+                ctr
+              });
+            }
+          } catch (e) {
+            console.warn('Failed to load GSC data', e);
+          }
+        }
+      }
+
+      // Meta campaigns spend
+      if (meta?.settings?.metaToken && meta.settings.metaAdsId) {
+        try {
+          const metaCampaigns = await fetchMetaCampaigns(meta.settings.metaToken, meta.settings.metaAdsId);
+          const spendFromMeta = metaCampaigns.reduce((sum: number, c: any) => sum + moneyFromString(c.spend), 0);
+          realSpend += spendFromMeta;
+        } catch (e) {
+          console.warn('Failed to load Meta campaigns', e);
+        }
+      }
+
+      // TikTok campaigns spend
+      if (tiktok?.settings?.tiktokToken && tiktok.settings.tiktokAdvertiserId) {
+        try {
+          const tiktokCampaigns = await fetchTikTokCampaigns(tiktok.settings.tiktokToken, tiktok.settings.tiktokAdvertiserId);
+          const spendFromTikTok = (Array.isArray(tiktokCampaigns) ? tiktokCampaigns : []).reduce((sum: number, c: any) => {
+            return sum + moneyFromString(c.stat_cost || c.spend || c.cost);
+          }, 0);
+          realSpend += spendFromTikTok;
+        } catch (e) {
+          console.warn('Failed to load TikTok campaigns', e);
+        }
+      }
+
+      if (cancelled) return;
+
+      // Update main financial metrics if we have at least some real data
+      if (realRevenue > 0 || realSpend > 0) {
+        const finalRevenue = realRevenue > 0 ? realRevenue : totalRevenue;
+        const finalSpend = realSpend > 0 ? realSpend : totalSpend;
+        const finalRoas = finalSpend > 0 ? (finalRevenue / finalSpend).toFixed(2) : '0.00';
+        const finalNetProfit = finalRevenue - finalSpend;
+
+        setTotalRevenue(finalRevenue);
+        setTotalSpend(finalSpend);
+        setRoas(finalRoas);
+        setNetProfit(finalNetProfit);
+
+        // Simple 30-point chart based on aggregated totals
+        const points = chartData.length || 30;
+        const perDayRevenue = finalRevenue / points;
+        const perDaySpend = finalSpend / points;
+        const realChart = Array.from({ length: points }).map((_, idx) => ({
+          name: chartData[idx]?.name || String(idx + 1),
+          revenue: Math.round(perDayRevenue * (0.8 + Math.random() * 0.4)),
+          spend: Math.round(perDaySpend * (0.8 + Math.random() * 0.4))
+        }));
+        setChartData(realChart);
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [connectedPlatforms.length, connections, totalRevenue, totalSpend, chartData.length]);
 
   const quickActions = [
     { id: 'ai-recs', title: t('dashboard.viewAiRecs'), icon: Zap, color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', desc: t('dashboard.viewAiRecsDesc') },
@@ -159,11 +347,11 @@ export function Dashboard() {
               <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full", dir === 'rtl' ? "left-3" : "right-3")} />
               <div>
                 <p className="text-sm font-medium text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-1">{t('dashboard.activeNow')}</p>
-                <p className="text-5xl font-black text-blue-600 dark:text-blue-400">42</p>
+                <p className="text-5xl font-black text-blue-600 dark:text-blue-400">{ga4Stats.activeNow}</p>
               </div>
               <div className="text-end">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('dashboard.totalUsers')}</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">1,247</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{ga4Stats.totalUsers.toLocaleString()}</p>
               </div>
             </div>
 
@@ -272,22 +460,22 @@ export function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
             <MousePointerClick className="w-6 h-6 text-blue-500 dark:text-blue-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">3,842</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.clicks.toLocaleString()}</p>
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.clicks')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors cursor-pointer group">
             <Eye className="w-6 h-6 text-purple-500 dark:text-purple-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">48,200</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.impressions.toLocaleString()}</p>
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.impressions')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-orange-200 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
             <Target className="w-6 h-6 text-orange-500 dark:text-orange-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">#14.3</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">#{gscStats.avgPosition.toFixed(1)}</p>
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.avgPosition')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-emerald-200 dark:hover:border-emerald-500/30 transition-colors cursor-pointer group">
             <TrendingUp className="w-6 h-6 text-emerald-500 dark:text-emerald-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">7.97%</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.ctr.toFixed(2)}%</p>
             <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.ctr')}</p>
           </div>
         </div>

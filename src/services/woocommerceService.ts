@@ -136,3 +136,46 @@ export async function updateWooCommerceProduct(url: string, key: string, secret:
     throw error;
   }
 }
+
+export async function fetchWooCommerceRevenue(url: string, key: string, secret: string): Promise<number> {
+  if (!url || !key || !secret) {
+    return 0;
+  }
+
+  try {
+    const response = await fetch('/api/proxy/woocommerce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        key,
+        secret,
+        endpoint: 'reports/sales?period=month'
+      })
+    });
+
+    const text = await response.text();
+    if (!text) {
+      return 0;
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn('Failed to parse WooCommerce revenue response, returning 0');
+      return 0;
+    }
+
+    // WooCommerce reports API can return array or single object
+    const first = Array.isArray(data) ? data[0] : data;
+    const total = typeof first?.total_sales === 'string'
+      ? parseFloat(first.total_sales || '0')
+      : Number(first?.total_sales || 0);
+
+    return isNaN(total) ? 0 : total;
+  } catch (error) {
+    console.error('WooCommerce revenue fetch error:', error);
+    return 0;
+  }
+}
