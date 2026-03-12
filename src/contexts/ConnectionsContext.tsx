@@ -49,6 +49,20 @@ const initialConnections: Connection[] = [
     description: 'integrations.platforms.gemini.desc' 
   },
   { 
+    id: 'openai', 
+    name: 'integrations.platforms.openai.name', 
+    category: 'AI Engine', 
+    status: 'disconnected', 
+    description: 'integrations.platforms.openai.desc' 
+  },
+  { 
+    id: 'claude', 
+    name: 'integrations.platforms.claude.name', 
+    category: 'AI Engine', 
+    status: 'disconnected', 
+    description: 'integrations.platforms.claude.desc' 
+  },
+  { 
     id: 'google', 
     name: 'integrations.platforms.google.name', 
     category: 'Google', 
@@ -103,7 +117,16 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
         const unsubscribeSnapshot = onSnapshot(connectionsRef, (docSnap) => {
           if (docSnap.exists()) {
-            setConnections(docSnap.data().items || initialConnections);
+            const saved = docSnap.data().items || [];
+            const savedIds = new Set((saved as Connection[]).map((c: Connection) => c.id));
+            const merged = [...(saved as Connection[])];
+            initialConnections.forEach((c) => {
+              if (!savedIds.has(c.id)) {
+                merged.push(c);
+                savedIds.add(c.id);
+              }
+            });
+            setConnections(merged);
           } else {
             // Initialize with clean state if not exists
             setDoc(connectionsRef, { items: initialConnections });

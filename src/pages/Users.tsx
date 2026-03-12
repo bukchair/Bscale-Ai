@@ -10,6 +10,8 @@ interface UserProfile {
   name: string;
   email: string;
   role: 'admin' | 'agency' | 'owner' | 'editor' | 'viewer';
+  plan?: string;
+  subscriptionStatus?: string;
   createdAt: string;
   storeIds?: string[];
   photoURL?: string;
@@ -51,6 +53,17 @@ export function Users() {
       await updateDoc(doc(db, 'users', userId), { role: newRole });
     } catch (error) {
       console.error("Error updating role:", error);
+    }
+  };
+
+  const handleSubscriptionChange = async (userId: string, grantAccess: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        subscriptionStatus: grantAccess ? 'active' : 'demo',
+        plan: grantAccess ? 'granted_by_admin' : 'demo',
+      });
+    } catch (error) {
+      console.error("Error updating subscription:", error);
     }
   };
 
@@ -179,6 +192,7 @@ export function Users() {
               <tr>
                 <th className="px-6 py-4 font-medium">{t('users.user')}</th>
                 <th className="px-6 py-4 font-medium">{t('users.role')}</th>
+                <th className="px-6 py-4 font-medium">{t('users.subscriptionAccess')}</th>
                 <th className="px-6 py-4 font-medium">{t('users.managedStores')}</th>
                 <th className="px-6 py-4 font-medium">{t('users.status')}</th>
                 <th className="px-6 py-4 font-medium">{t('users.lastActivity')}</th>
@@ -222,6 +236,25 @@ export function Users() {
                           <option key={key} value={key}>{t(role.labelKey)}</option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.role === 'admin' ? (
+                        <span className="text-gray-400 text-xs font-medium">—</span>
+                      ) : (
+                        <select
+                          value={user.subscriptionStatus === 'active' ? 'active' : 'demo'}
+                          onChange={(e) => handleSubscriptionChange(user.uid, e.target.value === 'active')}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
+                            user.subscriptionStatus === 'active'
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          )}
+                        >
+                          <option value="active">{t('users.accessActive')}</option>
+                          <option value="demo">{t('users.accessDemo')}</option>
+                        </select>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1.5">

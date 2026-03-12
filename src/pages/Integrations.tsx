@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus } from 'lucide-react';
+import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
@@ -7,6 +7,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const iconMap: Record<string, React.ElementType> = {
   'gemini': Sparkles,
+  'openai': Zap,
+  'claude': BrainCircuit,
   'google': Megaphone,
   'meta': Facebook,
   'tiktok': Video,
@@ -16,6 +18,8 @@ const iconMap: Record<string, React.ElementType> = {
 
 const brandStyles: Record<string, { bg: string, text: string, border: string, lightBg: string }> = {
   'gemini': { bg: 'bg-gradient-to-br from-purple-500 to-blue-500', text: 'text-white', border: 'border-purple-200', lightBg: 'bg-purple-50' },
+  'openai': { bg: 'bg-gradient-to-br from-emerald-600 to-teal-600', text: 'text-white', border: 'border-emerald-200', lightBg: 'bg-emerald-50' },
+  'claude': { bg: 'bg-gradient-to-br from-amber-600 to-orange-600', text: 'text-white', border: 'border-amber-200', lightBg: 'bg-amber-50' },
   'google': { bg: 'bg-gradient-to-br from-blue-500 to-red-400', text: 'text-white', border: 'border-blue-200', lightBg: 'bg-blue-50' },
   'meta': { bg: 'bg-gradient-to-br from-blue-600 to-blue-700', text: 'text-white', border: 'border-blue-200', lightBg: 'bg-blue-50' },
   'tiktok': { bg: 'bg-gradient-to-br from-gray-800 to-black', text: 'text-white', border: 'border-gray-300', lightBg: 'bg-gray-100' },
@@ -23,7 +27,8 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
   'shopify': { bg: 'bg-gradient-to-br from-emerald-500 to-green-600', text: 'text-white', border: 'border-emerald-200', lightBg: 'bg-emerald-50' },
 };
 
-export function Integrations() {
+export function Integrations({ userProfile }: { userProfile?: { role?: string } | null }) {
+  const isAdmin = userProfile?.role === 'admin';
   const { t, dir } = useLanguage();
   const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, testConnection } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
@@ -229,6 +234,37 @@ export function Integrations() {
   const renderIntegrationSettings = (integration: Connection) => {
     const isConnected = integration.status === 'connected';
     const isConnecting = integration.status === 'connecting';
+    const isAiReadOnly = integration.category === 'AI Engine' && !isAdmin;
+
+    if (isAiReadOnly) {
+      return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-gray-400" />
+                {t('integrations.connectionSettings')} - {t(integration.name)}
+              </h4>
+              <button onClick={() => setExpandedId(null)} className="text-gray-400 hover:text-gray-600 transition-colors bg-gray-50 hover:bg-gray-100 p-2 rounded-full">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-white/10 p-4">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {isConnected ? (
+                  <span className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" /> {t('integrations.connected')}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2 text-gray-500">{t('integrations.disconnected')}</span>
+                )}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('integrations.aiAdminOnly')}</p>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
 
     return (
       <motion.div 
@@ -271,6 +307,50 @@ export function Integrations() {
                     <select className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-xs" value={formValues.model || "Gemini 1.5 Pro"} onChange={(e) => handleInputChange('model', e.target.value)}>
                       <option>Gemini 1.5 Pro</option>
                       <option>Gemini 1.5 Flash</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {integration.id === 'openai' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.apiKey')}</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <Key className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <input type="password" placeholder="sk-..." className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.apiKey || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('apiKey', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.defaultModel')}</label>
+                    <select className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-xs" value={formValues.model || "gpt-4o"} onChange={(e) => handleInputChange('model', e.target.value)}>
+                      <option>gpt-4o</option>
+                      <option>gpt-4o-mini</option>
+                      <option>gpt-4-turbo</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {integration.id === 'claude' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.apiKey')}</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                        <Key className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <input type="password" placeholder="sk-ant-..." className="w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.apiKey || (isConnected ? "••••••••••••••••" : "")} onChange={(e) => handleInputChange('apiKey', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.defaultModel')}</label>
+                    <select className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-xs" value={formValues.model || "claude-sonnet-4-20250514"} onChange={(e) => handleInputChange('model', e.target.value)}>
+                      <option>claude-sonnet-4-20250514</option>
+                      <option>claude-3-5-sonnet-20241022</option>
+                      <option>claude-3-haiku-20240307</option>
                     </select>
                   </div>
                 </>
@@ -472,6 +552,13 @@ export function Integrations() {
                     <li>{t('integrations.gemini.step1')} <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline">AI Studio</a></li>
                     <li>{t('integrations.gemini.step2')}</li>
                     <li>{t('integrations.gemini.step3')}</li>
+                  </ul>
+                )}
+                {(integration.id === 'openai' || integration.id === 'claude') && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>{integration.id === 'openai' ? 'OpenAI: platform.openai.com → API keys' : 'Anthropic: console.anthropic.com → API keys'}</li>
+                    <li>Create a key with appropriate usage</li>
+                    <li>Paste the key in the field on the left</li>
                   </ul>
                 )}
                 {integration.id === 'google' && (

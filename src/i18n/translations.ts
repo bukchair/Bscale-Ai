@@ -125,7 +125,19 @@ export const translations = {
       articleL2: "Smart Insights: AI that analyzes data and provides actionable recommendations in real-time.",
       articleL3: "Automation: Save valuable time by automating routine processes.",
       articleL4: "Customization: A flexible interface that adapts to the specific needs of your business.",
-      articleP3: "With our system, you don't just track data - you understand it and act on it. Join thousands of businesses that have already improved their performance with our help."
+      articleP3: "With our system, you don't just track data - you understand it and act on it. Join thousands of businesses that have already improved their performance with our help.",
+      pricingTitle: "Plans & Pricing",
+      pricingSubtitle: "Choose the plan that fits your business. Start with a demo site; full access after subscribing.",
+      plan1Name: "Independent — Single Store",
+      plan2Name: "Managed + Remote Support",
+      plan3Name: "Agencies",
+      plan1Desc: "One store, full platform access. Ideal for solo entrepreneurs.",
+      plan2Desc: "Managed campaigns plus remote support. Best for growing businesses.",
+      plan3Desc: "Custom solutions for agencies and multi-store setups.",
+      plan3Price: "Contact us",
+      planCtaStart: "Start Now",
+      planCtaContact: "Contact Us",
+      recommended: "Recommended"
     },
     auth: {
       welcome: "Welcome to BScale AI",
@@ -141,6 +153,13 @@ export const translations = {
       hasAccount: "Already have an account?",
       signUp: "Sign up",
       signIn: "Sign in"
+    },
+    subscription: {
+      title: "Subscription required",
+      subtitle: "You need an active subscription to access the dashboard. Choose a plan below or contact us.",
+      ctaPlans: "View plans & pricing",
+      ctaContact: "Contact us",
+      logout: "Sign out"
     },
     header: {
       search: "Search...",
@@ -199,10 +218,19 @@ export const translations = {
       wooResetConnection: "Reset connection and reconfigure",
       wooResetConfirm: "Delete WooCommerce connection and enter new credentials?",
       wooResetDone: "Connection cleared. Enter new details above.",
+      aiAdminOnly: "Only admins can edit AI provider settings. You can see connection status only.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
           desc: "The core AI engine powering recommendations, creative generation, and automated optimizations."
+        },
+        openai: {
+          name: "OpenAI (GPT)",
+          desc: "Use GPT-4 and other OpenAI models for content and recommendations. Configure API key in admin."
+        },
+        claude: {
+          name: "Claude (Anthropic)",
+          desc: "Use Claude models for analysis and copy. Configure API key in admin."
         },
         google: {
           name: "Google Ecosystem",
@@ -409,6 +437,9 @@ export const translations = {
       managedStores: 'Managed Stores',
       status: 'Status',
       lastActivity: 'Last Activity',
+      subscriptionAccess: 'Access',
+      accessActive: 'Active (no payment)',
+      accessDemo: 'Demo / Blocked',
       active: 'Active',
       noStores: 'No stores',
       noResults: 'No results found',
@@ -646,7 +677,19 @@ export const translations = {
       articleL2: "תובנות חכמות: בינה מלאכותית שמנתחת את הנתונים ומספקת המלצות פעולה בזמן אמת.",
       articleL3: "אוטומציה: חיסכון בזמן יקר על ידי אוטומציה של תהליכים שגרתיים.",
       articleL4: "התאמה אישית: ממשק גמיש שמתאים את עצמו לצרכים הספציפיים של העסק שלכם.",
-      articleP3: "עם המערכת שלנו, אתם לא רק עוקבים אחרי הנתונים - אתם מבינים אותם ופועלים לפיהם. הצטרפו לאלפי עסקים שכבר שיפרו את הביצועים שלהם בעזרתנו."
+      articleP3: "עם המערכת שלנו, אתם לא רק עוקבים אחרי הנתונים - אתם מבינים אותם ופועלים לפיהם. הצטרפו לאלפי עסקים שכבר שיפרו את הביצועים שלהם בעזרתנו.",
+      pricingTitle: "תוכניות ומחירים",
+      pricingSubtitle: "בחר את התוכנית שמתאימה לעסק שלך. מתחילים עם אתר דמו; גישה מלאה לאחר רכישת מנוי.",
+      plan1Name: "עצמאי — חנות אחת",
+      plan2Name: "מנוהל + תמיכה מרוחקת",
+      plan3Name: "סוכנויות",
+      plan1Desc: "חנות אחת, גישה מלאה לפלטפורמה. מתאים ליזמים עצמאיים.",
+      plan2Desc: "קמפיינים מנוהלים ותמיכה מרוחקת. מומלץ לעסקים בצמיחה.",
+      plan3Desc: "פתרונות מותאמים לסוכנויות ומספר חנויות.",
+      plan3Price: "צרו קשר",
+      planCtaStart: "התחל עכשיו",
+      planCtaContact: "צרו קשר",
+      recommended: "מומלץ"
     },
     auth: {
       welcome: "ברוכים הבאים ל-BScale AI",
@@ -662,6 +705,13 @@ export const translations = {
       hasAccount: "יש לך כבר חשבון?",
       signUp: "הירשם",
       signIn: "התחבר"
+    },
+    subscription: {
+      title: "נדרש מנוי",
+      subtitle: "נדרש מנוי פעיל כדי להיכנס לממשק. בחר תוכנית למטה או צור קשר.",
+      ctaPlans: "צפה בתוכניות ומחירים",
+      ctaContact: "צור קשר",
+      logout: "התנתק"
     },
     header: {
       search: "חיפוש...",
@@ -720,10 +770,19 @@ export const translations = {
       wooResetConnection: "מחק חיבור והגדר מחדש",
       wooResetConfirm: "למחוק את החיבור ל-WooCommerce ולהזין פרטים חדשים?",
       wooResetDone: "החיבור נוקה. הזן פרטים חדשים למעלה.",
+      aiAdminOnly: "רק מנהלים יכולים לערוך הגדרות ספקי AI. כאן מוצג רק סטטוס החיבור.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
           desc: "מנוע ה-AI המרכזי המניע המלצות, יצירת קריאייטיב ואופטימיזציות אוטומטיות."
+        },
+        openai: {
+          name: "OpenAI (GPT)",
+          desc: "שימוש ב-GPT-4 ובמודלים נוספים של OpenAI לתוכן והמלצות. הגדרת מפתח API במנהל."
+        },
+        claude: {
+          name: "Claude (Anthropic)",
+          desc: "שימוש במודלי Claude לניתוח וקופי. הגדרת מפתח API במנהל."
         },
         google: {
           name: "Google Ecosystem",
@@ -930,6 +989,9 @@ export const translations = {
       managedStores: 'חנויות מנוהלות',
       status: 'סטטוס',
       lastActivity: 'פעילות אחרונה',
+      subscriptionAccess: 'גישה',
+      accessActive: 'פעיל (ללא תשלום)',
+      accessDemo: 'דמו / חסום',
       active: 'פעיל',
       noStores: 'אין חנויות',
       noResults: 'לא נמצאו תוצאות',

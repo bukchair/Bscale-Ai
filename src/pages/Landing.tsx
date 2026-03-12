@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, BrainCircuit, BarChart3, Globe, Target, Zap, Mail, Layers, LineChart, Sparkles, ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, BarChart3, Globe, Target, Zap, Mail, Layers, LineChart, Sparkles, ArrowRight, BookOpen, ShoppingBag, Headphones, Building2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { ThemeSwitcher } from '../components/ThemeSwitcher';
@@ -8,6 +8,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 interface LandingProps {
   onEnter: () => void;
+  scrollToPricing?: boolean;
 }
 
 const mockChartData = [
@@ -20,8 +21,15 @@ const mockChartData = [
   { name: 'Jul', value: 7000 },
 ];
 
-export function Landing({ onEnter }: LandingProps) {
+export function Landing({ onEnter, scrollToPricing }: LandingProps) {
   const { t, dir } = useLanguage();
+
+  React.useEffect(() => {
+    if (scrollToPricing) {
+      const el = document.getElementById('pricing');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [scrollToPricing]);
 
   const features = [
     { icon: Target, title: t('landing.f1_title'), desc: t('landing.f1_desc') },
@@ -189,6 +197,94 @@ export function Landing({ onEnter }: LandingProps) {
                  className="rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 w-full object-cover"
                  referrerPolicy="no-referrer"
                />
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-24 bg-white dark:bg-white/5 border-y border-gray-200 dark:border-white/10">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">{t('landing.pricingTitle')}</h2>
+              <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">{t('landing.pricingSubtitle')}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="relative p-8 rounded-2xl border-2 border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] hover:border-indigo-300 dark:hover:border-indigo-500/50 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                    <ShoppingBag className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('landing.plan1Name')}</h3>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">{t('landing.plan1Desc')}</p>
+                <div className="mb-6">
+                  <span className="text-3xl font-black text-gray-900 dark:text-white">₪499</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm">/חודש</span>
+                </div>
+                <button
+                  onClick={onEnter}
+                  className="w-full py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                >
+                  {t('landing.planCtaStart')}
+                </button>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="relative p-8 rounded-2xl border-2 border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 dark:border-indigo-500/50 shadow-lg shadow-indigo-500/10"
+              >
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-indigo-600 text-white text-xs font-bold rounded-full">{t('landing.recommended')}</span>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-200 dark:bg-indigo-500/30 flex items-center justify-center">
+                    <Headphones className="w-6 h-6 text-indigo-700 dark:text-indigo-300" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('landing.plan2Name')}</h3>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">{t('landing.plan2Desc')}</p>
+                <div className="mb-6">
+                  <span className="text-3xl font-black text-gray-900 dark:text-white">₪999</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm">/חודש</span>
+                </div>
+                <button
+                  onClick={onEnter}
+                  className="w-full py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                >
+                  {t('landing.planCtaStart')}
+                </button>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="relative p-8 rounded-2xl border-2 border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] hover:border-purple-300 dark:hover:border-purple-500/50 transition-all"
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('landing.plan3Name')}</h3>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">{t('landing.plan3Desc')}</p>
+                <div className="mb-6">
+                  <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">{t('landing.plan3Price')}</span>
+                </div>
+                <a
+                  href="mailto:contact@bscale.ai?subject=סוכנות - BScale AI"
+                  className="block w-full py-3 rounded-xl font-bold text-center border-2 border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
+                >
+                  {t('landing.planCtaContact')}
+                </a>
+              </motion.div>
             </div>
           </div>
         </section>

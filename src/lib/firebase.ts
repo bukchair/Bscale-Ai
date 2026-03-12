@@ -26,6 +26,8 @@ export async function syncUserProfile(user: any) {
       email: user.email,
       name: user.displayName || 'User',
       role: initialRole,
+      plan: 'demo',
+      subscriptionStatus: 'demo',
       createdAt: new Date().toISOString(),
       storeIds: [],
       photoURL: user.photoURL

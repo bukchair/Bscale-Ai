@@ -21,6 +21,7 @@ import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
 import { Landing } from './pages/Landing';
 import { Auth } from './pages/Auth';
+import { SubscriptionRequired } from './pages/SubscriptionRequired';
 import { WooCommerce } from './pages/WooCommerce';
 import { useLanguage } from './contexts/LanguageContext';
 import { auth, onAuthStateChanged, syncUserProfile } from './lib/firebase';
@@ -33,6 +34,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [scrollToPricing, setScrollToPricing] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,11 +63,26 @@ export default function App() {
   }
 
   if (view === 'landing') {
-    return <Landing onEnter={() => setView('auth')} />;
+    return <Landing onEnter={() => { setView('auth'); setScrollToPricing(false); }} scrollToPricing={scrollToPricing} />;
   }
 
   if (view === 'auth') {
     return <Auth onLogin={() => setView('app')} />;
+  }
+
+  const hasAccess =
+    userProfile?.role === 'admin' ||
+    userProfile?.subscriptionStatus === 'active' ||
+    userProfile?.subscriptionStatus === undefined;
+  if (view === 'app' && !hasAccess) {
+    return (
+      <SubscriptionRequired
+        onGoToPricing={() => {
+          setView('landing');
+          setScrollToPricing(true);
+        }}
+      />
+    );
   }
 
   const renderContent = () => {
@@ -93,7 +110,7 @@ export default function App() {
       case 'approvals-automations':
         return <Automations />;
       case 'connections':
-        return <Integrations />;
+        return <Integrations userProfile={userProfile} />;
       case 'users':
         return userProfile?.role === 'admin' ? <Users /> : <Dashboard />;
       case 'settings':
