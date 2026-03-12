@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield } from 'lucide-react';
+import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield, Mail } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -14,6 +14,13 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
   const [isSavingPayment, setIsSavingPayment] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
 
+  const [isLoadingEmailSettings, setIsLoadingEmailSettings] = useState(false);
+  const [isSavingEmailSettings, setIsSavingEmailSettings] = useState(false);
+  const [emailSettingsMessage, setEmailSettingsMessage] = useState<string | null>(null);
+  const [imapUser, setImapUser] = useState('');
+  const [imapHost, setImapHost] = useState('imap.gmail.com');
+  const [imapPort, setImapPort] = useState('993');
+
   useEffect(() => {
     if (!isAdmin) return;
     setIsLoadingPayment(true);
@@ -26,6 +33,22 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
         }
       })
       .finally(() => setIsLoadingPayment(false));
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setIsLoadingEmailSettings(true);
+    const ref = doc(db, 'appSettings', 'email');
+    getDoc(ref)
+      .then((snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as { imapUser?: string; imapHost?: string; imapPort?: string };
+          if (data?.imapUser) setImapUser(data.imapUser);
+          if (data?.imapHost) setImapHost(data.imapHost);
+          if (data?.imapPort) setImapPort(data.imapPort);
+        }
+      })
+      .finally(() => setIsLoadingEmailSettings(false));
   }, [isAdmin]);
 
   const handleSavePaymentToken = async () => {
@@ -47,6 +70,31 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
 
   const handleDemoAction = (label: string) => {
     alert(`בגרסת הדמו הפעולה "${label}" מסומנת כהצלחה. בחיבור לשרת מלא נחבר אותה לעדכון אמיתי.`);
+  };
+
+  const handleSaveEmailSettings = async () => {
+    if (!isAdmin) return;
+    setIsSavingEmailSettings(true);
+    setEmailSettingsMessage(null);
+    try {
+      const ref = doc(db, 'appSettings', 'email');
+      await setDoc(
+        ref,
+        {
+          imapUser: imapUser || null,
+          imapHost: imapHost || null,
+          imapPort: imapPort || null,
+        },
+        { merge: true }
+      );
+      setEmailSettingsMessage('הגדרות ה‑IMAP נשמרו בהצלחה.');
+    } catch (e) {
+      console.error('Failed to save email settings', e);
+      setEmailSettingsMessage('שמירת הגדרות ה‑IMAP נכשלה. נסה שוב מאוחר יותר.');
+    } finally {
+      setIsSavingEmailSettings(false);
+      setTimeout(() => setEmailSettingsMessage(null), 4000);
+    }
   };
 
   return (
@@ -463,6 +511,85 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                     </label>
                   </div>
                 </div>
+
+                {isAdmin && (
+                  <div className="pt-6 border-t border-gray-100 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-indigo-500" />
+                          הגדרות דוא״ל (Gmail IMAP / חיבור התראות)
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          הגדר תיבת Gmail ייעודית לשליחת התראות והודעות מהמערכת. אפשר להזין פרטי IMAP ידנית או להתחבר בהמשך דרך Google OAuth.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">משתמש Gmail (כתובת מלאה)</label>
+                        <input
+                          type="email"
+                          dir="ltr"
+                          value={imapUser}
+                          onChange={(e) => setImapUser(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="alerts@yourdomain.com"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">שרת IMAP</label>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={imapHost}
+                          onChange={(e) => setImapHost(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-700">פורט</label>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={imapPort}
+                          onChange={(e) => setImapPort(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="font-semibold">התחברות עם Google (דמו):</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            alert(
+                              'בגרסת הדמו הכפתור רק מסמן התחברות. בחיבור מלא נפתח כאן OAuth מול Google לחשבון הדוא״ל.'
+                            )
+                          }
+                          className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          התחברות לחשבון Google
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSaveEmailSettings}
+                        disabled={isSavingEmailSettings || isLoadingEmailSettings}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-60"
+                      >
+                        {isSavingEmailSettings ? 'שומר...' : <Save className="w-4 h-4" />}
+                        {isSavingEmailSettings ? 'שומר הגדרות דוא״ל' : 'שמור הגדרות דוא״ל'}
+                      </button>
+                    </div>
+                    {emailSettingsMessage && (
+                      <div className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                        {emailSettingsMessage}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
                 <button
