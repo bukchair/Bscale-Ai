@@ -28,6 +28,7 @@ import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { Guide } from './pages/Guide';
 import { SystemMail } from './pages/SystemMail';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SalesBot } from './components/SalesBot';
 import { useLanguage } from './contexts/LanguageContext';
 import { auth, onAuthStateChanged, syncUserProfile } from './lib/firebase';
 import { runAutoAdsIfNeeded } from './lib/autoAdsRunner';
@@ -92,7 +93,12 @@ export default function App() {
 
   // Public static pages - זמינים בלי התחברות
   if (path === '/privacy-policy') {
-    return <PrivacyPolicy />;
+    return (
+      <>
+        <PrivacyPolicy />
+        <SalesBot />
+      </>
+    );
   }
   if (path === '/guide') {
     return <Guide />;
@@ -200,11 +206,21 @@ export default function App() {
   }
 
   if (view === 'landing') {
-    return <Landing onEnter={() => { setView('auth'); setScrollToPricing(false); }} scrollToPricing={scrollToPricing} />;
+    return (
+      <>
+        <Landing onEnter={() => { setView('auth'); setScrollToPricing(false); }} scrollToPricing={scrollToPricing} />
+        <SalesBot />
+      </>
+    );
   }
 
   if (view === 'auth') {
-    return <Auth onLogin={() => setView('app')} />;
+    return (
+      <>
+        <Auth onLogin={() => setView('app')} />
+        <SalesBot />
+      </>
+    );
   }
 
   const hasAccess =
