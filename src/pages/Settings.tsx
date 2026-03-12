@@ -45,6 +45,10 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
     }
   };
 
+  const handleDemoAction = (label: string) => {
+    alert(`בגרסת הדמו הפעולה "${label}" מסומנת כהצלחה. בחיבור לשרת מלא נחבר אותה לעדכון אמיתי.`);
+  };
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div>
@@ -144,7 +148,10 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                 </div>
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                <button
+                  onClick={() => handleDemoAction('שמירת פרופיל אישי')}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
                   <Save className="w-4 h-4" />
                   שמור שינויים
                 </button>
@@ -173,7 +180,10 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                 </div>
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                <button
+                  onClick={() => handleDemoAction('שמירת פרטי סוכנות')}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
                   <Save className="w-4 h-4" />
                   שמור שינויים
                 </button>
@@ -344,8 +354,8 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                       </label>
                     </div>
                     <button
+                      onClick={() => handleDemoAction('הפעלת מנוי בתשלום (דמו)')}
                       className="mt-2 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"
-                      // הערה: בפועל יש לחבר לכפתור לוגיקת סליקה + בדיקת checkbox
                     >
                       התחלת מנוי בתשלום
                     </button>
@@ -455,7 +465,10 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                 </div>
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                <button
+                  onClick={() => handleDemoAction('שמירת הגדרות התראות')}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
                   <Save className="w-4 h-4" />
                   שמור שינויים
                 </button>
@@ -500,7 +513,10 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                 </div>
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                <button
+                  onClick={() => handleDemoAction('עדכון סיסמה ואבטחה')}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
                   <Save className="w-4 h-4" />
                   עדכן סיסמה
                 </button>

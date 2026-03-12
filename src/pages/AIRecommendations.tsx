@@ -119,6 +119,12 @@ export function AIRecommendations() {
     setRecs(recs.map(r => r.id === id ? { ...r, status: 'applied' } : r));
   };
 
+  const handleApplyAll = () => {
+    if (!pendingRecs.length) return;
+    setRecs(recs.map(r => r.status === 'pending' ? { ...r, status: 'applied' } : r));
+    alert('כל ההמלצות סומנו כמייושמות (דמו). בחיבור מלא ניתן יהיה להחיל שינויים אמיתיים בקמפיינים.');
+  };
+
   const pendingRecs = recs.filter(r => r.status === 'pending');
   const appliedRecs = recs.filter(r => r.status === 'applied');
 
@@ -144,7 +150,11 @@ export function AIRecommendations() {
               חבר את Gemini בהתחברויות והזן API Key לקבלת המלצות
             </span>
           )}
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm">
+          <button
+            onClick={handleApplyAll}
+            disabled={!pendingRecs.length}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+          >
             <Zap className="w-4 h-4" />
             {t('ai.applyAll')}
           </button>
