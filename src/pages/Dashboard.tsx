@@ -21,6 +21,7 @@ export function Dashboard() {
   const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
   const hasLoadedRealDataRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -65,6 +66,17 @@ export function Dashboard() {
     avgPosition: 14.3,
     ctr: 7.97
   });
+
+  // Detect very narrow/mobile viewports to avoid Recharts width/height -1 issues
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640); // sm breakpoint
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Sync fallback data when dependencies change
   useEffect(() => {
@@ -385,46 +397,52 @@ export function Dashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.topPages')}</h3>
-                <div className="space-y-3">
-                  {[
-                    { name: t('dashboard.homePage'), percent: 41 },
-                    { name: t('dashboard.products'), percent: 28 },
-                    { name: t('dashboard.promotions'), percent: 18 },
-                  ].map((page, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{page.name}</span>
-                      <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full" style={{ width: `${page.percent}%` }} />
+            {isMobile ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                תצוגת הפילוח המלאה של GA4 זמינה במסכים רחבים. במובייל מוצגים רק המספרים המרכזיים.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.topPages')}</h3>
+                  <div className="space-y-3">
+                    {[
+                      { name: t('dashboard.homePage'), percent: 41 },
+                      { name: t('dashboard.products'), percent: 28 },
+                      { name: t('dashboard.promotions'), percent: 18 },
+                    ].map((page, i) => (
+                      <div key={i} className="flex items-center gap-3 text-sm">
+                        <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{page.name}</span>
+                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full" style={{ width: `${page.percent}%` }} />
+                        </div>
+                        <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{page.percent}%</span>
                       </div>
-                      <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{page.percent}%</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.trafficSources')}</h3>
-                <div className="space-y-3">
-                  {[
-                    { name: t('dashboard.organicSearch'), percent: 45, color: 'bg-emerald-500' },
-                    { name: t('dashboard.paidSearch'), percent: 30, color: 'bg-blue-500' },
-                    { name: t('dashboard.direct'), percent: 15, color: 'bg-purple-500' },
-                  ].map((source, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <div className={cn("w-2 h-2 rounded-full", source.color)} />
-                      <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{source.name}</span>
-                      <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full", source.color)} style={{ width: `${source.percent}%` }} />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.trafficSources')}</h3>
+                  <div className="space-y-3">
+                    {[
+                      { name: t('dashboard.organicSearch'), percent: 45, color: 'bg-emerald-500' },
+                      { name: t('dashboard.paidSearch'), percent: 30, color: 'bg-blue-500' },
+                      { name: t('dashboard.direct'), percent: 15, color: 'bg-purple-500' },
+                    ].map((source, i) => (
+                      <div key={i} className="flex items-center gap-3 text-sm">
+                        <div className={cn("w-2 h-2 rounded-full", source.color)} />
+                        <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{source.name}</span>
+                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full", source.color)} style={{ width: `${source.percent}%` }} />
+                        </div>
+                        <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{source.percent}%</span>
                       </div>
-                      <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{source.percent}%</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -440,32 +458,38 @@ export function Dashboard() {
             </div>
           </div>
           
-          <div className="h-72 mt-6">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1f2937', color: '#fff' }}
-                  itemStyle={{ fontWeight: 600, color: '#fff' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }} />
-                <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={t('dashboard.revenue')} />
-                <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" name={t('dashboard.spend')} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {isMobile ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+              גרף הצמיחה מוצג במלואו במסכים רחבים. במובייל מוצגים רק המספרים המרכזיים כדי לשמור על יציבות התצוגה.
+            </p>
+          ) : (
+            <div className="h-72 mt-6">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1f2937', color: '#fff' }}
+                    itemStyle={{ fontWeight: 600, color: '#fff' }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }} />
+                  <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={t('dashboard.revenue')} />
+                  <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" name={t('dashboard.spend')} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
 

@@ -13,7 +13,7 @@ interface DateRangeContextType {
   setDateRange: (range: DateRangeType) => void;
   customRange: { start: Date | null; end: Date | null };
   setCustomRange: (range: { start: Date | null; end: Date | null }) => void;
-  /** גבולות התקופה הנוכחית – לשימוש בקבלת נתונים לפי תקופה */
+  /** גבולות התקופה הנוכחית - לשימוש בקבלת נתונים לפי תקופה */
   bounds: DateRangeBounds;
 }
 
@@ -79,7 +79,7 @@ export function useDateRange() {
   return context;
 }
 
-/** מחזיר את גבולות התקופה הנוכחית – להשתמש כשצריך לטעון נתונים לפי התקופה שבחירה */
+/** מחזיר את גבולות התקופה הנוכחית - להשתמש כשצריך לטעון נתונים לפי התקופה שבחירה */
 export function useDateRangeBounds(): DateRangeBounds {
   const { bounds } = useDateRange();
   return bounds;

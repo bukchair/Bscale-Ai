@@ -33,9 +33,10 @@ export function Profitability() {
   const [isLoadingWoo, setIsLoadingWoo] = useState(false);
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
-  const periodSubtitle = dateRange === 'custom'
-    ? `${bounds.startDate.toLocaleDateString('he-IL')} – ${bounds.endDate.toLocaleDateString('he-IL')}`
-    : periodLabel;
+  const periodSubtitle =
+    dateRange === 'custom'
+      ? `${bounds.startDate.toLocaleDateString('he-IL')} - ${bounds.endDate.toLocaleDateString('he-IL')}`
+      : periodLabel;
   const mult = getPeriodMultiplier(dateRange);
 
   useEffect(() => {

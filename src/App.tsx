@@ -87,7 +87,7 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [scrollToPricing, setScrollToPricing] = useState(false);
 
-  // Public static pages – זמינים בלי התחברות
+  // Public static pages - זמינים בלי התחברות
   if (path === '/privacy-policy') {
     return <PrivacyPolicy />;
   }
@@ -173,7 +173,7 @@ export default function App() {
     }
   }, [activeTab, view]);
 
-  // תמיכה בכפתורי Back/Forward – מעדכן את הטאב לפי ה־URL
+  // תמיכה בכפתורי Back/Forward - מעדכן את הטאב לפי ה־URL
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const onPopState = () => {

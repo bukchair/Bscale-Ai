@@ -40,6 +40,8 @@ export function CreativeLab() {
   const { connections } = useConnections();
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [activeTab, setActiveTab] = useState<'image' | 'copy' | 'video'>('image');
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [selectedProduct, setSelectedProduct] = useState<CreativeProduct | null>(null);
@@ -59,6 +61,15 @@ export function CreativeLab() {
   const wooConnection = connections.find((c) => c.id === 'woocommerce');
   const isWooConnected = wooConnection?.status === 'connected';
   const aiKeys = getAIKeysFromConnections(connections);
+
+  // טיימר זמן ריצה לתהליכי AI (תמונות / טקסט / וידאו)
+  useEffect(() => {
+    if (!isGenerating || generationStartedAt == null) return;
+    const id = window.setInterval(() => {
+      setElapsedMs(Date.now() - generationStartedAt);
+    }, 300);
+    return () => window.clearInterval(id);
+  }, [isGenerating, generationStartedAt]);
 
   useEffect(() => {
     if (!isWooConnected) {
@@ -240,6 +251,8 @@ export function CreativeLab() {
       return;
     }
     setIsGenerating(true);
+    setGenerationStartedAt(Date.now());
+    setElapsedMs(0);
     try {
       const baseName = selectedProduct?.name || 'מוצר';
       const baseDesc = selectedProduct?.longDesc || prompt || '';
@@ -262,12 +275,16 @@ export function CreativeLab() {
       showToast('קריאת ה‑AI נכשלה. נסה שוב מאוחר יותר.');
     } finally {
       setIsGenerating(false);
+      setGenerationStartedAt(null);
+      setElapsedMs(0);
     }
   };
 
   const handleGenerate = async () => {
     if (!prompt && !selectedProduct) return;
     setIsGenerating(true);
+    setGenerationStartedAt(Date.now());
+    setElapsedMs(0);
     
     if (activeTab === 'copy' && selectedProduct) {
       try {
@@ -280,6 +297,8 @@ export function CreativeLab() {
         console.error("Failed to generate copy", error);
       }
       setIsGenerating(false);
+      setGenerationStartedAt(null);
+      setElapsedMs(0);
       return;
     }
 
@@ -302,6 +321,8 @@ export function CreativeLab() {
         variations
       });
       setIsGenerating(false);
+      setGenerationStartedAt(null);
+      setElapsedMs(0);
       return;
     }
 
@@ -317,6 +338,8 @@ export function CreativeLab() {
           ]
         });
         setIsGenerating(false);
+        setGenerationStartedAt(null);
+        setElapsedMs(0);
       }, 2000);
       return;
     }
@@ -497,10 +520,37 @@ export function CreativeLab() {
             )}
 
             {isGenerating && (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-                <h3 className="text-gray-900 font-medium mb-1">הבינה המלאכותית עובדת...</h3>
-                <p className="text-sm text-gray-500">זה בדרך כלל לוקח כמה שניות.</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-3">
+                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto" />
+                <div>
+                  <h3 className="text-gray-900 font-medium mb-1">הבינה המלאכותית עובדת...</h3>
+                  <p className="text-sm text-gray-500">
+                    זמן ריצה: {(elapsedMs / 1000).toFixed(1)} שניות
+                  </p>
+                </div>
+                <div className="w-full max-w-md mx-auto text-start space-y-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-20 font-bold text-gray-600">שלב 1</span>
+                    <span className="flex-1 h-1.5 rounded-full bg-emerald-200 overflow-hidden">
+                      <span className="block h-full bg-emerald-500" style={{ width: `${Math.min(100, elapsedMs / 300)}%` }} />
+                    </span>
+                    <span className="text-gray-400">קריאת מנועי AI</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-20 font-bold text-gray-600">שלב 2</span>
+                    <span className="flex-1 h-1.5 rounded-full bg-indigo-200 overflow-hidden">
+                      <span className="block h-full bg-indigo-500" style={{ width: `${Math.min(100, Math.max(0, (elapsedMs - 800) / 300))}%` }} />
+                    </span>
+                    <span className="text-gray-400">עיבוד תוצאה ויצירת הצעה</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-20 font-bold text-gray-600">שלב 3</span>
+                    <span className="flex-1 h-1.5 rounded-full bg-purple-200 overflow-hidden">
+                      <span className="block h-full bg-purple-500" style={{ width: `${Math.min(100, Math.max(0, (elapsedMs - 1600) / 300))}%` }} />
+                    </span>
+                    <span className="text-gray-400">הכנת התצוגה למסך</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -625,7 +675,7 @@ export function CreativeLab() {
             {generatedContent?.type === 'copy' && (
               <div className="space-y-4 animate-in fade-in duration-500">
                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4">
-                  <h4 className="text-sm font-bold text-indigo-900 mb-1">קופירייטינג מבוסס AI – ניתן לעריכה</h4>
+                <h4 className="text-sm font-bold text-indigo-900 mb-1">קופירייטינג מבוסס AI - ניתן לעריכה</h4>
                   <p className="text-xs text-indigo-700">ערוך את השדות, שמור מודעה או שלח לפרסום ב-Google, Meta או TikTok.</p>
                 </div>
                 

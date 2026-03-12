@@ -142,7 +142,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
       const handleSnapshotError = (source: 'global' | 'user') => (err: any) => {
         console.error(`Error in ${source} connections snapshot:`, err);
-        // אם אין הרשאות לקרוא את המסמכים – נישאר על נתוני דמו ולא נפיל את האפליקציה
+        // אם אין הרשאות לקרוא את המסמכים - נישאר על נתוני דמו ולא נפיל את האפליקציה
         globalItems = [];
         if (source === 'user') {
           userItems = [];
@@ -171,11 +171,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         (snap) => {
           if (snap.exists()) {
             const items = (snap.data().items || []) as Connection[];
-            // שומרים גם AI וגם פלטפורמות במסמך המשתמש – AI ישמש כגיבוי אם אין גישה למסמך הגלובלי
+            // שומרים גם AI וגם פלטפורמות במסמך המשתמש - AI ישמש כגיבוי אם אין גישה למסמך הגלובלי
             userItems = items;
           } else {
             userItems = [];
-            // אל תנסה ליצור מסמך אם אין הרשאות – זה ייכשל ברמת השרת
+            // אל תנסה ליצור מסמך אם אין הרשאות - זה ייכשל ברמת השרת
             setDoc(
               userConnectionsRef,
               { items: initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any)) }

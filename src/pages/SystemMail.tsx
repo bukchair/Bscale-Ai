@@ -26,7 +26,7 @@ interface MailMessage {
 const mockThreads: MailThread[] = [
   {
     id: 't1',
-    subject: 'התראות מערכת יומיות – BScale AI',
+    subject: 'התראות מערכת יומיות - BScale AI',
     from: 'alerts@bscale.co.il',
     to: 'admin@agency.co.il',
     preview: 'סיכום יומי: 3 קמפיינים ב‑ROAS נמוך מהיעד...',
@@ -86,7 +86,7 @@ export function SystemMail() {
   const threads = mockThreads.filter((t) => {
     if (activeFolder === 'inbox') return t.status === 'new' || t.status === 'read';
     if (activeFolder === 'archived') return t.status === 'archived';
-    return true; // sent – בדמו מציג את הכל
+    return true; // sent - בדמו מציג את הכל
   });
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId) || threads[0] || null;
@@ -97,7 +97,7 @@ export function SystemMail() {
     setTimeout(() => {
       setIsSending(false);
       setReplyBody('');
-      alert('בדמו – התשובה נשלחה דרך תיבת המערכת הקבועה.\nבחיבור מלא זה ישלח דרך Gmail API לחשבון שהגדרת.');
+      alert('בדמו - התשובה נשלחה דרך תיבת המערכת הקבועה.\nבחיבור מלא זה ישלח דרך Gmail API לחשבון שהגדרת.');
     }, 800);
   };
 
@@ -244,11 +244,11 @@ export function SystemMail() {
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                  onClick={() =>
-                    alert(
-                      'בדמו – סימון כשיחה טופלה בלבד. בחיבור מלא זה יעדכן שדה status ויזיז לארכיון.'
-                    )
-                  }
+                    onClick={() =>
+                      alert(
+                        'בדמו - סימון כשיחה טופלה בלבד. בחיבור מלא זה יעדכן שדה status ויזיז לארכיון.'
+                      )
+                    }
                 >
                   סמן כטופל
                   <ChevronRight className="w-3 h-3" />

@@ -3,7 +3,7 @@ export function PrivacyPolicy() {
     <div className="min-h-screen bg-gray-50 text-gray-900 flex justify-center px-4 py-10">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-10 space-y-6">
         <header className="space-y-2">
-          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">מדיניות פרטיות – BScale AI</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900">מדיניות פרטיות - BScale AI</h1>
           <p className="text-sm text-gray-500">תוקף אחרון: 12.03.2026</p>
         </header>
 
@@ -38,7 +38,7 @@ export function PrivacyPolicy() {
             <li>לתפעול המערכת, ניהול חשבונות ומשתמשים ומתן השירותים שביקשת.</li>
             <li>לניתוח נתוני פרסום ו‑Analytics והפקת תובנות והמלצות AI.</li>
             <li>לשיפור השירות, ניטור תקלות, אבטחת מידע ומניעת הונאות.</li>
-            <li>לשליחת עדכונים תפעוליים, דוחות והתראות – בכפוף להגדרות ההתראות שלך.</li>
+            <li>לשליחת עדכונים תפעוליים, דוחות והתראות - בכפוף להגדרות ההתראות שלך.</li>
           </ul>
         </section>
 

@@ -12,7 +12,7 @@
 
 ## שלב 2: הרשאות ל-Git (אחת מהאפשרויות)
 
-### אופציה א – HTTPS + Token (פשוט להתחלה)
+### אופציה א - HTTPS + Token (פשוט להתחלה)
 
 1. ב-GitHub: **Settings** (פרופיל) → **Developer settings** → **Personal access tokens** → **Tokens (classic)**.
 2. **Generate new token (classic)**. תן שם (למשל "Cursor"), סמן **repo**.
@@ -39,7 +39,7 @@ git remote set-url origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 
 ---
 
-### אופציה ב – GitHub CLI (נוח אחרי התקנה)
+### אופציה ב - GitHub CLI (נוח אחרי התקנה)
 
 1. התקן: **https://cli.github.com**
 2. בטרמינל:
@@ -56,7 +56,7 @@ git push -u origin main
 
 ---
 
-### אופציה ג – SSH
+### אופציה ג - SSH
 
 1. צור מפתח SSH (אם אין):
 ```powershell
@@ -98,4 +98,4 @@ git push
 ```powershell
 git remote add origin https://github.com/USER/REPO.git
 ```
-בפעם הראשונה שתריץ `git push` Windows יכול להציג חלון התחברות ל-GitHub – התחבר שם (או הזן Token כ-Security password). אם לא מופיע חלון, השתמש באופציה א (Token בתוך ה-URL פעם אחת) או ב-GitHub CLI.
+בפעם הראשונה שתריץ `git push` Windows יכול להציג חלון התחברות ל-GitHub - התחבר שם (או הזן Token כ-Security password). אם לא מופיע חלון, השתמש באופציה א (Token בתוך ה-URL פעם אחת) או ב-GitHub CLI.

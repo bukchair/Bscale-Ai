@@ -247,7 +247,7 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">הצטרפות לשירות בתשלום</h2>
                     <p className="text-sm text-gray-500 mt-1">
-                      בחר תוכנית, מטבע ותקופת חיוב – והתאם את המנוי שלך ללקוחות מכל העולם.
+                      בחר תוכנית, מטבע ותקופת חיוב - והתאם את המנוי שלך ללקוחות מכל העולם.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">

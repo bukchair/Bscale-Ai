@@ -7,7 +7,7 @@ export function Guide() {
         <header className="space-y-2 text-center">
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900">מדריך הפעלה למערכת BScale AI</h1>
           <p className="text-sm text-gray-500">
-            איך לעבוד צעד‑אחד‑אחר‑השני עם הממשק – מחיבור הפלטפורמות ועד שימוש ב‑AI ובדוחות.
+            איך לעבוד צעד‑אחד‑אחר‑השני עם הממשק - מחיבור הפלטפורמות ועד שימוש ב‑AI ובדוחות.
           </p>
         </header>
 
@@ -24,7 +24,7 @@ export function Guide() {
         </section>
 
         <section className="space-y-3 text-sm leading-relaxed">
-          <h2 className="text-lg font-bold text-gray-900">2. עמוד סקירה כללית – Dashboard</h2>
+          <h2 className="text-lg font-bold text-gray-900">2. עמוד סקירה כללית - Dashboard</h2>
           <p>
             זהו העמוד הראשי שמרכז עבורך במבט אחד את מצב העסק:
           </p>
@@ -41,10 +41,10 @@ export function Guide() {
         </section>
 
         <section className="space-y-3 text-sm leading-relaxed">
-          <h2 className="text-lg font-bold text-gray-900">3. חיבורים – Integrations</h2>
+          <h2 className="text-lg font-bold text-gray-900">3. חיבורים - Integrations</h2>
           <p>
             בעמוד <strong>חיבורים</strong> אתה מגדיר פעם אחת את כל ההתחברויות: מנועי AI, Google, Meta, TikTok,
-            WooCommerce ו‑Shopify. אחרי ההגדרה – שאר העמודים משתמשים בנתונים האלו באופן אוטומטי.
+            WooCommerce ו‑Shopify. אחרי ההגדרה - שאר העמודים משתמשים בנתונים האלו באופן אוטומטי.
           </p>
           <h3 className="text-base font-semibold mt-2">3.1 מנועי AI משותפים לכל המשתמשים</h3>
           <ul className="list-disc list-inside space-y-1">
@@ -52,7 +52,7 @@ export function Guide() {
             <li>בתוך כל מנוע מזינים <strong>API Key</strong> ובוחרים <strong>מודל ברירת מחדל</strong>.</li>
             <li>
               לאחר שמירה, החיבור נשמר ברמת החשבון הגלובלי,
-              וכל המשתמשים במערכת משתמשים באותם מפתחות – ללא צורך להגדיר לכל משתמש בנפרד.
+              וכל המשתמשים במערכת משתמשים באותם מפתחות - ללא צורך להגדיר לכל משתמש בנפרד.
             </li>
             <li>משתמשים רגילים רואים רק סטטוס (מחובר/מנותק) ולא יכולים לערוך את המפתחות.</li>
           </ul>
@@ -65,22 +65,22 @@ export function Guide() {
           </ul>
           <h3 className="text-base font-semibold mt-2">3.3 Meta / TikTok / WooCommerce / Shopify</h3>
           <ul className="list-disc list-inside space-y-1">
-            <li><strong>Meta</strong> – התחברות דרך Facebook, הזנת Ad Account ID ו‑Pixel ID.</li>
-            <li><strong>TikTok</strong> – התחברות דרך TikTok Ads והזנת Advertiser ID.</li>
-            <li><strong>WooCommerce</strong> – הזנת כתובת החנות, Consumer Key ו‑Consumer Secret.</li>
-            <li><strong>Shopify</strong> – כתובת חנות ו‑Admin Access Token.</li>
+            <li><strong>Meta</strong> - התחברות דרך Facebook, הזנת Ad Account ID ו‑Pixel ID.</li>
+            <li><strong>TikTok</strong> - התחברות דרך TikTok Ads והזנת Advertiser ID.</li>
+            <li><strong>WooCommerce</strong> - הזנת כתובת החנות, Consumer Key ו‑Consumer Secret.</li>
+            <li><strong>Shopify</strong> - כתובת חנות ו‑Admin Access Token.</li>
           </ul>
         </section>
 
         <section className="space-y-3 text-sm leading-relaxed">
-          <h2 className="text-lg font-bold text-gray-900">4. מעבדת יצירה – Creative Lab</h2>
+          <h2 className="text-lg font-bold text-gray-900">4. מעבדת יצירה - Creative Lab</h2>
           <p>
             במעבדת היצירה מנועי ה‑AI מייצרים עבורך קריאייטיבים: תמונות, טקסטים וסקיצות לווידאו.
           </p>
           <ul className="list-disc list-inside space-y-1">
-            <li>אם החנות (WooCommerce/Shopify) מחוברת – בוחרים מוצר מהרשימה.</li>
+            <li>אם החנות (WooCommerce/Shopify) מחוברת - בוחרים מוצר מהרשימה.</li>
             <li>המערכת מנקה את תיאורי המוצרים מ‑HTML ומשתמשת בהם כבסיס לפרומפט ל‑AI.</li>
-            <li>בוחרים סוג יצירה: תמונה, טקסט מודעה, תסריט וידאו – ולוחצים “צור בעזרת AI”.</li>
+            <li>בוחרים סוג יצירה: תמונה, טקסט מודעה, תסריט וידאו - ולוחצים “צור בעזרת AI”.</li>
             <li>מקבלים מספר גרסאות להצעה: ניתן לשמור, להעתיק ולהעביר לקמפיינים.</li>
           </ul>
         </section>
@@ -114,13 +114,13 @@ export function Guide() {
             <li>הזדמנויות לשיפור כותרות, תיאורים ותוכן.</li>
           </ul>
           <p>
-            המטרה: להבין במהירות איפה להשקיע מאמץ SEO – באיזה דפים, על אילו ביטויים ואיזה שינויים כנראה יביאו את
+            המטרה: להבין במהירות איפה להשקיע מאמץ SEO - באיזה דפים, על אילו ביטויים ואיזה שינויים כנראה יביאו את
             קפיצת המדרגה הבאה.
           </p>
         </section>
 
         <section className="space-y-3 text-sm leading-relaxed">
-          <h2 className="text-lg font-bold text-gray-900">7. מוצרים – WooCommerce / Shopify</h2>
+          <h2 className="text-lg font-bold text-gray-900">7. מוצרים - WooCommerce / Shopify</h2>
           <p>
             עמוד המוצרים מסנכרן את הקטלוג מהחנות שלך:
           </p>
@@ -129,7 +129,7 @@ export function Guide() {
             <li>בחירה מהירה של מוצרים לעבודה במעבדת היצירה ובקמפיינים.</li>
           </ul>
           <p>
-            כך אתה עובד תמיד על נתונים אמיתיים – לא על דוגמה כללית – וה‑AI מדבר בשפה של החנות שלך.
+            כך אתה עובד תמיד על נתונים אמיתיים - לא על דוגמה כללית - וה‑AI מדבר בשפה של החנות שלך.
           </p>
         </section>
 
@@ -144,7 +144,7 @@ export function Guide() {
             <li>אישור תנאי שימוש ומדיניות פרטיות לפני רכישה, כדי לעמוד בדרישות רגולציה.</li>
           </ul>
           <p>
-            למנהלי מערכת (אדמין) יש גם אזור נפרד להגדרת טוקן סליקה גלובלי – נסתר מהמשתמשים הרגילים.
+            למנהלי מערכת (אדמין) יש גם אזור נפרד להגדרת טוקן סליקה גלובלי - נסתר מהמשתמשים הרגילים.
           </p>
         </section>
 
