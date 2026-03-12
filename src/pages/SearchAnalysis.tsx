@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Search, AlertTriangle, TrendingUp, TrendingDown, Filter, Download, Zap, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const searchTerms = [
   { term: 'נעלי ריצה זולות', clicks: 145, cost: 320, conversions: 0, roas: 0, source: 'Google Ads', status: 'review' },
@@ -14,6 +15,7 @@ const searchTerms = [
 export function SearchAnalysis() {
   const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<'all' | 'ads' | 'organic' | 'negative'>('all');
+  const { format: formatCurrency } = useCurrency();
 
   const negativeKeywords = [
     { id: 1, term: 'חינם', matchType: 'רחב', campaign: 'כל הקמפיינים', addedDate: '2024-03-01' },
@@ -72,7 +74,9 @@ export function SearchAnalysis() {
             </div>
             <div className="bg-black/20 rounded-xl p-6 border border-white/10 flex flex-col justify-center items-center text-center">
               <p className="text-sm text-indigo-200 mb-2">{t('search.monthlySavings')}</p>
-              <p className="text-4xl font-black text-emerald-400" dir="ltr">₪1,760</p>
+              <p className="text-4xl font-black text-emerald-400" dir="ltr">
+                {formatCurrency(1760)}
+              </p>
               <button className="mt-6 px-6 py-2.5 bg-white text-indigo-900 font-bold rounded-xl hover:bg-indigo-50 transition-colors text-sm w-full shadow-lg">
                 {t('search.reviewAndApply')}
               </button>
@@ -189,7 +193,9 @@ export function SearchAnalysis() {
                       {term.source === 'Google Ads' ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-gray-900 font-medium">{term.clicks} {t('search.clicks')}</span>
-                          <span className="text-gray-500 text-xs" dir="ltr">₪{term.cost} {t('search.spend')}</span>
+                          <span className="text-gray-500 text-xs" dir="ltr">
+                            {formatCurrency(term.cost)} {t('search.spend')}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex flex-col gap-1">

@@ -3,19 +3,22 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useDateRange } from '../contexts/DateRangeContext';
+import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
 import { fetchGA4Report, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
 import { fetchMetaCampaigns } from '../services/metaService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
-import { fetchWooCommerceRevenue } from '../services/woocommerceService';
+import { fetchWooCommerceRevenue, fetchWooCommerceSalesByRange } from '../services/woocommerceService';
 import { auth } from '../lib/firebase';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 export function Dashboard() {
   const { t, dir } = useLanguage();
   const { dateRange } = useDateRange();
+  const bounds = useDateRangeBounds();
   const { connections } = useConnections();
+  const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
   const hasLoadedRealDataRef = useRef(false);
 
@@ -101,10 +104,29 @@ export function Dashboard() {
       let realRevenue = 0;
       let realSpend = 0;
 
-      // WooCommerce revenue (monthly)
+      // WooCommerce revenue for the selected date range
       if (woo?.settings?.storeUrl && woo.settings.wooKey && woo.settings.wooSecret) {
-        const revenue = await fetchWooCommerceRevenue(woo.settings.storeUrl, woo.settings.wooKey, woo.settings.wooSecret);
-        realRevenue = revenue || realRevenue;
+        try {
+          const startIso = bounds.startDate.toISOString().slice(0, 10);
+          const endIso = bounds.endDate.toISOString().slice(0, 10);
+          const salesRows = await fetchWooCommerceSalesByRange(
+            woo.settings.storeUrl,
+            woo.settings.wooKey,
+            woo.settings.wooSecret,
+            startIso,
+            endIso
+          );
+          const revenueFromWoo = salesRows.reduce(
+            (sum, row) => sum + (row.netSales || row.totalSales),
+            0
+          );
+          if (revenueFromWoo > 0) {
+            realRevenue = revenueFromWoo;
+          }
+        } catch (e) {
+          console.warn('Failed to load WooCommerce sales range', e);
+          // fall back to existing synthetic data
+        }
       }
 
       // Google: GA4 + Ads + GSC
@@ -236,7 +258,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [connections]);
+  }, [connections, bounds.startDate, bounds.endDate]);
 
   const quickActions = [
     { id: 'ai-recs', title: t('dashboard.viewAiRecs'), icon: Zap, color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', desc: t('dashboard.viewAiRecsDesc') },
@@ -300,7 +322,7 @@ export function Dashboard() {
           </div>
           <div className="text-end">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('dashboard.netProfit')}</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">₪{netProfit.toLocaleString()}</p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(netProfit)}</p>
           </div>
         </div>
         
@@ -308,7 +330,7 @@ export function Dashboard() {
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase tracking-wider">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">₪{totalRevenue.toLocaleString()}</p>
+            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">{formatCurrency(totalRevenue)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
             </div>
@@ -317,7 +339,7 @@ export function Dashboard() {
           <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-red-800 dark:text-red-400 mb-2 uppercase tracking-wider">{t('dashboard.campaignSpend')}</p>
-            <p className="text-4xl font-black text-red-900 dark:text-red-50">₪{totalSpend.toLocaleString()}</p>
+            <p className="text-4xl font-black text-red-900 dark:text-red-50">{formatCurrency(totalSpend)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>

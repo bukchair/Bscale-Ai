@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { fetchWooCommerceSalesByRange, WooCommerceSalesPoint } from '../services/woocommerceService';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const platformDataBase = [
   { name: 'Google Ads', spend: 4500, roas: 3.2 },
@@ -24,6 +25,7 @@ export function Profitability() {
   const { dateRange } = useDateRange();
   const bounds = useDateRangeBounds();
   const { connections } = useConnections();
+  const { format: formatCurrency, symbol } = useCurrency();
   const [reportType, setReportType] = useState<'period' | 'campaigns' | 'platforms'>('period');
 
   const wooConnection = connections.find((c) => c.id === 'woocommerce' && c.status === 'connected');
@@ -129,7 +131,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.revenueWoo')}</p>
-          <p className="text-3xl font-black text-gray-900">₪{kpiRevenue.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900">{formatCurrency(kpiRevenue)}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -142,7 +144,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.adSpend')}</p>
-          <p className="text-3xl font-black text-gray-900">₪{kpiSpend.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900">{formatCurrency(kpiSpend)}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -155,7 +157,7 @@ export function Profitability() {
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.netProfit')}</p>
-          <p className="text-3xl font-black text-gray-900">₪{kpiProfit.toLocaleString()}</p>
+          <p className="text-3xl font-black text-gray-900">{formatCurrency(kpiProfit)}</p>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -214,7 +216,9 @@ export function Profitability() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
             <div>
               <p className="text-indigo-100 text-sm font-medium mb-1">{t('profitability.profitImprovementPotential')}</p>
-              <p className="text-4xl font-black" dir="ltr">+₪12,500</p>
+              <p className="text-4xl font-black" dir="ltr">
+                +{formatCurrency(12500)}
+              </p>
               <p className="text-indigo-200 text-xs mt-2">{t('profitability.basedOnAi')}</p>
             </div>
             <button className="mt-6 w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-all shadow-lg active:scale-95">
@@ -277,8 +281,24 @@ export function Profitability() {
                       itemStyle={{ fontSize: '12px', fontWeight: 600 }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                    <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" name={`${t('profitability.revenue')} (₪)`} />
-                    <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpnd)" name={`${t('profitability.spend')} (₪)`} />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#10B981"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorRev)"
+                      name={`${t('profitability.revenue')} (${symbol})`}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="spend"
+                      stroke="#EF4444"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorSpnd)"
+                      name={`${t('profitability.spend')} (${symbol})`}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -298,9 +318,9 @@ export function Profitability() {
                     {financialData.map((row, i) => (
                       <tr key={i} className="hover:bg-gray-50 transition-colors">
                         <td className="py-4 font-bold text-gray-900">{row.name}</td>
-                        <td className="py-4 text-emerald-600 font-bold">₪{row.revenue.toLocaleString()}</td>
-                        <td className="py-4 text-red-500">₪{row.spend.toLocaleString()}</td>
-                        <td className="py-4 text-indigo-600 font-bold">₪{row.profit.toLocaleString()}</td>
+                        <td className="py-4 text-emerald-600 font-bold">{formatCurrency(row.revenue)}</td>
+                        <td className="py-4 text-red-500">{formatCurrency(row.spend)}</td>
+                        <td className="py-4 text-indigo-600 font-bold">{formatCurrency(row.profit)}</td>
                         <td className="py-4 font-medium" dir="ltr">{(row.revenue / row.spend).toFixed(2)}x</td>
                       </tr>
                     ))}
@@ -319,7 +339,13 @@ export function Profitability() {
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF' }} />
                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                    <Bar dataKey="spend" fill="#6366F1" radius={[6, 6, 0, 0]} name={`${t('profitability.spend')} (₪)`} maxBarSize={40} />
+                    <Bar
+                      dataKey="spend"
+                      fill="#6366F1"
+                      radius={[6, 6, 0, 0]}
+                      name={`${t('profitability.spend')} (${symbol})`}
+                      maxBarSize={40}
+                    />
                   </RechartsBarChart>
                 </ResponsiveContainer>
               </div>
@@ -333,7 +359,9 @@ export function Profitability() {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900">{platform.name}</p>
-                        <p className="text-xs text-gray-500">{t('profitability.spend')}: ₪{platform.spend.toLocaleString()}</p>
+                        <p className="text-xs text-gray-500">
+                          {t('profitability.spend')}: {formatCurrency(platform.spend)}
+                        </p>
                       </div>
                     </div>
                     <div className={dir === 'rtl' ? "text-left" : "text-right"}>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Package, DollarSign, Tag, Loader2, AlertCircle, RefreshCw, Sparkles, Image as ImageIcon, CheckCircle2, Search, Zap, Mail } from 'lucide-react';
+import { ShoppingCart, Package, DollarSign, Tag, Loader2, AlertCircle, RefreshCw, Sparkles, Image as ImageIcon, CheckCircle2, Search, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { fetchWooCommerceProducts, updateWooCommerceProduct } from '../services/woocommerceService';
-import { optimizeProductSEO, SEOOptimizationResult } from '../services/seoService';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCurrency } from '../contexts/CurrencyContext';
+import { getAIKeysFromConnections } from '../lib/gemini';
+import { requestJSON, type AIKeys } from '../lib/multiAI';
 
 interface Product {
   id: number;
@@ -19,21 +21,34 @@ interface Product {
   images: { src: string; alt: string }[];
 }
 
+type SeoSuggestion = {
+  engineId: keyof AIKeys;
+  engineLabel: string;
+  longDescription: string;
+  metaDescription: string;
+  metaTitle: string;
+  focusKeyword?: string;
+  imageAltTexts: string[];
+};
+
 export function WooCommerce() {
   const { connections } = useConnections();
   const { t, dir } = useLanguage();
+  const { format: formatCurrency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showListOnMobile, setShowListOnMobile] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [optimizationResult, setOptimizationResult] = useState<SEOOptimizationResult | null>(null);
+  const [isSeoLoading, setIsSeoLoading] = useState(false);
+  const [isSeoSaving, setIsSeoSaving] = useState(false);
+  const [seoSuggestions, setSeoSuggestions] = useState<SeoSuggestion[]>([]);
+  const [activeSeoIndex, setActiveSeoIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const wooConnection = connections.find(c => c.id === 'woocommerce');
   const isConnected = wooConnection?.status === 'connected';
   const { storeUrl, wooKey, wooSecret } = wooConnection?.settings || {};
+  const aiKeys = getAIKeysFromConnections(connections);
 
   const fetchProducts = async () => {
     if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
@@ -53,50 +68,152 @@ export function WooCommerce() {
     }
   };
 
-  const handleOptimize = async () => {
+  const buildSeoPrompt = (product: Product) => {
+    const categories = product.categories?.map((c) => c.name).join(', ') || '';
+    const base =
+      `אתה מומחה SEO לוורדפרס + WooCommerce, Rank Math ו‑Yoast.\n` +
+      `המטרה: לשפר SEO למוצר בחנות WooCommerce בעברית.\n\n` +
+      `פרטי מוצר קיימים:\n` +
+      `שם מוצר: ${product.name}\n` +
+      `SKU: ${product.sku || '-'}\n` +
+      `קטגוריות: ${categories}\n` +
+      `תיאור קצר (WooCommerce): ${product.short_description || '-'}\n` +
+      `תיאור מלא (WooCommerce): ${product.description || '-'}\n\n` +
+      `החזר אך ורק JSON עם המפתח הבודד "suggestion" במבנה הבא (ללא טקסט נוסף):\n` +
+      `{\n` +
+      `  "suggestion": {\n` +
+      `    "longDescription": "תיאור מלא חדש ומפורט למוצר (WooCommerce description) בעברית תקינה, מתאים ל‑SEO",\n` +
+      `    "metaTitle": "כותרת SEO מומלצת בעברית, עד ~60 תווים, מתאימה ל‑Rank Math ו‑Yoast",\n` +
+      `    "metaDescription": "תיאור מטא בעברית, עד ~155 תווים, משכנע ומכיל מילות מפתח רלוונטיות",\n` +
+      `    "focusKeyword": "מילת מפתח/ביטוי מפתח מרכזי בעברית",\n` +
+      `    "imageAltTexts": [\n` +
+      `      "טקסט אלטרנטיבי לתמונה ראשית בעברית",\n` +
+      `      "טקסט אלטרנטיבי לתמונה שנייה בעברית",\n` +
+      `      "טקסט אלטרנטיבי לתמונה שלישית בעברית"\n` +
+      `    ]\n` +
+      `  }\n` +
+      `}\n\n` +
+      `הטקסטים צריכים להיות מותאמים במיוחד לפורמט ש‑Rank Math ו‑Yoast אוהבים (meta title + meta description + focus keyword).`;
+    return base;
+  };
+
+  const handleOptimizeSeo = async () => {
     if (!selectedProduct) return;
-    
-    setIsOptimizing(true);
     setError(null);
+
+    const hasAnyKey = aiKeys.gemini || aiKeys.openai || aiKeys.claude;
+    if (!hasAnyKey) {
+      setError('כדי לבצע אופטימיזציית SEO עם AI, חבר לפחות אחד מהמנועים Gemini / OpenAI / Claude במסך חיבורים.');
+      return;
+    }
+
+    setIsSeoLoading(true);
     try {
-      const result = await optimizeProductSEO({
-        name: selectedProduct.name,
-        short_description: selectedProduct.short_description,
-        description: selectedProduct.description,
-        sku: selectedProduct.sku,
-        categories: selectedProduct.categories
-      });
-      setOptimizationResult(result);
-    } catch (err) {
-      console.error("Optimization failed:", err);
-      setError(t('woocommerce.optimizationFailed'));
+      const prompt = buildSeoPrompt(selectedProduct);
+      const engines: { id: keyof AIKeys; label: string }[] = [
+        { id: 'gemini', label: 'Gemini' },
+        { id: 'openai', label: 'OpenAI' },
+        { id: 'claude', label: 'Claude' },
+      ];
+      const suggestions: SeoSuggestion[] = [];
+
+      for (const engine of engines) {
+        const key = aiKeys[engine.id];
+        if (!key) continue;
+
+        const singleKeys: AIKeys = {
+          gemini: engine.id === 'gemini' ? key : undefined,
+          openai: engine.id === 'openai' ? key : undefined,
+          claude: engine.id === 'claude' ? key : undefined,
+        };
+
+        try {
+          const { data } = await requestJSON<{ suggestion?: Partial<SeoSuggestion> }>(prompt, singleKeys);
+          const s = data?.suggestion || {};
+          suggestions.push({
+            engineId: engine.id,
+            engineLabel: engine.label,
+            longDescription: s.longDescription || selectedProduct.description || '',
+            metaDescription: s.metaDescription || selectedProduct.short_description || '',
+            metaTitle: s.metaTitle || selectedProduct.name || '',
+            focusKeyword: s.focusKeyword || '',
+            imageAltTexts:
+              Array.isArray(s.imageAltTexts) && s.imageAltTexts.length
+                ? (s.imageAltTexts as string[]).slice(0, 3)
+                : [
+                    selectedProduct.name,
+                    `${selectedProduct.name} - מוצר`,
+                    `${selectedProduct.name} בחנות אונליין`,
+                  ],
+          });
+        } catch (e) {
+          console.warn(`SEO suggestion failed for ${engine.label}`, e);
+        }
+      }
+
+      if (!suggestions.length) {
+        setError('קריאת ה‑AI נכשלה עבור כל המנועים. בדוק את המפתחות או נסה שוב מאוחר יותר.');
+        setSeoSuggestions([]);
+        return;
+      }
+
+      setSeoSuggestions(suggestions);
+      setActiveSeoIndex(0);
     } finally {
-      setIsOptimizing(false);
+      setIsSeoLoading(false);
     }
   };
 
-  const handleApprove = async () => {
-    if (!selectedProduct || !optimizationResult) return;
+  const updateSeoField = (index: number, field: keyof SeoSuggestion, value: string) => {
+    setSeoSuggestions((prev) => {
+      const next = [...prev];
+      const current = next[index];
+      if (!current) return prev;
+      if (field === 'imageAltTexts') return prev;
+      next[index] = { ...current, [field]: value } as SeoSuggestion;
+      return next;
+    });
+  };
+
+  const updateAltText = (index: number, altIndex: number, value: string) => {
+    setSeoSuggestions((prev) => {
+      const next = [...prev];
+      const current = next[index];
+      if (!current) return prev;
+      const alts = [...current.imageAltTexts];
+      alts[altIndex] = value;
+      next[index] = { ...current, imageAltTexts: alts };
+      return next;
+    });
+  };
+
+  const handleSaveSeo = async (suggestion: SeoSuggestion) => {
+    if (!selectedProduct) return;
     if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
       setError(t('woocommerce.errorLoading'));
       return;
     }
-    setIsUpdating(true);
+    setIsSeoSaving(true);
     setError(null);
     try {
       await updateWooCommerceProduct(storeUrl, wooKey, wooSecret, selectedProduct.id, {
-        name: optimizationResult.seo_title,
-        short_description: optimizationResult.short_description,
-        description: optimizationResult.description
+        description: suggestion.longDescription,
+        short_description: suggestion.metaDescription,
+        meta_data: [
+          { key: '_yoast_wpseo_metadesc', value: suggestion.metaDescription },
+          { key: '_yoast_wpseo_title', value: suggestion.metaTitle },
+          { key: '_yoast_wpseo_focuskw', value: suggestion.focusKeyword || '' },
+          { key: 'rank_math_description', value: suggestion.metaDescription },
+          { key: 'rank_math_title', value: suggestion.metaTitle },
+        ],
       });
-      setOptimizationResult(null);
-      await fetchProducts(); // Refresh product list
-      alert(t('woocommerce.updateSuccess'));
+      alert('SEO של המוצר עודכן בהצלחה (WooCommerce + Rank Math / Yoast meta).');
+      await fetchProducts();
     } catch (err) {
-      console.error("Update failed:", err);
-      setError(t('woocommerce.updateFailed'));
+      console.error('Update SEO failed:', err);
+      setError('שמירת אופטימיזציית ה‑SEO נכשלה. נסה שוב מאוחר יותר.');
     } finally {
-      setIsUpdating(false);
+      setIsSeoSaving(false);
     }
   };
 
@@ -107,7 +224,7 @@ export function WooCommerce() {
   }, [isConnected]);
 
   useEffect(() => {
-    setOptimizationResult(null);
+    setSeoSuggestions([]);
     if (selectedProduct) {
       setShowListOnMobile(false);
     }
@@ -205,7 +322,9 @@ export function WooCommerce() {
                   <div className="min-w-0 flex-1">
                     <div className="flex justify-between items-start mb-1">
                       <p className="text-sm font-bold text-gray-900 truncate flex-1">{product.name}</p>
-                      <p className="text-sm font-black text-indigo-600 mr-2 shrink-0">₪{product.price}</p>
+                      <p className="text-sm font-black text-indigo-600 mr-2 shrink-0">
+                        {product.price ? formatCurrency(Number(product.price)) : ''}
+                      </p>
                     </div>
                     <div className="flex justify-between items-center">
                       <p className="text-[10px] font-mono text-gray-400">{t('woocommerce.sku')}: {product.sku || '---'}</p>
@@ -243,12 +362,12 @@ export function WooCommerce() {
                   </h3>
                 </div>
                 <button 
-                  onClick={handleOptimize}
-                  disabled={isOptimizing}
+                  onClick={handleOptimizeSeo}
+                  disabled={isSeoLoading}
                   className="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 sm:py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                 >
-                  {isOptimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {t('woocommerce.aiOptimization')}
+                  {isSeoLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  אופטימיזציית SEO עם AI
                 </button>
               </div>
               <div className="p-4 sm:p-6 space-y-6 flex-1 overflow-y-auto">
@@ -268,7 +387,9 @@ export function WooCommerce() {
                         <DollarSign className="w-4 h-4" />
                         <span className="text-xs font-bold uppercase tracking-wider">{t('woocommerce.price')}</span>
                       </div>
-                      <p className="text-xl sm:text-2xl font-black text-gray-900">₪{selectedProduct.price}</p>
+                      <p className="text-xl sm:text-2xl font-black text-gray-900">
+                        {selectedProduct.price ? formatCurrency(Number(selectedProduct.price)) : ''}
+                      </p>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                       <div className="flex items-center gap-2 text-gray-500 mb-1">
@@ -280,64 +401,136 @@ export function WooCommerce() {
                   </div>
                 </div>
 
-                {optimizationResult && (
+                {seoSuggestions.length > 0 && (
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 space-y-4"
                   >
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-indigo-900 font-bold flex items-center gap-2">
-                        <Sparkles className="w-5 h-5" />
-                        {t('woocommerce.suggestedAiImprovements')}
-                      </h4>
-                      <span className="text-[10px] bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">{t('woocommerce.new')}</span>
-                    </div>
-                    
-                    <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div>
-                        <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{t('woocommerce.suggestedSeoTitle')}</label>
-                        <p className="text-sm font-bold text-indigo-900">{optimizationResult.seo_title}</p>
+                        <h4 className="text-indigo-900 font-bold flex items-center gap-2">
+                          <Sparkles className="w-5 h-5" />
+                          הצעות SEO מ‑3 מנועי AI
+                        </h4>
+                        <p className="text-xs text-indigo-700 mt-1">
+                          נכתב בפורמט ש‑Rank Math ו‑Yoast אוהבים (meta title + meta description + focus keyword).
+                        </p>
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{t('woocommerce.improvedShortDescription')}</label>
-                          <p className="text-xs text-indigo-800 leading-relaxed">{optimizationResult.short_description}</p>
+                      <span className="text-[10px] bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">
+                        {seoSuggestions.length} הצעות
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {seoSuggestions.map((s, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setActiveSeoIndex(idx)}
+                          className={cn(
+                            'px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5',
+                            activeSeoIndex === idx
+                              ? 'bg-indigo-600 text-white border-indigo-700'
+                              : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                          )}
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          {s.engineLabel}
+                        </button>
+                      ))}
+                    </div>
+
+                    {seoSuggestions[activeSeoIndex] && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">
+                              כותרת Meta Title (Rank Math / Yoast)
+                            </label>
+                            <input
+                              type="text"
+                              value={seoSuggestions[activeSeoIndex].metaTitle}
+                              onChange={(e) => updateSeoField(activeSeoIndex, 'metaTitle', e.target.value)}
+                              className="w-full px-3 py-2 border border-indigo-100 rounded-lg text-sm bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">
+                              Focus Keyword
+                            </label>
+                            <input
+                              type="text"
+                              value={seoSuggestions[activeSeoIndex].focusKeyword || ''}
+                              onChange={(e) => updateSeoField(activeSeoIndex, 'focusKeyword', e.target.value)}
+                              className="w-full px-3 py-2 border border-indigo-100 rounded-lg text-sm bg-white"
+                            />
+                          </div>
                         </div>
+
                         <div>
-                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{t('woocommerce.keywords')}</label>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {optimizationResult.seo_keywords.map((kw, i) => (
-                              <span key={i} className="bg-white/50 text-indigo-600 px-2 py-0.5 rounded text-[10px] font-medium border border-indigo-100">{kw}</span>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">
+                            Meta Description (Yoast / Rank Math)
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={seoSuggestions[activeSeoIndex].metaDescription}
+                            onChange={(e) => updateSeoField(activeSeoIndex, 'metaDescription', e.target.value)}
+                            className="w-full px-3 py-2 border border-indigo-100 rounded-lg text-sm bg-white resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">
+                            תיאור מלא חדש (WooCommerce Description)
+                          </label>
+                          <textarea
+                            rows={5}
+                            value={seoSuggestions[activeSeoIndex].longDescription}
+                            onChange={(e) => updateSeoField(activeSeoIndex, 'longDescription', e.target.value)}
+                            className="w-full px-3 py-2 border border-indigo-100 rounded-lg text-sm bg-white resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-2">
+                            טקסט אלטרנטיבי לתמונות (alt)
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            {seoSuggestions[activeSeoIndex].imageAltTexts.map((alt, i) => (
+                              <input
+                                key={i}
+                                type="text"
+                                value={alt}
+                                onChange={(e) => updateAltText(activeSeoIndex, i, e.target.value)}
+                                className="w-full px-3 py-2 border border-indigo-100 rounded-lg text-xs bg-white"
+                                placeholder={`Alt לתמונה ${i + 1}`}
+                              />
                             ))}
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="block text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">{t('woocommerce.improvedFullDescription')}</label>
-                        <p className="text-xs text-indigo-800 leading-relaxed whitespace-pre-wrap">{optimizationResult.description}</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button 
+                            onClick={() => handleSaveSeo(seoSuggestions[activeSeoIndex])}
+                            disabled={isSeoSaving}
+                            className="flex-1 bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {isSeoSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            שמור ל‑WooCommerce + Rank Math / Yoast
+                          </button>
+                          <button
+                            onClick={() =>
+                              navigator.clipboard.writeText(
+                                `${seoSuggestions[activeSeoIndex].metaTitle}\n${seoSuggestions[activeSeoIndex].metaDescription}\n\n${seoSuggestions[activeSeoIndex].longDescription}`
+                              )
+                            }
+                            className="px-4 py-2 bg-white text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold hover:bg-indigo-50"
+                          >
+                            העתק לטיוטת SEO
+                          </button>
+                        </div>
                       </div>
-
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={handleApprove}
-                          disabled={isUpdating}
-                          className="flex-1 bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                          {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                          {t('woocommerce.updateInWooCommerce')}
-                        </button>
-                        <button 
-                          onClick={() => alert("Ad creation from product not implemented yet.")}
-                          className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Zap className="w-4 h-4" />
-                          {t('woocommerce.createAd')}
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </motion.div>
                 )}
 
