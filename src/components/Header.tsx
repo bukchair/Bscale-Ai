@@ -32,7 +32,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     readBy?: Record<string, string>;
   }>>([]);
   const isDemo = userProfile?.subscriptionStatus === 'demo';
-  const canViewLeads = ['admin', 'agency', 'owner'].includes(userProfile?.role || '');
+  const canViewLeads = userProfile?.role === 'admin';
   const currentUid = auth.currentUser?.uid;
   const previousNewestLeadRef = useRef<string | null>(null);
   const hasInitializedLeadFeed = useRef(false);

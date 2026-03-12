@@ -278,7 +278,7 @@ export default function App() {
       case 'connections':
         return <Integrations userProfile={userProfile} />;
       case 'leads':
-        return userProfile && ['admin', 'agency', 'owner'].includes(userProfile.role) ? <Leads /> : <Dashboard />;
+        return userProfile?.role === 'admin' ? <Leads /> : <Dashboard />;
       case 'users':
         return userProfile?.role === 'admin' ? <Users /> : <Dashboard />;
       case 'system-mail':
@@ -291,22 +291,25 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white transition-colors duration-300" dir={dir}>
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isOpen={isSidebarOpen} 
-        setIsOpen={setIsSidebarOpen} 
-        userProfile={userProfile}
-      />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setIsSidebarOpen(true)} userProfile={userProfile} />
+    <>
+      <div className="flex h-screen bg-gray-50 dark:bg-[#050505] text-gray-900 dark:text-white transition-colors duration-300" dir={dir}>
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          isOpen={isSidebarOpen} 
+          setIsOpen={setIsSidebarOpen} 
+          userProfile={userProfile}
+        />
         
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-[#050505] p-4 sm:p-6 lg:p-8 transition-colors duration-300">
-          {renderContent()}
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header onMenuClick={() => setIsSidebarOpen(true)} userProfile={userProfile} />
+          
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-[#050505] p-4 sm:p-6 lg:p-8 transition-colors duration-300">
+            {renderContent()}
+          </main>
+        </div>
       </div>
-    </div>
+      <SalesBot />
+    </>
   );
 }

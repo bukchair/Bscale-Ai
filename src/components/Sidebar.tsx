@@ -37,7 +37,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
   const { t } = useLanguage();
   const currentUser = auth.currentUser;
   const isAdmin = userProfile?.role === 'admin';
-  const canViewLeads = ['admin', 'agency', 'owner'].includes(userProfile?.role || '');
+  const canViewLeads = userProfile?.role === 'admin';
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.stopPropagation();

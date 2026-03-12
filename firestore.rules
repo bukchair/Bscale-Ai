@@ -101,9 +101,8 @@ service cloud.firestore {
                     request.resource.data.createdAt is string &&
                     request.resource.data.status in ['new', 'contacted', 'closed'];
 
-      // Internal app visibility and management.
-      allow read, update: if isAuthenticated() &&
-                          (isAdmin() || isAgency() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'editor']);
+      // Internal app visibility and management - admin only.
+      allow read, update: if isAdmin();
 
       allow delete: if isAdmin();
     }

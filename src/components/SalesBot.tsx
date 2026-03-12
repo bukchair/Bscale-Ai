@@ -147,7 +147,7 @@ export function SalesBot() {
   };
 
   return (
-    <div className={cn('fixed z-50', dir === 'rtl' ? 'left-4 sm:left-6' : 'right-4 sm:right-6', 'bottom-4 sm:bottom-6')} dir={dir}>
+    <div className={cn('fixed z-[120]', dir === 'rtl' ? 'left-4 sm:left-6' : 'right-4 sm:right-6', 'bottom-4 sm:bottom-6')} dir={dir}>
       {isOpen && (
         <div className="mb-3 w-[calc(100vw-2rem)] sm:w-[360px] bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden">
           <div className="px-4 py-3 bg-indigo-600 text-white flex items-center justify-between">
