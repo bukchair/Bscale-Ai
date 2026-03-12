@@ -213,6 +213,14 @@ export function CreativeLab() {
     setExportedImageUrl(dataUrl);
   };
 
+  const handleDownloadComposite = () => {
+    if (!exportedImageUrl) return;
+    const a = document.createElement('a');
+    a.href = exportedImageUrl;
+    a.download = 'creative-overlay.png';
+    a.click();
+  };
+
   const handleSaveAdImageClick = async () => {
     const url = generatedContent?.type === 'image' ? generatedContent.url : null;
     if (!url) return;
@@ -225,6 +233,37 @@ export function CreativeLab() {
       drawCanvas(generatedContent.url).then((dataUrl) => dataUrl && setExportedImageUrl(dataUrl));
     }
   }, [generatedContent?.url, overlayHeadline, overlayCta, overlayPosition]);
+
+  const handleSuggestOverlayFromAI = async () => {
+    if (!aiKeys || (!selectedProduct && !prompt)) {
+      showToast('כדי לקבל הצעה מה‑AI, חבר מנועי AI בהתחברויות והגדר מוצר או תיאור.');
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const baseName = selectedProduct?.name || 'מוצר';
+      const baseDesc = selectedProduct?.longDesc || prompt || '';
+      const res = await generateCreativeCopy(
+        baseName,
+        baseDesc,
+        (prompt || '') + '\nהתמקד בהצעת כותרת קצרה ו‑CTA חזק בעברית.',
+        aiKeys
+      );
+      const first = Array.isArray(res.options) && res.options[0] ? res.options[0] : null;
+      if (first) {
+        setOverlayHeadline(first.headline || baseName);
+        setOverlayCta(first.description || 'קנה עכשיו');
+        showToast('ה‑AI הציע כותרת ו‑CTA למודעה.');
+      } else {
+        showToast('לא התקבלה הצעה מה‑AI, נסה ניסוח שונה.');
+      }
+    } catch (e) {
+      console.error('Failed to suggest overlay from AI', e);
+      showToast('קריאת ה‑AI נכשלה. נסה שוב מאוחר יותר.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt && !selectedProduct) return;
@@ -517,6 +556,12 @@ export function CreativeLab() {
                       <button onClick={() => handlePublishTo('tiktok')} className="px-3 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 flex items-center gap-1">
                         <Send className="w-4 h-4" /> פרסם TikTok
                       </button>
+                      <button
+                        onClick={handleSuggestOverlayFromAI}
+                        className="px-3 py-2 bg-white text-indigo-600 border border-indigo-200 rounded-lg text-sm font-medium hover:bg-indigo-50 flex items-center gap-1"
+                      >
+                        <Sparkles className="w-4 h-4" /> הצעת כותרת ו‑CTA מה‑AI
+                      </button>
                     </div>
                   </div>
                   <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
@@ -564,6 +609,16 @@ export function CreativeLab() {
                     </button>
                   ))}
                 </div>
+                {exportedImageUrl && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleDownloadComposite}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700"
+                    >
+                      <Download className="w-4 h-4" /> הורד את גרסת ה‑AI עם הטקסט
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
