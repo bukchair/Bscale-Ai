@@ -18,3 +18,19 @@ View your app in AI Studio: https://ai.studio/apps/3c82a4d3-e216-4ee2-a10f-71d88
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## דחיפה אוטומטית (Auto Push)
+
+לאחר שתגדיר חיבור ל-Git אחת פעמיים:
+
+```bash
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+```
+
+תוכל לדחוף שינויים אוטומטית עם:
+
+```bash
+npm run push
+```
+
+הפקודה מבצעת: `git add -A`, commit (אם יש שינויים), ו-`git push`.
