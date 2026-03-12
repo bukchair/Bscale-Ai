@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -17,6 +17,7 @@ export function Dashboard() {
   const { dateRange } = useDateRange();
   const { connections } = useConnections();
   const currentUser = auth.currentUser;
+  const hasLoadedRealDataRef = useRef(false);
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -73,6 +74,13 @@ export function Dashboard() {
 
   // Load real metrics from WooCommerce, Google (GA4, GSC, Ads), Meta and TikTok when connections exist
   useEffect(() => {
+    // דואגים שהטעינה תרוץ רק פעם אחת לכל טעינת דף,
+    // כדי למנוע לולאות אינסופיות כשחיבורי Firestore מתחדשים או נכשלים בהרשאות
+    if (hasLoadedRealDataRef.current) {
+      return;
+    }
+    hasLoadedRealDataRef.current = true;
+
     let cancelled = false;
 
     const moneyFromString = (value: string | number | undefined): number => {
