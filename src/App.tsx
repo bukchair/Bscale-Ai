@@ -16,6 +16,7 @@ import { SEOReports } from './pages/SEOReports';
 import { Audiences } from './pages/Audiences';
 import { CreativeLab } from './pages/CreativeLab';
 import { Automations } from './pages/Automations';
+import { Orders } from './pages\Orders';
 import { Integrations } from './pages/Integrations';
 import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
@@ -58,6 +59,8 @@ export default function App() {
         return 'seo';
       case 'products':
         return 'products';
+      case 'orders':
+        return 'orders';
       case 'audiences':
         return 'audiences';
       case 'creative-lab':
@@ -145,6 +148,9 @@ export default function App() {
         break;
       case 'products':
         desiredPath = '/products';
+        break;
+      case 'orders':
+        desiredPath = '/orders';
         break;
       case 'audiences':
         desiredPath = '/audiences';
@@ -238,6 +244,8 @@ export default function App() {
         return <SEOReports />;
       case 'products':
         return <WooCommerce />;
+      case 'orders':
+        return <Orders />;
       case 'audiences':
         return <Audiences />;
       case 'creative-lab':

@@ -69,6 +69,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
       items: [
         { id: 'seo', label: t('nav.seoCenter'), icon: LineChart },
         { id: 'products', label: t('nav.products'), icon: ShoppingCart },
+        { id: 'orders', label: t('nav.orders') || 'Orders', icon: ListTodo },
         { id: 'audiences', label: t('nav.audiences'), icon: Users },
         { id: 'creative-lab', label: t('nav.creativeLab'), icon: PenTool },
       ]

@@ -186,6 +186,23 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 <li>{t('landing.articleL3')}</li>
                 <li>{t('landing.articleL4')}</li>
               </ul>
+              <div className="mt-8 p-4 sm:p-5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/40 rounded-2xl">
+                <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-200 mb-3">
+                  דרישות מערכת וחיבורים מומלצים
+                </h3>
+                <p className="text-sm mb-3">
+                  כדי ליהנות מכל היכולות של BScale AI, מומלץ לחבר את חשבונות הפרסום והאנליטיקה המרכזיים שלך:
+                </p>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  <li>Google Ads — ניהול קמפיינים, תקציבים והמרות.</li>
+                  <li>Google Search Console — נתוני SEO, מיקומים אורגניים ומונחי חיפוש.</li>
+                  <li>Google Analytics 4 — תנועת גולשים והתנהגות באתר.</li>
+                  <li>Meta Ads (Facebook / Instagram) — קמפיינים ברשתות חברתיות וקהלים.</li>
+                  <li>TikTok Ads — קמפיינים בווידאו וניתוח ביצועים.</li>
+                  <li>WooCommerce — חיבור חנות וורדפרס, מוצרים והזמנות.</li>
+                  <li>Shopify — חיבור חנות Shopify, קטלוג ומכירות.</li>
+                </ul>
+              </div>
               <p>
                 {t('landing.articleP3')}
               </p>

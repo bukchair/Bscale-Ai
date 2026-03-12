@@ -193,6 +193,57 @@ export interface WooCommerceSalesPoint {
   orders: number;
 }
 
+export interface WooCommerceOrder {
+  id: number;
+  number: string;
+  status: string;
+  currency: string;
+  total: number;
+  total_tax: number;
+  shipping_total: number;
+  payment_method: string;
+  payment_method_title: string;
+  date_created: string;
+  date_modified: string;
+  date_completed: string | null;
+  customer_note: string;
+  billing: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    company?: string;
+    address_1?: string;
+    address_2?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+  shipping: {
+    first_name: string;
+    last_name: string;
+    company?: string;
+    address_1?: string;
+    address_2?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
+  };
+  line_items: {
+    id: number;
+    name: string;
+    product_id: number;
+    variation_id: number;
+    quantity: number;
+    total: string;
+    total_tax: string;
+    sku?: string;
+  }[];
+  meta_data?: { key: string; value: any }[];
+}
+
 export async function fetchWooCommerceSalesByRange(
   url: string,
   key: string,
@@ -254,3 +305,149 @@ export async function fetchWooCommerceSalesByRange(
     return [];
   }
 }
+
+export async function fetchWooCommerceOrdersByRange(
+  url: string,
+  key: string,
+  secret: string,
+  dateMinISO: string,
+  dateMaxISO: string
+): Promise<WooCommerceOrder[]> {
+  if (!url || !key || !secret) {
+    return [];
+  }
+
+  // When working in demo/mock mode, return a small static set of orders
+  if (key === 'mock' || secret === 'mock') {
+    return [
+      {
+        id: 101,
+        number: '101',
+        status: 'completed',
+        currency: 'ILS',
+        total: 1349,
+        total_tax: 0,
+        shipping_total: 0,
+        payment_method: 'bscale_gateway',
+        payment_method_title: 'BScale Demo Gateway',
+        date_created: dateMinISO,
+        date_modified: dateMinISO,
+        date_completed: dateMaxISO,
+        customer_note: 'נא ליצור קשר לפני משלוח.',
+        billing: {
+          first_name: 'דנה',
+          last_name: 'כהן',
+          email: 'dana@example.com',
+          phone: '+972501234567',
+          company: 'Demo Ltd',
+          address_1: 'רחוב הדגמה 1',
+          address_2: '',
+          city: 'תל אביב',
+          state: '',
+          postcode: '61000',
+          country: 'IL'
+        },
+        shipping: {
+          first_name: 'דנה',
+          last_name: 'כהן',
+          company: 'Demo Ltd',
+          address_1: 'רחוב הדגמה 1',
+          address_2: '',
+          city: 'תל אביב',
+          state: '',
+          postcode: '61000',
+          country: 'IL'
+        },
+        line_items: [
+          {
+            id: 1,
+            name: 'נעלי ריצה מקצועיות - דגם 2024',
+            product_id: 1,
+            variation_id: 0,
+            quantity: 1,
+            total: '1349',
+            total_tax: '0',
+            sku: 'RUN-2024-BL'
+          }
+        ],
+        meta_data: [
+          { key: 'internal_note', value: 'הדגמה בלבד - לא נשלח ללקוח' }
+        ]
+      }
+    ];
+  }
+
+  try {
+    const perPage = 100;
+    const endpoint = `orders?per_page=${perPage}&status=any&after=${encodeURIComponent(
+      dateMinISO
+    )}&before=${encodeURIComponent(dateMaxISO)}`;
+
+    const response = await fetch(`${API_BASE}/api/proxy/woocommerce`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        key,
+        secret,
+        endpoint
+      })
+    });
+
+    const text = await response.text();
+    if (!text) {
+      return [];
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn('Failed to parse WooCommerce orders response, returning empty list');
+      return [];
+    }
+
+    const rows: any[] = Array.isArray(data) ? data : [data];
+
+    return rows.map((row) => ({
+      id: row.id,
+      number: String(row.number ?? row.id),
+      status: row.status || 'pending',
+      currency: row.currency || 'ILS',
+      total:
+        typeof row.total === 'string'
+          ? parseFloat(row.total || '0')
+          : Number(row.total || 0),
+      total_tax:
+        typeof row.total_tax === 'string'
+          ? parseFloat(row.total_tax || '0')
+          : Number(row.total_tax || 0),
+      shipping_total:
+        typeof row.shipping_total === 'string'
+          ? parseFloat(row.shipping_total || '0')
+          : Number(row.shipping_total || 0),
+      payment_method: row.payment_method || '',
+      payment_method_title: row.payment_method_title || '',
+      date_created: row.date_created || '',
+      date_modified: row.date_modified || '',
+      date_completed: row.date_completed || null,
+      customer_note: row.customer_note || '',
+      billing: row.billing || {
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: ''
+      },
+      shipping: row.shipping || {
+        first_name: '',
+        last_name: ''
+      },
+      line_items: Array.isArray(row.line_items) ? row.line_items : [],
+      meta_data: Array.isArray(row.meta_data) ? row.meta_data : []
+    }));
+  } catch (error) {
+    console.error('WooCommerce orders fetch error:', error);
+    return [];
+  }
+}
+
