@@ -185,3 +185,72 @@ export async function fetchWooCommerceRevenue(url: string, key: string, secret: 
     return 0;
   }
 }
+
+export interface WooCommerceSalesPoint {
+  date: string;
+  totalSales: number;
+  netSales: number;
+  orders: number;
+}
+
+export async function fetchWooCommerceSalesByRange(
+  url: string,
+  key: string,
+  secret: string,
+  dateMin: string,
+  dateMax: string
+): Promise<WooCommerceSalesPoint[]> {
+  if (!url || !key || !secret) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/proxy/woocommerce`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        key,
+        secret,
+        endpoint: `reports/sales?date_min=${dateMin}&date_max=${dateMax}`
+      })
+    });
+
+    const text = await response.text();
+    if (!text) {
+      return [];
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.warn('Failed to parse WooCommerce sales range response, returning empty list');
+      return [];
+    }
+
+    const rows: any[] = Array.isArray(data) ? data : [data];
+
+    return rows.map((row) => {
+      const total = typeof row.total_sales === 'string' ? parseFloat(row.total_sales || '0') : Number(row.total_sales || 0);
+      const net = typeof row.net_sales === 'string' ? parseFloat(row.net_sales || '0') : Number(row.net_sales || 0);
+      const orders = Number(row.total_orders || 0);
+      const date =
+        typeof row.date === 'string'
+          ? row.date
+          : typeof row.start_date === 'string'
+          ? row.start_date
+          : '';
+
+      return {
+        date,
+        totalSales: isNaN(total) ? 0 : total,
+        netSales: isNaN(net) ? 0 : net,
+        orders: isNaN(orders) ? 0 : orders,
+      };
+    });
+  } catch (error) {
+    console.error('WooCommerce sales range fetch error:', error);
+    return [];
+  }
+}

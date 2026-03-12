@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { DollarSign, TrendingUp, TrendingDown, Activity, Download, Filter, Zap, BarChart3, PieChart, CheckCircle2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
 import { cn } from '../lib/utils';
+import { useConnections } from '../contexts/ConnectionsContext';
+import { fetchWooCommerceSalesByRange, WooCommerceSalesPoint } from '../services/woocommerceService';
 
 const platformDataBase = [
   { name: 'Google Ads', spend: 4500, roas: 3.2 },
@@ -21,7 +23,12 @@ export function Profitability() {
   const { t, dir } = useLanguage();
   const { dateRange } = useDateRange();
   const bounds = useDateRangeBounds();
+  const { connections } = useConnections();
   const [reportType, setReportType] = useState<'period' | 'campaigns' | 'platforms'>('period');
+
+  const wooConnection = connections.find((c) => c.id === 'woocommerce' && c.status === 'connected');
+  const [wooSales, setWooSales] = useState<WooCommerceSalesPoint[] | null>(null);
+  const [isLoadingWoo, setIsLoadingWoo] = useState(false);
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
   const periodSubtitle = dateRange === 'custom'
@@ -29,7 +36,42 @@ export function Profitability() {
     : periodLabel;
   const mult = getPeriodMultiplier(dateRange);
 
+  useEffect(() => {
+    if (!wooConnection?.settings) {
+      setWooSales(null);
+      return;
+    }
+    const { storeUrl, wooKey, wooSecret } = wooConnection.settings as any;
+    if (!storeUrl || !wooKey || !wooSecret) {
+      setWooSales(null);
+      return;
+    }
+
+    const startIso = bounds.startDate.toISOString().slice(0, 10);
+    const endIso = bounds.endDate.toISOString().slice(0, 10);
+
+    setIsLoadingWoo(true);
+    fetchWooCommerceSalesByRange(storeUrl, wooKey, wooSecret, startIso, endIso)
+      .then((rows) => setWooSales(rows.length ? rows : null))
+      .finally(() => setIsLoadingWoo(false));
+  }, [wooConnection?.settings, bounds.startDate, bounds.endDate]);
+
   const financialData = useMemo(() => {
+    if (wooSales && wooSales.length) {
+      // שימוש בנתוני אמת מ‑WooCommerce לפי טווח התאריכים
+      return wooSales.map((row) => {
+        const dateLabel = row.date ? new Date(row.date).toLocaleDateString('he-IL') : '';
+        return {
+          name: dateLabel,
+          revenue: Math.round(row.totalSales),
+          // הוצאת פרסום עדיין מדומיינת כאן; ניתן בעתיד לחבר ל‑Ad Spend אמיתי
+          spend: Math.round(row.totalSales - row.netSales),
+          profit: Math.round(row.netSales),
+        };
+      });
+    }
+
+    // נתוני דמו כאשר אין חיבור WooCommerce
     const base = [
       { name: 'Jan', revenue: 12000, spend: 4000, profit: 8000 },
       { name: 'Feb', revenue: 19000, spend: 6000, profit: 13000 },
@@ -46,7 +88,7 @@ export function Profitability() {
       spend: Math.round(row.spend * mult),
       profit: Math.round(row.profit * mult),
     }));
-  }, [dateRange, mult]);
+  }, [wooSales, dateRange, mult]);
 
   const platformData = useMemo(() =>
     platformDataBase.map(p => ({ ...p, spend: Math.round(p.spend * mult) })), [mult]);
