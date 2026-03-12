@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Search, User, ChevronDown, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
+import { Menu, Bell, Search, User, ChevronDown, CheckCircle, AlertTriangle, Calendar, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, DateRangeType } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -38,14 +38,25 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 transition-colors duration-300">
       <div className="flex items-center flex-1">
-        <button
-          onClick={onMenuClick}
-          className="p-2 me-2 text-gray-500 dark:text-gray-400 rounded-md lg:hidden hover:bg-gray-100 dark:hover:bg-white/5"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-        
-        <div className="hidden sm:flex items-center gap-2 relative">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onMenuClick}
+            className="p-2 me-1 text-gray-500 dark:text-gray-400 rounded-md lg:hidden hover:bg-gray-100 dark:hover:bg-white/5"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          {/* לוגו קומפקטי במיוחד למובייל, שומר על אייקון יפה */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-500 to-pink-500 shadow-md flex items-center justify-center text-white">
+              <BrainCircuit className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <span className="hidden xs:inline-block text-sm sm:text-base font-black tracking-tight text-gray-900 dark:text-white">
+              BScale AI
+            </span>
+          </div>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 relative ms-4">
           <div className="flex items-center bg-gray-100 dark:bg-[#1a1a1a] rounded-lg p-1">
             <button 
               onClick={() => handleDateClick('today')}
