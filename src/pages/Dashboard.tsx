@@ -288,10 +288,10 @@ export function Dashboard() {
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Personalized Welcome */}
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
+        <h1 className="ui-display text-2xl sm:text-3xl text-gray-900 dark:text-white">
           {t('dashboard.welcome')}, {currentUser?.displayName?.split(' ')[0] || 'User'}! 👋
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">
+        <p className="ui-subtitle text-gray-500 dark:text-gray-400 mt-1">
           {t('dashboard.welcomeSubtitle')}
         </p>
       </div>
@@ -300,7 +300,7 @@ export function Dashboard() {
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <Zap className="w-5 h-5 text-amber-500" />
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.quickSmartActions')}</h2>
+          <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.quickSmartActions')}</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickActions.map((action) => (
@@ -312,8 +312,8 @@ export function Dashboard() {
                 <action.icon className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-gray-900 dark:text-white mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{action.title}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{action.desc}</p>
+                <h3 className="ui-section-title text-base text-gray-900 dark:text-white mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{action.title}</h3>
+                <p className="ui-body-copy text-sm text-gray-500 dark:text-gray-400">{action.desc}</p>
               </div>
             </button>
           ))}
@@ -328,21 +328,21 @@ export function Dashboard() {
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.financialAnalysis')}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.wooCommerceRevenueVsCampaignSpend')} <span className="font-bold text-indigo-600 dark:text-indigo-400">({dateRangeLabel})</span></p>
+              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.financialAnalysis')}</h2>
+              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.wooCommerceRevenueVsCampaignSpend')} <span className="font-bold text-indigo-600 dark:text-indigo-400">({dateRangeLabel})</span></p>
             </div>
           </div>
           <div className="text-end">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('dashboard.netProfit')}</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(netProfit)}</p>
+            <p className="ui-kpi-label text-gray-400">{t('dashboard.netProfit')}</p>
+            <p className="ui-kpi-value text-2xl text-indigo-600 dark:text-indigo-400">{formatCurrency(netProfit)}</p>
           </div>
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase tracking-wider">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">{formatCurrency(totalRevenue)}</p>
+            <p className="ui-kpi-label text-emerald-800 dark:text-emerald-400 mb-2">{t('dashboard.wooCommerceRevenue')}</p>
+            <p className="ui-kpi-value text-4xl text-emerald-900 dark:text-emerald-50">{formatCurrency(totalRevenue)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
             </div>
@@ -350,8 +350,8 @@ export function Dashboard() {
           
           <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="text-sm font-bold text-red-800 dark:text-red-400 mb-2 uppercase tracking-wider">{t('dashboard.campaignSpend')}</p>
-            <p className="text-4xl font-black text-red-900 dark:text-red-50">{formatCurrency(totalSpend)}</p>
+            <p className="ui-kpi-label text-red-800 dark:text-red-400 mb-2">{t('dashboard.campaignSpend')}</p>
+            <p className="ui-kpi-value text-4xl text-red-900 dark:text-red-50">{formatCurrency(totalSpend)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>
@@ -360,8 +360,8 @@ export function Dashboard() {
           
           <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-xl border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <TrendingUp className={cn("absolute -bottom-4 w-24 h-24 text-indigo-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="text-sm font-bold text-indigo-800 dark:text-indigo-400 mb-2 uppercase tracking-wider">{t('dashboard.roas')}</p>
-            <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">{roas}x</p>
+            <p className="ui-kpi-label text-indigo-800 dark:text-indigo-400 mb-2">{t('dashboard.roas')}</p>
+            <p className="ui-kpi-value text-4xl text-indigo-900 dark:text-indigo-50">{roas}x</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">POAS: 1.8x</span>
@@ -378,8 +378,8 @@ export function Dashboard() {
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.realtimeTrafficGa4')}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.activeUsersAndSources')}</p>
+              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.realtimeTrafficGa4')}</h2>
+              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.activeUsersAndSources')}</p>
             </div>
           </div>
           
@@ -388,8 +388,8 @@ export function Dashboard() {
               <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full animate-ping", dir === 'rtl' ? "left-3" : "right-3")} />
               <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full", dir === 'rtl' ? "left-3" : "right-3")} />
               <div>
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-1">{t('dashboard.activeNow')}</p>
-                <p className="text-5xl font-black text-blue-600 dark:text-blue-400">{ga4Stats.activeNow}</p>
+                <p className="ui-kpi-label text-blue-800 dark:text-blue-300 mb-1">{t('dashboard.activeNow')}</p>
+                <p className="ui-kpi-value text-5xl text-blue-600 dark:text-blue-400">{ga4Stats.activeNow}</p>
               </div>
               <div className="text-end">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('dashboard.totalUsers')}</p>
@@ -404,7 +404,7 @@ export function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.topPages')}</h3>
+                  <h3 className="ui-kpi-label text-gray-900 dark:text-white">{t('dashboard.topPages')}</h3>
                   <div className="space-y-3">
                     {[
                       { name: t('dashboard.homePage'), percent: 41 },
@@ -423,7 +423,7 @@ export function Dashboard() {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">{t('dashboard.trafficSources')}</h3>
+                  <h3 className="ui-kpi-label text-gray-900 dark:text-white">{t('dashboard.trafficSources')}</h3>
                   <div className="space-y-3">
                     {[
                       { name: t('dashboard.organicSearch'), percent: 45, color: 'bg-emerald-500' },
@@ -453,8 +453,8 @@ export function Dashboard() {
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.businessGrowth')}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.businessGrowthDesc')} {dateRangeLabel}</p>
+              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.businessGrowth')}</h2>
+              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.businessGrowthDesc')} {dateRangeLabel}</p>
             </div>
           </div>
           
@@ -501,8 +501,8 @@ export function Dashboard() {
               <Search className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t('dashboard.seoOverview')}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{t('dashboard.performanceDataFromGsc')}</p>
+              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.seoOverview')}</h2>
+              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.performanceDataFromGsc')}</p>
             </div>
           </div>
           <button className="text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
@@ -514,23 +514,23 @@ export function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
             <MousePointerClick className="w-6 h-6 text-blue-500 dark:text-blue-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.clicks.toLocaleString()}</p>
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.clicks')}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.clicks.toLocaleString()}</p>
+            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.clicks')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors cursor-pointer group">
             <Eye className="w-6 h-6 text-purple-500 dark:text-purple-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.impressions.toLocaleString()}</p>
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.impressions')}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.impressions.toLocaleString()}</p>
+            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.impressions')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-orange-200 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
             <Target className="w-6 h-6 text-orange-500 dark:text-orange-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">#{gscStats.avgPosition.toFixed(1)}</p>
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.avgPosition')}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">#{gscStats.avgPosition.toFixed(1)}</p>
+            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.avgPosition')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-emerald-200 dark:hover:border-emerald-500/30 transition-colors cursor-pointer group">
             <TrendingUp className="w-6 h-6 text-emerald-500 dark:text-emerald-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{gscStats.ctr.toFixed(2)}%</p>
-            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t('dashboard.ctr')}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.ctr.toFixed(2)}%</p>
+            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.ctr')}</p>
           </div>
         </div>
       </div>

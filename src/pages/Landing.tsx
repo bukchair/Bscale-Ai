@@ -157,13 +157,13 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
               <Sparkles className="w-4 h-4" />
               <span>{t('app.slogan')}</span>
             </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-6 leading-tight">
+            <h1 className="ui-display text-5xl md:text-6xl lg:text-7xl mb-6">
               {t('landing.heroTitle1')} <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-500 dark:via-purple-500 dark:to-pink-500">
                 {t('landing.heroTitle2')}
               </span>
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="ui-subtitle text-xl text-gray-600 dark:text-gray-400 mb-8 max-w-2xl mx-auto lg:mx-0">
               {t('landing.heroSubtitle')}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
@@ -240,8 +240,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
         {/* Article/Description Section */}
         <section id="article" className="py-24 bg-white dark:bg-white/5 border-y border-gray-200 dark:border-white/10">
           <div className="max-w-4xl mx-auto px-6 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-8 text-gray-900 dark:text-white">{t('landing.articleTitle')}</h2>
-            <div className="prose prose-lg dark:prose-invert mx-auto text-gray-600 dark:text-gray-300 leading-relaxed text-start">
+            <h2 className="ui-section-title text-3xl md:text-4xl mb-8 text-gray-900 dark:text-white">{t('landing.articleTitle')}</h2>
+            <div className="prose prose-lg ui-body-copy dark:prose-invert mx-auto text-gray-600 dark:text-gray-300 text-start">
               <p className="mb-6">
                 {t('landing.articleP1')}
               </p>
@@ -255,7 +255,7 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 <li>{t('landing.articleL4')}</li>
               </ul>
               <div className="mt-8 p-4 sm:p-5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/40 rounded-2xl">
-                <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-200 mb-3">
+                <h3 className="ui-section-title text-lg text-indigo-900 dark:text-indigo-200 mb-3">
                   דרישות מערכת וחיבורים מומלצים
                 </h3>
                 <p className="text-sm mb-3">
@@ -290,8 +290,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
         <section id="pricing" className="py-24 bg-white dark:bg-white/5 border-y border-gray-200 dark:border-white/10">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">{t('landing.pricingTitle')}</h2>
-              <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">{t('landing.pricingSubtitle')}</p>
+              <h2 className="ui-section-title text-3xl md:text-4xl mb-4 text-gray-900 dark:text-white">{t('landing.pricingTitle')}</h2>
+              <p className="ui-subtitle text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">{t('landing.pricingSubtitle')}</p>
               <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-3">{paypalHintText}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -403,8 +403,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
         <section className="py-24">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">{t('landing.featuresTitle')}</h2>
-              <p className="text-gray-600 dark:text-gray-400">{t('landing.featuresSubtitle')}</p>
+              <h2 className="ui-section-title text-3xl md:text-4xl mb-4 text-gray-900 dark:text-white">{t('landing.featuresTitle')}</h2>
+              <p className="ui-subtitle text-gray-600 dark:text-gray-400">{t('landing.featuresSubtitle')}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {features.map((feature, idx) => (
@@ -417,8 +417,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   className="p-6 rounded-2xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:shadow-lg dark:hover:bg-white/10 transition-all"
                 >
                   <feature.icon className="w-10 h-10 text-indigo-600 dark:text-indigo-400 mb-4" />
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">{feature.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
+                  <h3 className="ui-section-title text-xl mb-2 text-gray-900 dark:text-white">{feature.title}</h3>
+                  <p className="ui-body-copy text-gray-600 dark:text-gray-400 text-sm">{feature.desc}</p>
                 </motion.div>
               ))}
             </div>
@@ -429,8 +429,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
         <section className="py-24 bg-gray-50 dark:bg-[#0a0a0a] border-y border-gray-200 dark:border-white/10">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">{t('landing.howItWorks')}</h2>
-              <p className="text-gray-600 dark:text-gray-400">{t('landing.howItWorksSub')}</p>
+              <h2 className="ui-section-title text-3xl md:text-4xl mb-4 text-gray-900 dark:text-white">{t('landing.howItWorks')}</h2>
+              <p className="ui-subtitle text-gray-600 dark:text-gray-400">{t('landing.howItWorksSub')}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
               {/* Connecting Line */}
@@ -448,8 +448,8 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   <div className="w-20 h-20 rounded-full bg-white dark:bg-indigo-600/20 border-2 border-indigo-100 dark:border-indigo-500/30 flex items-center justify-center text-3xl font-black text-indigo-600 dark:text-indigo-400 mb-6 shadow-md dark:backdrop-blur-sm">
                     {step.num}
                   </div>
-                  <h3 className="text-2xl font-bold mb-3 text-gray-900 dark:text-white">{step.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{step.desc}</p>
+                  <h3 className="ui-section-title text-2xl mb-3 text-gray-900 dark:text-white">{step.title}</h3>
+                  <p className="ui-body-copy text-gray-600 dark:text-gray-400">{step.desc}</p>
                 </motion.div>
               ))}
             </div>
@@ -460,7 +460,7 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
         <section className="py-24 text-center">
           <div className="max-w-3xl mx-auto px-6 space-y-6">
             <div>
-              <h2 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">{t('landing.ready')}</h2>
+              <h2 className="ui-section-title text-4xl mb-8 text-gray-900 dark:text-white">{t('landing.ready')}</h2>
               <button
                 onClick={onEnter}
                 className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gradient-to-r from-indigo-600 to-purple-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:scale-105 shadow-[0_0_40px_rgba(79,70,229,0.3)] dark:shadow-[0_0_40px_rgba(79,70,229,0.4)]"

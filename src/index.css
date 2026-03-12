@@ -56,3 +56,43 @@ button {
 :lang(he) h6 {
   letter-spacing: 0;
 }
+
+.ui-display {
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.ui-section-title {
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.ui-subtitle {
+  font-weight: 500;
+  line-height: 1.65;
+}
+
+.ui-body-copy {
+  line-height: 1.75;
+}
+
+.ui-kpi-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ui-kpi-value {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+:lang(he) .ui-display,
+:lang(he) .ui-section-title,
+:lang(he) .ui-kpi-value {
+  letter-spacing: 0;
+}
