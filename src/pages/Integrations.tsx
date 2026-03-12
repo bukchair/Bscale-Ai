@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit } from 'lucide-react';
+import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
@@ -30,7 +30,7 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 export function Integrations({ userProfile }: { userProfile?: { role?: string } | null }) {
   const isAdmin = userProfile?.role === 'admin';
   const { t, dir } = useLanguage();
-  const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, testConnection } = useConnections();
+  const { connections, toggleConnection, updateConnectionSettings, clearConnectionSettings, resetAllConnections, testConnection } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -732,6 +732,20 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
         >
           <CheckCircle2 className="w-4 h-4" />
           {t('integrations.testAll')}
+        </button>
+        <button
+          onClick={async () => {
+            if (window.confirm(t('integrations.resetAllConfirm'))) {
+              await resetAllConnections();
+              setExpandedId(null);
+              setFormValues({});
+              setToast({ message: t('integrations.resetAllDone'), type: 'success' });
+            }
+          }}
+          className="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-600 transition-all shadow-sm flex items-center gap-2"
+        >
+          <RotateCcw className="w-4 h-4" />
+          {t('integrations.resetAll')}
         </button>
       </div>
       

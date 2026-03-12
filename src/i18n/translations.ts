@@ -219,6 +219,9 @@ export const translations = {
       wooResetConfirm: "Delete WooCommerce connection and enter new credentials?",
       wooResetDone: "Connection cleared. Enter new details above.",
       aiAdminOnly: "Only admins can edit AI provider settings. You can see connection status only.",
+      resetAll: "Reset all connections",
+      resetAllConfirm: "Reset all connections to default? All saved credentials will be cleared.",
+      resetAllDone: "All connections have been reset. You can configure them again.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
@@ -771,6 +774,9 @@ export const translations = {
       wooResetConfirm: "למחוק את החיבור ל-WooCommerce ולהזין פרטים חדשים?",
       wooResetDone: "החיבור נוקה. הזן פרטים חדשים למעלה.",
       aiAdminOnly: "רק מנהלים יכולים לערוך הגדרות ספקי AI. כאן מוצג רק סטטוס החיבור.",
+      resetAll: "איפוס כל החיבורים",
+      resetAllConfirm: "לאפס את כל החיבורים לברירת מחדל? כל ההגדרות השמורות יימחקו.",
+      resetAllDone: "כל החיבורים אופסו. אפשר להגדיר אותם מחדש.",
       platforms: {
         gemini: {
           name: "Google Gemini AI",
