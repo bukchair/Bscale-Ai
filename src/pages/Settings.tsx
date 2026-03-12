@@ -1,11 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-export function Settings() {
+export function Settings({ userProfile }: { userProfile?: { role?: string } | null }) {
   const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<'profile' | 'agency' | 'billing' | 'notifications' | 'security'>('profile');
+  const isAdmin = userProfile?.role === 'admin';
+  const [paymentToken, setPaymentToken] = useState('');
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    setIsLoadingPayment(true);
+    const ref = doc(db, 'appSettings', 'payment');
+    getDoc(ref)
+      .then((snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as { providerToken?: string };
+          if (data?.providerToken) setPaymentToken(data.providerToken);
+        }
+      })
+      .finally(() => setIsLoadingPayment(false));
+  }, [isAdmin]);
+
+  const handleSavePaymentToken = async () => {
+    if (!isAdmin) return;
+    setIsSavingPayment(true);
+    setPaymentMessage(null);
+    try {
+      const ref = doc(db, 'appSettings', 'payment');
+      await setDoc(ref, { providerToken: paymentToken || null }, { merge: true });
+      setPaymentMessage('טוקן הסליקה נשמר בהצלחה.');
+    } catch (e) {
+      console.error('Failed to save payment token', e);
+      setPaymentMessage('שמירת טוקן הסליקה נכשלה. נסה שוב מאוחר יותר.');
+    } finally {
+      setIsSavingPayment(false);
+      setTimeout(() => setPaymentMessage(null), 4000);
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -193,6 +231,66 @@ export function Settings() {
                   </div>
                   <button className="text-xs font-bold text-indigo-600 hover:underline">ערוך</button>
                 </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">הגדרות סליקה (טוקן ספק תשלומים)</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      הגדר כאן טוקן API של ספק הסליקה (למשל Stripe / Tranzila / Max). ערך זה נשמר באופן מרכזי עבור כל החשבון.
+                    </p>
+                  </div>
+                  <Shield className="w-6 h-6 text-indigo-500" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    טוקן סליקה (Server-side)
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentToken}
+                    onChange={(e) => setPaymentToken(e.target.value)}
+                    placeholder={isAdmin ? 'sk_live_...' : 'זמין למנהל המערכת בלבד'}
+                    disabled={!isAdmin || isLoadingPayment || isSavingPayment}
+                    className={cn(
+                      'w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-gray-50',
+                      !isAdmin && 'opacity-60 cursor-not-allowed'
+                    )}
+                    dir="ltr"
+                  />
+                  {!isAdmin && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      רק מנהלי מערכת יכולים לערוך את טוקן הסליקה. פנה למנהל שלך אם נדרש עדכון.
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-400">
+                    שים לב: הטוקן נשמר במסמך <code>appSettings/payment</code> ב‑Firestore ומוגן לפי הרשאות אדמין.
+                  </p>
+                  {isAdmin && (
+                    <button
+                      onClick={handleSavePaymentToken}
+                      disabled={isSavingPayment}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {isSavingPayment ? (
+                        'שומר...'
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          שמור טוקן סליקה
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+                {paymentMessage && (
+                  <div className="mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                    {paymentMessage}
+                  </div>
+                )}
               </div>
             </div>
           )}

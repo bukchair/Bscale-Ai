@@ -114,7 +114,7 @@ export default function App() {
       case 'users':
         return userProfile?.role === 'admin' ? <Users /> : <Dashboard />;
       case 'settings':
-        return <Settings />;
+        return <Settings userProfile={userProfile} />;
       default:
         return <Dashboard />;
     }
