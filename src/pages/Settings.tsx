@@ -183,93 +183,208 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
 
           {activeTab === 'billing' && (
             <div className="space-y-6">
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+              {/* Intl subscription signup */}
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">התוכנית הנוכחית</h2>
-                    <p className="text-sm text-gray-500 mt-1">אתה נמצא כרגע בתוכנית <span className="font-bold text-gray-900">DIY</span>.</p>
+                    <h2 className="text-lg font-bold text-gray-900">הצטרפות לשירות בתשלום</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      בחר תוכנית, מטבע ותקופת חיוב – והתאם את המנוי שלך ללקוחות מכל העולם.
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
-                    <CreditCard className="w-4 h-4 text-indigo-600" />
-                    <span className="font-medium">תאריך חיוב הבא: 1 באוקטובר 2024</span>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">מטבע</span>
+                      <select className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
+                        <option>USD $</option>
+                        <option>EUR €</option>
+                        <option>ILS ₪</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">חיוב</span>
+                      <div className="inline-flex rounded-full bg-gray-100 p-1">
+                        <button className="px-3 py-1 text-xs font-bold rounded-full bg-white shadow-sm">
+                          חודשי
+                        </button>
+                        <button className="px-3 py-1 text-xs font-bold rounded-full text-gray-600">
+                          שנתי (‎15%‑)
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {[
-                    { id: 'diy', name: 'DIY', price: '$200', desc: 'ניהול עצמי עם סיוע AI' },
-                    { id: 'full', name: 'תמיכה מלאה', price: '$500', desc: 'תמיכה צמודה ואוטומציה', recommended: true },
-                    { id: 'agency', name: 'סוכנות', price: 'מותאם', desc: 'פתרונות White-label' }
+                    { id: 'starter', name: 'Starter', price: '$79', desc: 'עד 3 חנויות, חיבור ל‑Google + Meta + WooCommerce.' },
+                    { id: 'growth', name: 'Growth', price: '$149', desc: '5‑10 חנויות, AI מתקדם ותמיכה מועדפת.', recommended: true },
+                    { id: 'scale', name: 'Scale', price: '$299', desc: 'מספר חנויות בלתי מוגבל ו‑SLA מותאם.' }
                   ].map((plan) => (
-                    <div key={plan.id} className={cn("relative p-6 rounded-2xl border-2 transition-all", plan.id === 'diy' ? "border-indigo-600 bg-indigo-50/30" : "border-gray-100 hover:border-indigo-200")}>
-                      {plan.recommended && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-full">מומלץ</span>}
+                    <div
+                      key={plan.id}
+                      className={cn(
+                        'relative p-6 rounded-2xl border-2 transition-all',
+                        plan.id === 'growth' ? 'border-indigo-600 bg-indigo-50/40' : 'border-gray-100 hover:border-indigo-200'
+                      )}
+                    >
+                      {plan.recommended && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-indigo-600 text-white text-[10px] font-bold rounded-full">
+                          מומלץ
+                        </span>
+                      )}
                       <h3 className="font-bold text-gray-900">{plan.name}</h3>
                       <div className="my-2">
                         <span className="text-2xl font-black text-gray-900">{plan.price}</span>
-                        <span className="text-xs text-gray-500">/חודש</span>
+                        <span className="text-xs text-gray-500"> / חודש</span>
                       </div>
-                      <p className="text-xs text-gray-500 mb-4">{plan.desc}</p>
-                      <button className={cn("w-full py-2 rounded-lg text-xs font-bold transition-colors", plan.id === 'diy' ? "bg-indigo-600 text-white" : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50")}>
-                        {plan.id === 'diy' ? 'התוכנית הנוכחית' : 'שדרג'}
+                      <p className="text-xs text-gray-500 mb-4 leading-relaxed">{plan.desc}</p>
+                      <button className="w-full py-2 rounded-lg text-xs font-bold transition-colors bg-indigo-600 text-white hover:bg-indigo-700">
+                        בחר {plan.name}
                       </button>
                     </div>
                   ))}
                 </div>
+
+                <div className="border-t border-gray-100 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-bold text-gray-900">פרטי חיוב</h3>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">שם החברה / הסוכנות</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="לדוגמה: BScale Digital Ltd."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">אימייל לחיוב</label>
+                      <input
+                        type="email"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="billing@company.com"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-700">מדינה</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Israel"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-700">עיר</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Tel Aviv"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-700">רחוב וכתובת</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Herzl 10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-gray-700">מיקוד</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="1234567"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-gray-700">VAT / Tax ID (אופציונלי)</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="IL123456789"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-bold text-gray-900">אמצעי תשלום</h3>
+                    <p className="text-xs text-gray-500">
+                      שדה זה מיועד להטמעת רכיב הסליקה (כמו Stripe Elements) בצד הלקוח. אין לשמור כאן פרטי כרטיס מלאים.
+                    </p>
+                    <div className="h-28 rounded-xl border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-xs text-gray-400">
+                      Placeholder לרכיב כרטיס אשראי / ספק סליקה
+                    </div>
+                    <div className="text-sm font-medium text-gray-900 flex items-center justify-between pt-2 border-t border-gray-100">
+                      <span>סיכום חיוב היום</span>
+                      <span className="font-black text-indigo-600">$149.00</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      החיוב מתבצע במטבע שבחרת. יתכנו הפרשי שער והעמלות מצד ספק האשראי שלך.
+                    </p>
+                    <div className="flex items-start gap-2 mt-2">
+                      <input id="accept-terms" type="checkbox" className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600" />
+                      <label htmlFor="accept-terms" className="text-xs text-gray-600">
+                        אני מאשר/ת שקראתי והסכמתי ל{' '}
+                        <a href="/terms" target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                          תנאי השימוש
+                        </a>{' '}
+                        ו{' '}
+                        <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                          מדיניות הפרטיות
+                        </a>
+                        .
+                      </label>
+                    </div>
+                    <button
+                      className="mt-2 w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"
+                      // הערה: בפועל יש לחבר לכפתור לוגיקת סליקה + בדיקת checkbox
+                    >
+                      התחלת מנוי בתשלום
+                    </button>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      ניתן לבטל את המנוי בכל עת דרך מסך ההגדרות. ביטול ייכנס לתוקף בסוף תקופת החיוב הנוכחית.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">אמצעי תשלום</h2>
-                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-gray-50/50">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-8 bg-white border border-gray-200 rounded flex items-center justify-center shadow-sm">
-                      <CreditCard className="w-5 h-5 text-indigo-600" />
-                    </div>
+              {isAdmin && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-bold text-gray-900">Visa מסתיים ב-4242</p>
-                      <p className="text-xs text-gray-500">תוקף 12/2025</p>
+                      <h2 className="text-lg font-bold text-gray-900">הגדרות סליקה (טוקן ספק תשלומים)</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        הגדר כאן טוקן API של ספק הסליקה (למשל Stripe / Tranzila / Max). ערך זה נשמר באופן מרכזי עבור כל החשבון.
+                      </p>
                     </div>
+                    <Shield className="w-6 h-6 text-indigo-500" />
                   </div>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline">ערוך</button>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">הגדרות סליקה (טוקן ספק תשלומים)</h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      הגדר כאן טוקן API של ספק הסליקה (למשל Stripe / Tranzila / Max). ערך זה נשמר באופן מרכזי עבור כל החשבון.
-                    </p>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+                      טוקן סליקה (Server-side)
+                    </label>
+                    <input
+                      type="password"
+                      value={paymentToken}
+                      onChange={(e) => setPaymentToken(e.target.value)}
+                      placeholder="sk_live_..."
+                      disabled={isLoadingPayment || isSavingPayment}
+                      className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-gray-50"
+                      dir="ltr"
+                    />
                   </div>
-                  <Shield className="w-6 h-6 text-indigo-500" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-                    טוקן סליקה (Server-side)
-                  </label>
-                  <input
-                    type="password"
-                    value={paymentToken}
-                    onChange={(e) => setPaymentToken(e.target.value)}
-                    placeholder={isAdmin ? 'sk_live_...' : 'זמין למנהל המערכת בלבד'}
-                    disabled={!isAdmin || isLoadingPayment || isSavingPayment}
-                    className={cn(
-                      'w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm bg-gray-50',
-                      !isAdmin && 'opacity-60 cursor-not-allowed'
-                    )}
-                    dir="ltr"
-                  />
-                  {!isAdmin && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      רק מנהלי מערכת יכולים לערוך את טוקן הסליקה. פנה למנהל שלך אם נדרש עדכון.
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400">
+                      שים לב: הטוקן נשמר במסמך <code>appSettings/payment</code> ב‑Firestore ומוגן לפי הרשאות אדמין.
                     </p>
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-400">
-                    שים לב: הטוקן נשמר במסמך <code>appSettings/payment</code> ב‑Firestore ומוגן לפי הרשאות אדמין.
-                  </p>
-                  {isAdmin && (
                     <button
                       onClick={handleSavePaymentToken}
                       disabled={isSavingPayment}
@@ -284,14 +399,14 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                         </>
                       )}
                     </button>
+                  </div>
+                  {paymentMessage && (
+                    <div className="mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                      {paymentMessage}
+                    </div>
                   )}
                 </div>
-                {paymentMessage && (
-                  <div className="mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-                    {paymentMessage}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 

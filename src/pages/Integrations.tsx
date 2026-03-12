@@ -317,7 +317,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
             </button>
           </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {integration.id === 'gemini' && (
@@ -740,7 +740,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string } 
               </div>
             </div>
 
-            {!isExpanded && (
+            {!isExpanded && !(integration.category === 'AI Engine' && !isAdmin) && (
               <button
                 onClick={() => handleExpand(integration)}
                 disabled={isConnecting}
