@@ -5,13 +5,39 @@ import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { auth, signOut, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 
 interface SubscriptionRequiredProps {
   onGoToPricing: () => void;
 }
 
 export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProps) {
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
+  const payPalButtonText =
+    language === 'he'
+      ? 'תשלום ישיר ב‑PayPal'
+      : language === 'ru'
+        ? 'Оплатить напрямую через PayPal'
+        : language === 'pt'
+          ? 'Pagar direto com PayPal'
+          : language === 'fr'
+            ? 'Payer directement avec PayPal'
+            : 'Pay directly with PayPal';
+  const payPalSubtitle =
+    language === 'he'
+      ? `התשלום יועבר לחשבון ${PAYPAL_BUSINESS_EMAIL}`
+      : language === 'ru'
+        ? `Оплата будет отправлена на аккаунт ${PAYPAL_BUSINESS_EMAIL}`
+        : language === 'pt'
+          ? `O pagamento será enviado para ${PAYPAL_BUSINESS_EMAIL}`
+          : language === 'fr'
+            ? `Le paiement sera envoyé au compte ${PAYPAL_BUSINESS_EMAIL}`
+            : `Payment will be sent to ${PAYPAL_BUSINESS_EMAIL}`;
+  const payPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Subscription payment',
+    currency: 'ILS',
+    customId: 'subscription_required_entry',
+  });
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -63,6 +89,15 @@ export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProp
             {t('subscription.ctaPlans')}
             <ArrowRight className="w-5 h-5" />
           </button>
+          <a
+            href={payPalUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold border-2 border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
+          >
+            {payPalButtonText}
+          </a>
+          <p className="text-[11px] text-gray-500">{payPalSubtitle}</p>
           <button
             onClick={handleEnterDemo}
             className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-bold border-2 border-dashed border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors text-sm"

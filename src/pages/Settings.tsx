@@ -4,6 +4,7 @@ import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield, Mail } fro
 import { cn } from '../lib/utils';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 
 export function Settings({ userProfile }: { userProfile?: { role?: string } | null }) {
   const { t, dir } = useLanguage();
@@ -20,6 +21,24 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
   const [imapUser, setImapUser] = useState('');
   const [imapHost, setImapHost] = useState('imap.gmail.com');
   const [imapPort, setImapPort] = useState('993');
+  const starterPayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Starter Plan (Monthly)',
+    amount: 79,
+    currency: 'USD',
+    customId: 'settings_billing_starter',
+  });
+  const growthPayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Growth Plan (Monthly)',
+    amount: 149,
+    currency: 'USD',
+    customId: 'settings_billing_growth',
+  });
+  const scalePayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Scale Plan (Monthly)',
+    amount: 299,
+    currency: 'USD',
+    customId: 'settings_billing_scale',
+  });
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -379,6 +398,38 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                     </p>
                     <div className="h-28 rounded-xl border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-xs text-gray-400">
                       Placeholder לרכיב כרטיס אשראי / ספק סליקה
+                    </div>
+                    <div className="rounded-xl border border-[#0070ba]/30 bg-[#0070ba]/5 p-3 space-y-2">
+                      <p className="text-xs font-bold text-[#0070ba]">אפשר גם לשלם דרך PayPal</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <a
+                          href={starterPayPalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-center py-2 rounded-lg bg-white border border-[#0070ba] text-[#0070ba] text-xs font-bold hover:bg-[#0070ba]/10 transition-colors"
+                        >
+                          Starter ($79)
+                        </a>
+                        <a
+                          href={growthPayPalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-center py-2 rounded-lg bg-white border border-[#0070ba] text-[#0070ba] text-xs font-bold hover:bg-[#0070ba]/10 transition-colors"
+                        >
+                          Growth ($149)
+                        </a>
+                        <a
+                          href={scalePayPalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-center py-2 rounded-lg bg-white border border-[#0070ba] text-[#0070ba] text-xs font-bold hover:bg-[#0070ba]/10 transition-colors"
+                        >
+                          Scale ($299)
+                        </a>
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        חשבון היעד לתשלום: <span dir="ltr">{PAYPAL_BUSINESS_EMAIL}</span>
+                      </p>
                     </div>
                     <div className="text-sm font-medium text-gray-900 flex items-center justify-between pt-2 border-t border-gray-100">
                       <span>סיכום חיוב היום</span>

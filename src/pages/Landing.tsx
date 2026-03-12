@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 
 interface LandingProps {
   onEnter: () => void;
@@ -22,7 +23,44 @@ const mockChartData = [
 ];
 
 export function Landing({ onEnter, scrollToPricing }: LandingProps) {
-  const { t, dir } = useLanguage();
+  const { t, dir, language } = useLanguage();
+  const paypalButtonText =
+    language === 'he'
+      ? 'תשלום ב‑PayPal'
+      : language === 'ru'
+        ? 'Оплатить через PayPal'
+        : language === 'pt'
+          ? 'Pagar com PayPal'
+          : language === 'fr'
+            ? 'Payer avec PayPal'
+            : 'Pay with PayPal';
+  const paypalHintText =
+    language === 'he'
+      ? `אפשרות תשלום ב‑PayPal פעילה (חשבון: ${PAYPAL_BUSINESS_EMAIL})`
+      : language === 'ru'
+        ? `Оплата через PayPal активна (аккаунт: ${PAYPAL_BUSINESS_EMAIL})`
+        : language === 'pt'
+          ? `Pagamento via PayPal ativo (conta: ${PAYPAL_BUSINESS_EMAIL})`
+          : language === 'fr'
+            ? `Paiement PayPal actif (compte : ${PAYPAL_BUSINESS_EMAIL})`
+            : `PayPal checkout is active (account: ${PAYPAL_BUSINESS_EMAIL})`;
+  const plan1PayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Independent Plan (Monthly)',
+    amount: 499,
+    currency: 'ILS',
+    customId: 'landing_plan1_monthly_ils',
+  });
+  const plan2PayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Managed Support Plan (Monthly)',
+    amount: 999,
+    currency: 'ILS',
+    customId: 'landing_plan2_monthly_ils',
+  });
+  const plan3PayPalUrl = createPayPalCheckoutUrl({
+    itemName: 'BScale AI - Agencies Plan',
+    currency: 'ILS',
+    customId: 'landing_plan3_custom_ils',
+  });
 
   React.useEffect(() => {
     if (scrollToPricing) {
@@ -224,6 +262,7 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900 dark:text-white">{t('landing.pricingTitle')}</h2>
               <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">{t('landing.pricingSubtitle')}</p>
+              <p className="text-xs text-indigo-600 dark:text-indigo-300 mt-3">{paypalHintText}</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <motion.div
@@ -249,6 +288,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 >
                   {t('landing.planCtaStart')}
                 </button>
+                <a
+                  href={plan1PayPalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
+                >
+                  {paypalButtonText}
+                </a>
               </motion.div>
 
               <motion.div
@@ -276,6 +323,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 >
                   {t('landing.planCtaStart')}
                 </button>
+                <a
+                  href={plan2PayPalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
+                >
+                  {paypalButtonText}
+                </a>
               </motion.div>
 
               <motion.div
@@ -300,6 +355,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   className="block w-full py-3 rounded-xl font-bold text-center border-2 border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
                 >
                   {t('landing.planCtaContact')}
+                </a>
+                <a
+                  href={plan3PayPalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
+                >
+                  {paypalButtonText}
                 </a>
               </motion.div>
             </div>
