@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
-import { BadgeCheck, Clock3, PhoneCall, UserRoundCheck, XCircle } from 'lucide-react';
+import { BadgeCheck, Clock3, Download, PhoneCall, Search, XCircle } from 'lucide-react';
 import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -22,6 +22,7 @@ export function Leads() {
   const { dir } = useLanguage();
   const [leads, setLeads] = useState<SalesLeadRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | LeadStatus>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,10 +45,17 @@ export function Leads() {
     return () => unsubscribe();
   }, []);
 
-  const filteredLeads = useMemo(
-    () => (statusFilter === 'all' ? leads : leads.filter((lead) => lead.status === statusFilter)),
-    [leads, statusFilter]
-  );
+  const filteredLeads = useMemo(() => {
+    const base = statusFilter === 'all' ? leads : leads.filter((lead) => lead.status === statusFilter);
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return base;
+
+    return base.filter((lead) =>
+      [lead.name, lead.email, lead.phone, lead.website, lead.sourcePath]
+        .map((value) => String(value || '').toLowerCase())
+        .some((value) => value.includes(q))
+    );
+  }, [leads, searchTerm, statusFilter]);
 
   const stats = useMemo(() => {
     const total = leads.length;
@@ -63,6 +71,35 @@ export function Leads() {
     } catch (error) {
       console.error('Failed to update lead status:', error);
     }
+  };
+
+  const escapeCsv = (value: string | number | null | undefined) => {
+    const raw = String(value ?? '');
+    if (raw.includes(',') || raw.includes('"') || raw.includes('\n')) {
+      return `"${raw.replace(/"/g, '""')}"`;
+    }
+    return raw;
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['name', 'email', 'phone', 'website', 'sourcePath', 'createdAt', 'status'];
+    const rows = filteredLeads.map((lead) => [
+      lead.name || '',
+      lead.email || '',
+      lead.phone || '',
+      lead.website || '',
+      lead.sourcePath || '',
+      lead.createdAt || '',
+      lead.status || '',
+    ]);
+    const csv = [headers.join(','), ...rows.map((row) => row.map((cell) => escapeCsv(cell)).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -92,9 +129,33 @@ export function Leads() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-sm font-bold text-gray-900">ניהול סטטוס לידים</p>
-          <div className="flex items-center gap-2">
+        <div className="p-4 border-b border-gray-100 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm font-bold text-gray-900">ניהול סטטוס לידים</p>
+            <button
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            >
+              <Download className="w-3.5 h-3.5" />
+              ייצוא CSV
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="relative w-full sm:max-w-sm">
+              <Search className={cn('absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', dir === 'rtl' ? 'right-3' : 'left-3')} />
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="חיפוש לפי שם / אימייל / טלפון / אתר"
+                className={cn(
+                  'w-full py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500',
+                  dir === 'rtl' ? 'pr-10 pl-3' : 'pl-10 pr-3'
+                )}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
             <button
               onClick={() => setStatusFilter('all')}
               className={cn('px-3 py-1.5 rounded-lg text-xs font-bold', statusFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700')}
@@ -119,6 +180,7 @@ export function Leads() {
             >
               נסגרו
             </button>
+            </div>
           </div>
         </div>
 

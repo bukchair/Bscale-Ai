@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Bell, Search, User, ChevronDown, CheckCircle, AlertTriangle, Calendar, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, DateRangeType } from '../contexts/DateRangeContext';
@@ -21,6 +21,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const [isConnectionsOpen, setIsConnectionsOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [liveLeadToast, setLiveLeadToast] = useState<{ id: string; name: string; contact: string } | null>(null);
   const [leadNotifications, setLeadNotifications] = useState<Array<{
     id: string;
     name: string;
@@ -33,6 +34,8 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const isDemo = userProfile?.subscriptionStatus === 'demo';
   const canViewLeads = ['admin', 'agency', 'owner'].includes(userProfile?.role || '');
   const currentUid = auth.currentUser?.uid;
+  const previousNewestLeadRef = useRef<string | null>(null);
+  const hasInitializedLeadFeed = useRef(false);
 
   const tr = (key: string, fallback: string) => {
     const translated = t(key);
@@ -57,6 +60,10 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
       leadsQuery,
       (snapshot) => {
         const leads = snapshot.docs.map((leadDoc) => ({ id: leadDoc.id, ...(leadDoc.data() as any) }));
+        if (!hasInitializedLeadFeed.current) {
+          hasInitializedLeadFeed.current = true;
+          previousNewestLeadRef.current = leads[0]?.id || null;
+        }
         setLeadNotifications(leads);
       },
       (error) => {
@@ -66,6 +73,51 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
     return () => unsubscribe();
   }, [canViewLeads]);
+
+  const playLeadAlertSound = () => {
+    try {
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.38);
+      window.setTimeout(() => ctx.close(), 500);
+    } catch (error) {
+      console.warn('Failed to play lead alert sound:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!canViewLeads || !hasInitializedLeadFeed.current || leadNotifications.length === 0) return;
+    const newestLead = leadNotifications[0];
+
+    if (previousNewestLeadRef.current !== newestLead.id) {
+      const contact = newestLead.email || newestLead.phone || tr('notifications.noContact', 'ללא פרטי קשר');
+      setLiveLeadToast({ id: newestLead.id, name: newestLead.name, contact });
+      playLeadAlertSound();
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(tr('notifications.newLeadTitle', 'ליד חדש מהאתר'), {
+          body: `${newestLead.name} • ${contact}`,
+        });
+      }
+      previousNewestLeadRef.current = newestLead.id;
+    }
+  }, [canViewLeads, leadNotifications]);
+
+  useEffect(() => {
+    if (!liveLeadToast) return;
+    const timeout = window.setTimeout(() => setLiveLeadToast(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [liveLeadToast]);
 
   const unreadLeadCount = useMemo(() => {
     if (!currentUid) return 0;
@@ -94,6 +146,9 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const handleToggleNotifications = async () => {
     const nextState = !isNotificationsOpen;
     setIsNotificationsOpen(nextState);
+    if (nextState && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => undefined);
+    }
     if (!nextState || !currentUid || !canViewLeads) return;
 
     const unreadLeads = leadNotifications.filter((lead) => !lead.readBy?.[currentUid]);
@@ -364,6 +419,15 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           )}
         </div>
       </div>
+      {liveLeadToast && (
+        <div className={cn("fixed top-20 z-[90] w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[320px]", dir === 'rtl' ? 'left-4 sm:left-6' : 'right-4 sm:right-6')}>
+          <div className="bg-indigo-600 text-white px-4 py-3 rounded-2xl shadow-2xl border border-indigo-500">
+            <p className="text-xs font-black uppercase tracking-wider mb-1">{tr('notifications.newLeadTitle', 'ליד חדש מהאתר')}</p>
+            <p className="text-sm font-bold">{liveLeadToast.name}</p>
+            <p className="text-xs text-indigo-100">{liveLeadToast.contact}</p>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
