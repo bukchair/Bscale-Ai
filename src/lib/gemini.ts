@@ -163,7 +163,9 @@ Return ONLY valid JSON with this exact structure (write in Hebrew for title, des
   if (isAIKeys(apiKeyOrKeys) && hasAnyAIKey(apiKeyOrKeys)) {
     try {
       const data = await runWithMultiAI<{ recommendations?: AudienceRecommendation[] }>(prompt, apiKeyOrKeys);
-      return Array.isArray(data?.recommendations) ? data : { recommendations: [] };
+      return {
+        recommendations: Array.isArray(data?.recommendations) ? data.recommendations : [],
+      };
     } catch (e) {
       console.warn("getAudienceRecommendations failed", e);
       return { recommendations: [] };
