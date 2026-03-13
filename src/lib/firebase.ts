@@ -315,19 +315,48 @@ export interface SalesLead extends SalesLeadInput {
 }
 
 export async function createPublicSalesLead(input: SalesLeadInput): Promise<string> {
+  const createdAt = new Date().toISOString();
+  const safeName = (input.name || '').trim().slice(0, 120);
+  const safeEmail = (input.email || '').trim().slice(0, 200);
+  const safePhone = (input.phone || '').trim().slice(0, 80);
+  const safeSourcePath = (input.sourcePath || '/').trim().slice(0, 300);
+  const safeMessage = (input.message || '').trim().slice(0, 4000);
+  const safeWebsite = (input.website || '').trim().slice(0, 500);
+  const safeAssignedAdmin = (input.assignedAdminEmail || ADMIN_SALES_EMAIL).trim().slice(0, 200);
+
   const payload: Omit<SalesLead, 'id'> = {
-    name: input.name.trim(),
-    email: input.email?.trim() || '',
-    phone: input.phone?.trim() || '',
-    website: input.website?.trim() || '',
-    sourcePath: input.sourcePath?.trim() || '/',
-    message: input.message?.trim() || '',
-    assignedAdminEmail: input.assignedAdminEmail?.trim() || ADMIN_SALES_EMAIL,
-    createdAt: new Date().toISOString(),
+    name: safeName,
+    email: safeEmail,
+    phone: safePhone,
+    website: safeWebsite,
+    sourcePath: safeSourcePath,
+    message: safeMessage,
+    assignedAdminEmail: safeAssignedAdmin,
+    createdAt,
     status: 'new',
     readBy: {},
   };
 
-  const ref = await addDoc(collection(db, 'salesLeads'), payload);
-  return ref.id;
+  try {
+    const ref = await addDoc(collection(db, 'salesLeads'), payload);
+    return ref.id;
+  } catch (error) {
+    // Fallback for stricter legacy rules that may reject extra fields.
+    const minimalPayload = {
+      name: safeName,
+      email: safeEmail,
+      phone: safePhone,
+      sourcePath: safeSourcePath,
+      message: safeMessage,
+      createdAt,
+      status: 'new' as const,
+    };
+    try {
+      const ref = await addDoc(collection(db, 'salesLeads'), minimalPayload);
+      return ref.id;
+    } catch (fallbackError) {
+      console.error('createPublicSalesLead failed (full + minimal payload):', error, fallbackError);
+      throw fallbackError;
+    }
+  }
 }
