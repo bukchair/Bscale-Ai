@@ -181,6 +181,37 @@ const moneyFromUnknown = (value: unknown): number => {
 };
 
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '—');
+const orderStatusLabel = (status: string): string => {
+  const normalized = (status || '').toLowerCase();
+  switch (normalized) {
+    case 'completed':
+      return 'הושלמה';
+    case 'processing':
+      return 'בטיפול';
+    case 'pending':
+      return 'ממתינה';
+    case 'on-hold':
+      return 'בהמתנה';
+    case 'cancelled':
+      return 'בוטלה';
+    case 'refunded':
+      return 'הוחזרה';
+    case 'failed':
+      return 'נכשלה';
+    default:
+      return status || '—';
+  }
+};
+const orderStatusBadgeClass = (status: string) => {
+  const normalized = (status || '').toLowerCase();
+  if (normalized === 'completed') return 'bg-emerald-100 text-emerald-700';
+  if (normalized === 'processing') return 'bg-sky-100 text-sky-700';
+  if (normalized === 'pending' || normalized === 'on-hold') return 'bg-amber-100 text-amber-700';
+  if (normalized === 'cancelled' || normalized === 'refunded' || normalized === 'failed') {
+    return 'bg-red-100 text-red-700';
+  }
+  return 'bg-gray-100 text-gray-700';
+};
 
 export function Dashboard() {
   const { dir } = useLanguage();
@@ -777,7 +808,17 @@ export function Dashboard() {
                 return (
                   <div key={order.id} className="rounded-xl border border-gray-200 p-2.5 bg-gray-50/60">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-gray-900">#{order.number}</p>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <p className="text-xs font-bold text-gray-900">#{order.number}</p>
+                        <span
+                          className={cn(
+                            'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap',
+                            orderStatusBadgeClass(order.status)
+                          )}
+                        >
+                          {orderStatusLabel(order.status)}
+                        </span>
+                      </div>
                       <span className="text-[11px] text-gray-500">{formatDate(order.date_created)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-1">
