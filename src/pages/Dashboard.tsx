@@ -446,7 +446,9 @@ export function Dashboard() {
               });
               liveSpend += spend;
             });
-            hasSpendLive = true;
+            if (googleCampaigns.length > 0) {
+              hasSpendLive = true;
+            }
             if (googleCampaigns.length > 0) {
               hasCampaignsLive = true;
             }
@@ -472,7 +474,9 @@ export function Dashboard() {
             });
             liveSpend += spend;
           });
-          hasSpendLive = true;
+          if (metaCampaigns.length > 0) {
+            hasSpendLive = true;
+          }
           if (metaCampaigns.length > 0) {
             hasCampaignsLive = true;
           }
@@ -504,8 +508,9 @@ export function Dashboard() {
             });
             liveSpend += spend;
           });
-          hasSpendLive = true;
-          if ((Array.isArray(tiktokCampaigns) ? tiktokCampaigns.length : 0) > 0) {
+          const hasTikTokCampaignRows = (Array.isArray(tiktokCampaigns) ? tiktokCampaigns.length : 0) > 0;
+          if (hasTikTokCampaignRows) {
+            hasSpendLive = true;
             hasCampaignsLive = true;
           }
         } catch (error) {
@@ -623,6 +628,24 @@ export function Dashboard() {
   const hasGscData = isGscUsingDemo || safeGscStats.clicks > 0 || safeGscStats.impressions > 0;
   const hasOrdersData = isOrdersUsingDemo || recentOrders.length > 0;
   const hasCampaignData = isCampaignsUsingDemo || campaignSummary.totalCampaigns > 0;
+  const ga4Availability = {
+    activeNow: isGa4UsingDemo || safeGa4Stats.activeNow > 0,
+    totalUsers: isGa4UsingDemo || safeGa4Stats.totalUsers > 0,
+  };
+  const campaignAvailability = {
+    totalCampaigns: hasCampaignData,
+    activeCampaigns: hasCampaignData,
+    spend: isCampaignsUsingDemo || financialAvailability.spend,
+    roas: isCampaignsUsingDemo || campaignSummary.avgRoas > 0,
+  };
+  const seoAvailability = {
+    siteScore: hasGa4Data || hasGscData,
+    searchConsoleScore: hasGscData,
+    clicks: hasGscData,
+    impressions: hasGscData,
+    ctr: hasGscData,
+    avgPosition: hasGscData,
+  };
 
   const siteSeoScore = useMemo(() => {
     const ctrScore = Math.min(30, safeGscStats.ctr * 3);
@@ -769,14 +792,18 @@ export function Dashboard() {
           {hasGa4Data ? (
             <>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-[11px] font-semibold text-blue-700">פעילים עכשיו</p>
-                  <p className="text-3xl font-black text-blue-600 mt-1">{safeGa4Stats.activeNow}</p>
-                </div>
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
-                  <p className="text-[11px] font-semibold text-indigo-700">סה"כ משתמשים</p>
-                  <p className="text-3xl font-black text-indigo-600 mt-1">{safeGa4Stats.totalUsers.toLocaleString()}</p>
-                </div>
+                {ga4Availability.activeNow && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                    <p className="text-[11px] font-semibold text-blue-700">פעילים עכשיו</p>
+                    <p className="text-3xl font-black text-blue-600 mt-1">{safeGa4Stats.activeNow}</p>
+                  </div>
+                )}
+                {ga4Availability.totalUsers && (
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
+                    <p className="text-[11px] font-semibold text-indigo-700">סה"כ משתמשים</p>
+                    <p className="text-3xl font-black text-indigo-600 mt-1">{safeGa4Stats.totalUsers.toLocaleString()}</p>
+                  </div>
+                )}
               </div>
               <p className="text-xs text-gray-500">
                 מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.
@@ -855,37 +882,47 @@ export function Dashboard() {
             <DemoTag show={isCampaignsUsingDemo} />
           </div>
 
-          {hasCampaignData ? (
+          {hasCampaignData || campaignAvailability.spend || campaignAvailability.roas ? (
             <>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs">סה"כ קמפיינים</p>
-                  <p className="text-xl font-black text-gray-900">{campaignSummary.totalCampaigns}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs">פעילים כרגע</p>
-                  <p className="text-xl font-black text-emerald-600">{campaignSummary.activeCampaigns}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs">הוצאה כוללת</p>
-                  <p className="text-xl font-black text-red-600">{formatCurrency(campaignSummary.totalSpend)}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs">ROAS / ROS</p>
-                  <p className="text-xl font-black text-indigo-600">{campaignSummary.avgRoas.toFixed(2)}x</p>
-                </div>
+                {campaignAvailability.totalCampaigns && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <p className="text-gray-500 text-xs">סה"כ קמפיינים</p>
+                    <p className="text-xl font-black text-gray-900">{campaignSummary.totalCampaigns}</p>
+                  </div>
+                )}
+                {campaignAvailability.activeCampaigns && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <p className="text-gray-500 text-xs">פעילים כרגע</p>
+                    <p className="text-xl font-black text-emerald-600">{campaignSummary.activeCampaigns}</p>
+                  </div>
+                )}
+                {campaignAvailability.spend && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <p className="text-gray-500 text-xs">הוצאה כוללת</p>
+                    <p className="text-xl font-black text-red-600">{formatCurrency(campaignSummary.totalSpend)}</p>
+                  </div>
+                )}
+                {campaignAvailability.roas && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <p className="text-gray-500 text-xs">ROAS / ROS</p>
+                    <p className="text-xl font-black text-indigo-600">{campaignSummary.avgRoas.toFixed(2)}x</p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {campaignSummary.platformBreakdown.map((row) => (
-                  <span
-                    key={row.platform}
-                    className="text-[11px] font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full"
-                  >
-                    {row.platform}: {row.count}
-                  </span>
-                ))}
-              </div>
+              {campaignSummary.platformBreakdown.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {campaignSummary.platformBreakdown.map((row) => (
+                    <span
+                      key={row.platform}
+                      className="text-[11px] font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full"
+                    >
+                      {row.platform}: {row.count}
+                    </span>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <p className="text-xs text-gray-500">אין כרגע נתוני קמפיינים חיים להצגה.</p>
@@ -911,46 +948,58 @@ export function Dashboard() {
             <DemoTag show={isGscUsingDemo} />
           </div>
 
-          {hasGscData ? (
+          {seoAvailability.siteScore || seoAvailability.searchConsoleScore || seoAvailability.clicks ? (
             <>
               <div className="space-y-3">
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
-                    <span className="font-black text-gray-900">{siteSeoScore}/100</span>
+                {seoAvailability.siteScore && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
+                      <span className="font-black text-gray-900">{siteSeoScore}/100</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
+                    </div>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
+                )}
+                {seoAvailability.searchConsoleScore && (
+                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
+                      <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
-                    <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500">קליקים</p>
-                  <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500">חשיפות</p>
-                  <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500">CTR</p>
-                  <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500">מיקום ממוצע</p>
-                  <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
-                </div>
+                {seoAvailability.clicks && (
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                    <p className="text-gray-500">קליקים</p>
+                    <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
+                  </div>
+                )}
+                {seoAvailability.impressions && (
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                    <p className="text-gray-500">חשיפות</p>
+                    <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
+                  </div>
+                )}
+                {seoAvailability.ctr && (
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                    <p className="text-gray-500">CTR</p>
+                    <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
+                  </div>
+                )}
+                {seoAvailability.avgPosition && (
+                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                    <p className="text-gray-500">מיקום ממוצע</p>
+                    <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
