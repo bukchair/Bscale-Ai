@@ -586,6 +586,10 @@ export function Dashboard() {
     avgPosition: toNumber(gscStats.avgPosition, DEMO_GSC_STATS.avgPosition),
     ctr: toNumber(gscStats.ctr, DEMO_GSC_STATS.ctr),
   };
+  const hasGa4Data = isGa4UsingDemo || safeGa4Stats.activeNow > 0 || safeGa4Stats.totalUsers > 0;
+  const hasGscData = isGscUsingDemo || safeGscStats.clicks > 0 || safeGscStats.impressions > 0;
+  const hasOrdersData = isOrdersUsingDemo || recentOrders.length > 0;
+  const hasCampaignData = isCampaignsUsingDemo || campaignSummary.totalCampaigns > 0;
 
   const siteSeoScore = useMemo(() => {
     const ctrScore = Math.min(30, safeGscStats.ctr * 3);
@@ -607,25 +611,28 @@ export function Dashboard() {
     if (financialAvailability.roas && Number(safeRoas) < 2) {
       recommendations.push('להגדיל תקציב רק בקמפיינים עם המרות בפועל ולעצור קבוצות מודעות חלשות.');
     }
-    if (safeGscStats.avgPosition > 12) {
+    if (hasGscData && safeGscStats.avgPosition > 12) {
       recommendations.push('לחזק SEO בדפי קטגוריה ומוצר עם כותרות H1 מדויקות וקישורים פנימיים.');
     }
-    if (safeGscStats.ctr < 2.5) {
+    if (hasGscData && safeGscStats.ctr < 2.5) {
       recommendations.push('לשפר Meta Title ו Meta Description בדפים עם חשיפות גבוהות ו CTR נמוך.');
     }
-    if (safeGa4Stats.activeNow > 0 && recentOrders.length < 3) {
+    if (hasGa4Data && hasOrdersData && safeGa4Stats.activeNow > 0 && recentOrders.length < 3) {
       recommendations.push('לבדוק משפך רכישה ועמודי Checkout כדי לשפר יחס המרה מתנועה להזמנה.');
     }
-    if (campaignSummary.activeCampaigns < campaignSummary.totalCampaigns) {
+    if (hasCampaignData && campaignSummary.activeCampaigns < campaignSummary.totalCampaigns) {
       recommendations.push('להפעיל מחדש רק קמפיינים מושהים עם עלות לרכישה יציבה וללא שחיקת ROAS.');
     }
 
-    if (!recommendations.length) {
-      recommendations.push('הנתונים יציבים. מומלץ לבצע A B Testing לכותרות מודעה ולהשאיר את הקמפיינים המובילים פעילים.');
-    }
-
     return recommendations.slice(0, 5);
-  }, [campaignSummary.activeCampaigns, campaignSummary.totalCampaigns, financialAvailability.roas, recentOrders.length, safeGa4Stats.activeNow, safeGscStats.avgPosition, safeGscStats.ctr, safeRoas]);
+  }, [campaignSummary.activeCampaigns, campaignSummary.totalCampaigns, financialAvailability.roas, hasCampaignData, hasGa4Data, hasGscData, hasOrdersData, recentOrders.length, safeGa4Stats.activeNow, safeGscStats.avgPosition, safeGscStats.ctr, safeRoas]);
+  const hasAnyOptimizationInput =
+    financialAvailability.revenue ||
+    financialAvailability.spend ||
+    hasGa4Data ||
+    hasGscData ||
+    hasOrdersData ||
+    hasCampaignData;
 
   const goToPath = (path: string) => {
     if (typeof window === 'undefined') return;
@@ -726,7 +733,7 @@ export function Dashboard() {
             <DemoTag show={isGa4UsingDemo} />
           </div>
 
-          {isGa4UsingDemo || safeGa4Stats.activeNow > 0 || safeGa4Stats.totalUsers > 0 ? (
+          {hasGa4Data ? (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
@@ -805,7 +812,7 @@ export function Dashboard() {
             <DemoTag show={isCampaignsUsingDemo} />
           </div>
 
-          {isCampaignsUsingDemo || campaignSummary.totalCampaigns > 0 ? (
+          {hasCampaignData ? (
             <>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
@@ -861,45 +868,51 @@ export function Dashboard() {
             <DemoTag show={isGscUsingDemo} />
           </div>
 
-          <div className="space-y-3">
-            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
-                <span className="font-black text-gray-900">{siteSeoScore}/100</span>
+          {hasGscData ? (
+            <>
+              <div className="space-y-3">
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
+                    <span className="font-black text-gray-900">{siteSeoScore}/100</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
+                    <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
-              </div>
-            </div>
-            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
-                <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
-              </div>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-              <p className="text-gray-500">קליקים</p>
-              <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-              <p className="text-gray-500">חשיפות</p>
-              <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-              <p className="text-gray-500">CTR</p>
-              <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-              <p className="text-gray-500">מיקום ממוצע</p>
-              <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500">קליקים</p>
+                  <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500">חשיפות</p>
+                  <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500">CTR</p>
+                  <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500">מיקום ממוצע</p>
+                  <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-500">אין כרגע נתוני SEO חיים להצגה.</p>
+          )}
 
           <button
             onClick={() => goToPath('/seo')}
@@ -919,14 +932,20 @@ export function Dashboard() {
           </div>
 
           <div className="space-y-2.5">
-            {optimizationRecommendations.map((rec, idx) => (
-              <div key={idx} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
-                <div className="flex items-start gap-2">
-                  <Activity className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-xs text-gray-800 leading-relaxed">{rec}</p>
+            {optimizationRecommendations.length > 0 ? (
+              optimizationRecommendations.map((rec, idx) => (
+                <div key={idx} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
+                  <div className="flex items-start gap-2">
+                    <Activity className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-gray-800 leading-relaxed">{rec}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : hasAnyOptimizationInput ? (
+              <p className="text-xs text-gray-500">יש כרגע מעט נתונים חיים ולכן אין המלצות חדשות לאופטימיזציה.</p>
+            ) : (
+              <p className="text-xs text-gray-500">אין כרגע מספיק נתונים חיים כדי ליצור המלצות אופטימיזציה.</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
