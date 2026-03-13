@@ -22,6 +22,8 @@ export function Dashboard() {
   const currentUser = auth.currentUser;
   const hasLoadedRealDataRef = useRef(false);
   const [isMobile, setIsMobile] = useState(false);
+  const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
+  const DEMO_GSC_STATS = { clicks: 3842, impressions: 48200, avgPosition: 14.3, ctr: 7.97 };
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -55,17 +57,14 @@ export function Dashboard() {
   const [roas, setRoas] = useState(fallbackData.roas);
   const [netProfit, setNetProfit] = useState(fallbackData.netProfit);
 
-  const [ga4Stats, setGa4Stats] = useState<{ activeNow: number; totalUsers: number }>({
-    activeNow: 42,
-    totalUsers: 1247
-  });
+  const [ga4Stats, setGa4Stats] = useState<{ activeNow: number; totalUsers: number }>(DEMO_GA4_STATS);
 
-  const [gscStats, setGscStats] = useState<{ clicks: number; impressions: number; avgPosition: number; ctr: number }>({
-    clicks: 3842,
-    impressions: 48200,
-    avgPosition: 14.3,
-    ctr: 7.97
-  });
+  const [gscStats, setGscStats] = useState<{ clicks: number; impressions: number; avgPosition: number; ctr: number }>(
+    DEMO_GSC_STATS
+  );
+  const [isFinancialUsingDemo, setIsFinancialUsingDemo] = useState(true);
+  const [isGa4UsingDemo, setIsGa4UsingDemo] = useState(true);
+  const [isGscUsingDemo, setIsGscUsingDemo] = useState(true);
 
   // Detect very narrow/mobile viewports to avoid Recharts width/height -1 issues
   useEffect(() => {
@@ -104,6 +103,10 @@ export function Dashboard() {
       const n = parseFloat(String(value).replace(/[^\d.-]/g, ''));
       return isNaN(n) ? 0 : n;
     };
+    const safeFinite = (value: unknown, fallback = 0): number => {
+      const n = typeof value === 'number' ? value : Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
 
     async function load() {
       if (!connectedPlatforms.length) return;
@@ -115,6 +118,8 @@ export function Dashboard() {
 
       let realRevenue = 0;
       let realSpend = 0;
+      let hasGa4Live = false;
+      let hasGscLive = false;
 
       // WooCommerce revenue for the selected date range
       if (woo?.settings?.storeUrl && woo.settings.wooKey && woo.settings.wooSecret) {
@@ -162,10 +167,11 @@ export function Dashboard() {
             const activeNow = rows.length ? moneyFromString(rows[rows.length - 1]?.metricValues?.[0]?.value) : 0;
             if (!cancelled) {
               setGa4Stats({
-                activeNow,
-                totalUsers
+                activeNow: safeFinite(activeNow, DEMO_GA4_STATS.activeNow),
+                totalUsers: safeFinite(totalUsers, DEMO_GA4_STATS.totalUsers)
               });
             }
+            hasGa4Live = totalUsers > 0 || activeNow > 0;
             if (totalRevFromGa4 > 0) {
               realRevenue = totalRevFromGa4;
             }
@@ -202,12 +208,13 @@ export function Dashboard() {
             const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
             if (!cancelled) {
               setGscStats({
-                clicks,
-                impressions,
-                avgPosition,
-                ctr
+                clicks: safeFinite(clicks, DEMO_GSC_STATS.clicks),
+                impressions: safeFinite(impressions, DEMO_GSC_STATS.impressions),
+                avgPosition: safeFinite(avgPosition, DEMO_GSC_STATS.avgPosition),
+                ctr: safeFinite(ctr, DEMO_GSC_STATS.ctr)
               });
             }
+            hasGscLive = clicks > 0 || impressions > 0;
           } catch (e) {
             console.warn('Failed to load GSC data', e);
           }
@@ -240,10 +247,20 @@ export function Dashboard() {
 
       if (cancelled) return;
 
+      if (!hasGa4Live) {
+        setGa4Stats(DEMO_GA4_STATS);
+      }
+      if (!hasGscLive) {
+        setGscStats(DEMO_GSC_STATS);
+      }
+      setIsGa4UsingDemo(!hasGa4Live);
+      setIsGscUsingDemo(!hasGscLive);
+      setIsFinancialUsingDemo(!(realRevenue > 0 || realSpend > 0));
+
       // Update main financial metrics if we have at least some real data
       if (realRevenue > 0 || realSpend > 0) {
-        const finalRevenue = realRevenue > 0 ? realRevenue : totalRevenue;
-        const finalSpend = realSpend > 0 ? realSpend : totalSpend;
+        const finalRevenue = realRevenue > 0 ? realRevenue : safeFinite(totalRevenue, fallbackData.totalRevenue);
+        const finalSpend = realSpend > 0 ? realSpend : safeFinite(totalSpend, fallbackData.totalSpend);
         const finalRoas = finalSpend > 0 ? (finalRevenue / finalSpend).toFixed(2) : '0.00';
         const finalNetProfit = finalRevenue - finalSpend;
 
@@ -270,7 +287,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [connections, bounds.startDate, bounds.endDate]);
+  }, [connections, bounds.startDate, bounds.endDate, fallbackData.totalRevenue, fallbackData.totalSpend, totalRevenue, totalSpend]);
 
   const quickActions = [
     { id: 'ai-recs', title: t('dashboard.viewAiRecs'), icon: Zap, color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', desc: t('dashboard.viewAiRecsDesc') },
@@ -283,6 +300,36 @@ export function Dashboard() {
     dateRange === '7days' ? t('dashboard.last7Days') :
     dateRange === '30days' ? t('dashboard.last30Days') :
     t('dashboard.customRange');
+  const safeNumber = (value: unknown, fallback = 0) => {
+    const n = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const safeChartData = Array.isArray(chartData) && chartData.length
+    ? chartData.map((point, idx) => ({
+        name: point?.name || fallbackData.chartData[idx]?.name || String(idx + 1),
+        revenue: safeNumber(point?.revenue, safeNumber(fallbackData.chartData[idx]?.revenue, 0)),
+        spend: safeNumber(point?.spend, safeNumber(fallbackData.chartData[idx]?.spend, 0)),
+      }))
+    : fallbackData.chartData;
+  const safeTotalRevenue = safeNumber(totalRevenue, fallbackData.totalRevenue);
+  const safeTotalSpend = safeNumber(totalSpend, fallbackData.totalSpend);
+  const safeNetProfit = safeNumber(netProfit, fallbackData.netProfit);
+  const safeRoas = (() => {
+    const parsed = Number(roas);
+    if (Number.isFinite(parsed)) return parsed.toFixed(2);
+    if (safeTotalSpend > 0) return (safeTotalRevenue / safeTotalSpend).toFixed(2);
+    return '0.00';
+  })();
+  const safeGa4Stats = {
+    activeNow: safeNumber(ga4Stats.activeNow, DEMO_GA4_STATS.activeNow),
+    totalUsers: safeNumber(ga4Stats.totalUsers, DEMO_GA4_STATS.totalUsers),
+  };
+  const safeGscStats = {
+    clicks: safeNumber(gscStats.clicks, DEMO_GSC_STATS.clicks),
+    impressions: safeNumber(gscStats.impressions, DEMO_GSC_STATS.impressions),
+    avgPosition: safeNumber(gscStats.avgPosition, DEMO_GSC_STATS.avgPosition),
+    ctr: safeNumber(gscStats.ctr, DEMO_GSC_STATS.ctr),
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -334,7 +381,10 @@ export function Dashboard() {
           </div>
           <div className="text-end">
             <p className="ui-kpi-label text-gray-400">{t('dashboard.netProfit')}</p>
-            <p className="ui-kpi-value text-2xl text-indigo-600 dark:text-indigo-400">{formatCurrency(netProfit)}</p>
+            <p className="ui-kpi-value text-2xl text-indigo-600 dark:text-indigo-400">{formatCurrency(safeNetProfit)}</p>
+            {isFinancialUsingDemo && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Demo data</p>
+            )}
           </div>
         </div>
         
@@ -342,7 +392,7 @@ export function Dashboard() {
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="ui-kpi-label text-emerald-800 dark:text-emerald-400 mb-2">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="ui-kpi-value text-4xl text-emerald-900 dark:text-emerald-50">{formatCurrency(totalRevenue)}</p>
+            <p className="ui-kpi-value text-4xl text-emerald-900 dark:text-emerald-50">{formatCurrency(safeTotalRevenue)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
             </div>
@@ -351,7 +401,7 @@ export function Dashboard() {
           <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="ui-kpi-label text-red-800 dark:text-red-400 mb-2">{t('dashboard.campaignSpend')}</p>
-            <p className="ui-kpi-value text-4xl text-red-900 dark:text-red-50">{formatCurrency(totalSpend)}</p>
+            <p className="ui-kpi-value text-4xl text-red-900 dark:text-red-50">{formatCurrency(safeTotalSpend)}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>
@@ -361,7 +411,7 @@ export function Dashboard() {
           <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-xl border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <TrendingUp className={cn("absolute -bottom-4 w-24 h-24 text-indigo-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="ui-kpi-label text-indigo-800 dark:text-indigo-400 mb-2">{t('dashboard.roas')}</p>
-            <p className="ui-kpi-value text-4xl text-indigo-900 dark:text-indigo-50">{roas}x</p>
+            <p className="ui-kpi-value text-4xl text-indigo-900 dark:text-indigo-50">{safeRoas}x</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">POAS: 1.8x</span>
@@ -389,11 +439,14 @@ export function Dashboard() {
               <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full", dir === 'rtl' ? "left-3" : "right-3")} />
               <div>
                 <p className="ui-kpi-label text-blue-800 dark:text-blue-300 mb-1">{t('dashboard.activeNow')}</p>
-                <p className="ui-kpi-value text-5xl text-blue-600 dark:text-blue-400">{ga4Stats.activeNow}</p>
+                <p className="ui-kpi-value text-5xl text-blue-600 dark:text-blue-400">{safeGa4Stats.activeNow}</p>
               </div>
               <div className="text-end">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('dashboard.totalUsers')}</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{ga4Stats.totalUsers.toLocaleString()}</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{safeGa4Stats.totalUsers.toLocaleString()}</p>
+                {isGa4UsingDemo && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Demo data</p>
+                )}
               </div>
             </div>
 
@@ -465,7 +518,7 @@ export function Dashboard() {
           ) : (
             <div className="h-72 mt-6">
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <AreaChart data={safeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
@@ -514,23 +567,26 @@ export function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
             <MousePointerClick className="w-6 h-6 text-blue-500 dark:text-blue-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.clicks.toLocaleString()}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.clicks.toLocaleString()}</p>
             <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.clicks')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors cursor-pointer group">
             <Eye className="w-6 h-6 text-purple-500 dark:text-purple-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.impressions.toLocaleString()}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.impressions.toLocaleString()}</p>
             <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.impressions')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-orange-200 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
             <Target className="w-6 h-6 text-orange-500 dark:text-orange-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">#{gscStats.avgPosition.toFixed(1)}</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">#{safeGscStats.avgPosition.toFixed(1)}</p>
             <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.avgPosition')}</p>
           </div>
           <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-emerald-200 dark:hover:border-emerald-500/30 transition-colors cursor-pointer group">
             <TrendingUp className="w-6 h-6 text-emerald-500 dark:text-emerald-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{gscStats.ctr.toFixed(2)}%</p>
+            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.ctr.toFixed(2)}%</p>
             <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.ctr')}</p>
+            {isGscUsingDemo && (
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mt-1">Demo data</p>
+            )}
           </div>
         </div>
       </div>
