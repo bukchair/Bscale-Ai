@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Bot, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import { useLanguage, type Language } from '../contexts/LanguageContext';
 import { cn } from '../lib/utils';
-import { createPublicSalesLead } from '../lib/firebase';
+import { ADMIN_SALES_EMAIL, createPublicSalesLead } from '../lib/firebase';
 
 type ChatMessage = {
   id: string;
@@ -48,6 +48,7 @@ type BotCopy = {
   saveError: string;
   success: string;
   quickLogin: string;
+  quickRegister: string;
   openAria: string;
   respLeads: string;
   respSales: string;
@@ -83,6 +84,7 @@ const COPY: Record<Language, BotCopy> = {
     saveError: 'לא הצלחנו לשמור כרגע. נסה שוב בעוד רגע.',
     success: 'מעולה. ניתוח הצרכים והפרטים נשמרו. נחזור אליך עם כיוון מכירתי ברור.',
     quickLogin: 'כניסה מהירה למערכת',
+    quickRegister: 'פתיחת חשבון חדש',
     openAria: 'פתח צאט מכירות',
     respLeads: 'כדי להגדיל לידים צריך לחדד הצעה, קהל ומסר. נבנה עבורך מהלך פשוט שמייצר פניות איכותיות.',
     respSales: 'כדי להגדיל מכירות צריך חיבור בין קמפיינים, משפך וקריאייטיב. אפשר לשפר תוצאות מהר כשפועלים לפי נתונים.',
@@ -116,6 +118,7 @@ const COPY: Record<Language, BotCopy> = {
     saveError: 'Could not save right now. Please try again in a moment.',
     success: 'Great. Your needs analysis and contact were saved. We will return with a clear sales plan.',
     quickLogin: 'Quick login to platform',
+    quickRegister: 'Create account',
     openAria: 'Open sales chat',
     respLeads: 'To increase leads, we need a sharper offer, audience and message. We can build a simple lead flow fast.',
     respSales: 'To increase sales, we align campaigns, funnel and creative. Data driven steps usually create quick wins.',
@@ -149,6 +152,7 @@ const COPY: Record<Language, BotCopy> = {
     saveError: 'Сейчас не получилось сохранить. Попробуйте еще раз.',
     success: 'Отлично. Анализ и контакты сохранены. Вернемся с четким планом роста.',
     quickLogin: 'Быстрый вход',
+    quickRegister: 'Открыть новый аккаунт',
     openAria: 'Открыть чат продаж',
     respLeads: 'Для роста лидов нужно уточнить оффер, аудиторию и сообщение. Это дает быстрый эффект.',
     respSales: 'Для роста продаж важно связать кампании, воронку и креатив в одну систему.',
@@ -182,6 +186,7 @@ const COPY: Record<Language, BotCopy> = {
     saveError: 'Nao foi possivel salvar agora. Tente novamente.',
     success: 'Perfeito. Analise e contato salvos. Vamos retornar com plano comercial claro.',
     quickLogin: 'Login rapido na plataforma',
+    quickRegister: 'Criar conta',
     openAria: 'Abrir chat de vendas',
     respLeads: 'Para gerar mais leads precisamos ajustar oferta, publico e mensagem.',
     respSales: 'Para vender mais, alinhamos campanhas, funil e criativo com foco em conversão.',
@@ -215,6 +220,7 @@ const COPY: Record<Language, BotCopy> = {
     saveError: 'Impossible d enregistrer pour le moment. Réessayez dans un instant.',
     success: 'Parfait. Analyse et contact enregistrés. Nous revenons avec un plan commercial clair.',
     quickLogin: 'Connexion rapide à la plateforme',
+    quickRegister: 'Créer un compte',
     openAria: 'Ouvrir le chat commercial',
     respLeads: 'Pour obtenir plus de leads, il faut clarifier l offre, l audience et le message.',
     respSales: 'Pour vendre plus, il faut aligner campagnes, tunnel et créatifs sur un objectif conversion.',
@@ -238,7 +244,6 @@ export function SalesBot() {
   const { language, dir } = useLanguage();
   const copy = COPY[language] ?? COPY.en;
   const [isOpen, setIsOpen] = useState(false);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -259,15 +264,6 @@ export function SalesBot() {
   useEffect(() => {
     setMessages([{ id: 'greeting', from: 'bot', text: copy.greeting }]);
   }, [copy.greeting]);
-
-  useEffect(() => {
-    if (hasAutoOpened) return;
-    const timeout = window.setTimeout(() => {
-      setIsOpen(true);
-      setHasAutoOpened(true);
-    }, 3500);
-    return () => window.clearTimeout(timeout);
-  }, [hasAutoOpened]);
 
   const appendMessage = (from: 'bot' | 'user', text: string) => {
     setMessages((prev) => [...prev, { id: `${from}-${Date.now()}`, from, text }]);
@@ -363,6 +359,7 @@ export function SalesBot() {
         email: form.email,
         sourcePath: window.location.pathname,
         message: analysisMessage,
+        assignedAdminEmail: ADMIN_SALES_EMAIL,
       });
 
       appendMessage('bot', copy.success);
@@ -510,10 +507,13 @@ export function SalesBot() {
               <a href="/auth" className="text-xs text-indigo-600 font-bold hover:underline">
                 {copy.quickLogin}
               </a>
-              <span className="text-[11px] text-gray-400 inline-flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                AI Sales
-              </span>
+              <a href="/auth?mode=register" className="text-xs text-indigo-600 font-bold hover:underline">
+                {copy.quickRegister}
+              </a>
+            </div>
+            <div className="text-[11px] text-gray-400 inline-flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              AI Sales
             </div>
           </div>
         </div>

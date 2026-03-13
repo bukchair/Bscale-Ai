@@ -39,6 +39,7 @@ export default function App() {
   const { dir } = useLanguage();
   
   const path = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const search = typeof window !== 'undefined' ? window.location.search : '';
 
   const tabFromPath = (pathname: string): string => {
     const clean = pathname.replace(/\/+$/, '');
@@ -85,15 +86,23 @@ export default function App() {
   };
 
   const initialTab = tabFromPath(path);
+  const initialViewFromPath: 'landing' | 'auth' | 'app' =
+    path.replace(/\/+$/, '') === '/auth' ? 'auth' : initialTab === 'landing' ? 'landing' : 'app';
+  const initialAuthMode: 'login' | 'register' = (() => {
+    if (path.replace(/\/+$/, '') !== '/auth') return 'login';
+    const params = new URLSearchParams(search);
+    return params.get('mode') === 'register' ? 'register' : 'login';
+  })();
 
   const [view, setView] = useState<'landing' | 'auth' | 'app'>(
-    initialTab === 'landing' ? 'landing' : 'app'
+    initialViewFromPath
   );
-  const [activeTab, setActiveTab] = useState(initialTab === 'landing' ? 'dashboard' : initialTab);
+  const [activeTab, setActiveTab] = useState(initialViewFromPath === 'app' ? initialTab : 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [scrollToPricing, setScrollToPricing] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>(initialAuthMode);
 
   // Public static pages - זמינים בלי התחברות
   if (path === '/privacy-policy') {
@@ -210,7 +219,19 @@ export default function App() {
     if (typeof window === 'undefined') return;
     const onPopState = () => {
       const pathname = window.location.pathname;
+      const cleanPath = pathname.replace(/\/+$/, '') || '/';
+      if (cleanPath === '/auth') {
+        const params = new URLSearchParams(window.location.search);
+        setAuthMode(params.get('mode') === 'register' ? 'register' : 'login');
+        setView('auth');
+        return;
+      }
+      if (cleanPath === '/') {
+        setView('landing');
+        return;
+      }
       const nextTab = tabFromPath(pathname);
+      setView('app');
       setActiveTab(nextTab === 'landing' ? 'dashboard' : nextTab);
     };
     window.addEventListener('popstate', onPopState);
@@ -228,7 +249,17 @@ export default function App() {
   if (view === 'landing') {
     return (
       <>
-        <Landing onEnter={() => { setView('auth'); setScrollToPricing(false); }} scrollToPricing={scrollToPricing} />
+        <Landing
+          onEnter={() => {
+            setView('auth');
+            setAuthMode('login');
+            setScrollToPricing(false);
+            if (typeof window !== 'undefined') {
+              window.history.pushState({}, '', '/auth');
+            }
+          }}
+          scrollToPricing={scrollToPricing}
+        />
         <SalesBot />
       </>
     );
@@ -237,7 +268,7 @@ export default function App() {
   if (view === 'auth') {
     return (
       <>
-        <Auth onLogin={() => setView('app')} />
+        <Auth onLogin={() => setView('app')} initialMode={authMode} />
         <SalesBot />
       </>
     );

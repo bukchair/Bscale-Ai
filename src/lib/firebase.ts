@@ -7,6 +7,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
+export const ADMIN_SALES_EMAIL = 'asher205@gmail.com';
 
 export { signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut };
 
@@ -143,6 +144,7 @@ export interface SalesLeadInput {
   website?: string;
   sourcePath?: string;
   message?: string;
+  assignedAdminEmail?: string;
 }
 
 export interface SalesLead extends SalesLeadInput {
@@ -160,6 +162,7 @@ export async function createPublicSalesLead(input: SalesLeadInput): Promise<stri
     website: input.website?.trim() || '',
     sourcePath: input.sourcePath?.trim() || '/',
     message: input.message?.trim() || '',
+    assignedAdminEmail: input.assignedAdminEmail?.trim() || ADMIN_SALES_EMAIL,
     createdAt: new Date().toISOString(),
     status: 'new',
     readBy: {},

@@ -7,13 +7,18 @@ import { auth, googleProvider, signInWithPopup } from '../lib/firebase';
 
 interface AuthProps {
   onLogin: () => void;
+  initialMode?: 'login' | 'register';
 }
 
-export function Auth({ onLogin }: AuthProps) {
+export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
   const { t, dir } = useLanguage();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(initialMode !== 'register');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  React.useEffect(() => {
+    setIsLogin(initialMode !== 'register');
+  }, [initialMode]);
 
   const handleGoogleLogin = async () => {
     setError(null);
