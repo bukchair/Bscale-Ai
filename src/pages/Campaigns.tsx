@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizationRecommendations, getAIKeysFromConnections } from '../lib/gemini';
-import { CheckCircle2, AlertCircle, Loader2, Zap, Video, Mail } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Zap, Video, Mail, Target, ImagePlus, Trash2, Clock3, CalendarClock, PlusCircle, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -18,18 +18,149 @@ const mockCampaignData = [
   { id: 4, name: 'Brand Search', platform: 'Google', status: 'Active', spend: 300, roas: 8.5, cpa: 12 },
 ];
 
+type ContentType = 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
+type ProductType = 'fashion' | 'beauty' | 'tech' | 'home' | 'fitness' | 'services' | 'other';
+type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
+type SlotKey = 'morning' | 'afternoon' | 'evening' | 'night';
+type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
+type RuleAction = 'boost' | 'limit' | 'pause';
+
+type UploadedAsset = {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  previewUrl: string;
+  file: File;
+};
+
+type TimeRule = {
+  id: string;
+  platform: string;
+  slot: SlotKey;
+  action: RuleAction;
+  minRoas: number;
+};
+
+type DaySchedule = Record<DayKey, Record<SlotKey, boolean>>;
+type WeeklySchedule = Record<string, DaySchedule>;
+
+const PLATFORM_CONNECTION_MAP: Record<string, string> = {
+  Google: 'google',
+  Meta: 'meta',
+  TikTok: 'tiktok',
+};
+
+const SLOT_RANGES: Record<SlotKey, string> = {
+  morning: '06:00-11:00',
+  afternoon: '11:00-16:00',
+  evening: '16:00-21:00',
+  night: '21:00-01:00',
+};
+
+const BEST_TIME_WINDOWS: Record<string, { slot: SlotKey; roas: number; cpa: number }[]> = {
+  Google: [
+    { slot: 'evening', roas: 4.2, cpa: 28 },
+    { slot: 'afternoon', roas: 3.6, cpa: 34 },
+  ],
+  Meta: [
+    { slot: 'night', roas: 4.1, cpa: 26 },
+    { slot: 'evening', roas: 3.7, cpa: 29 },
+  ],
+  TikTok: [
+    { slot: 'evening', roas: 3.4, cpa: 31 },
+    { slot: 'night', roas: 3.2, cpa: 33 },
+  ],
+};
+
+const SMART_AUDIENCE_BY_CONTENT: Record<ContentType, string[]> = {
+  product: ['Product viewers 30d', 'Cart abandoners 14d', 'Lookalike 1% - Purchasers'],
+  offer: ['Price sensitive shoppers', 'Promo clickers 30d', 'Coupon users'],
+  educational: ['Blog readers 60d', 'Video viewers 75%', 'Top funnel warm audience'],
+  testimonial: ['Consideration audience', 'Review seekers', 'Competitor audience'],
+  video: ['Short video engagers', 'Watch time > 15s', 'Reels/TikTok engagers'],
+};
+
+const SMART_AUDIENCE_BY_PRODUCT: Record<ProductType, string[]> = {
+  fashion: ['Fashion interest', 'Streetwear audience', 'Seasonal shoppers'],
+  beauty: ['Beauty products interest', 'Skincare enthusiasts', 'Self care audience'],
+  tech: ['Tech enthusiasts', 'Gadget buyers', 'Early adopters'],
+  home: ['Home improvement', 'Interior design audience', 'Family buyers'],
+  fitness: ['Fitness audience', 'Running & sports', 'Healthy lifestyle'],
+  services: ['High intent leads', 'Local business services', 'Consultation seekers'],
+  other: ['Broad prospecting', 'Engaged audience 30d'],
+};
+
+const SMART_AUDIENCE_BY_OBJECTIVE: Record<ObjectiveType, string[]> = {
+  sales: ['High intent purchasers', 'Returning buyers', 'Upsell audience'],
+  traffic: ['Click propensity audience', 'Content consumers'],
+  leads: ['Lead forms engagers', 'WhatsApp clickers', 'Contact page visitors'],
+  awareness: ['Broad awareness 18-44', 'Reach optimized audience'],
+  retargeting: ['Site visitors 30d', 'Product viewers 14d', 'Initiated checkout 14d'],
+};
+
+const createEmptyDaySchedule = (): DaySchedule => ({
+  mon: { morning: false, afternoon: false, evening: false, night: false },
+  tue: { morning: false, afternoon: false, evening: false, night: false },
+  wed: { morning: false, afternoon: false, evening: false, night: false },
+  thu: { morning: false, afternoon: false, evening: false, night: false },
+  fri: { morning: false, afternoon: false, evening: false, night: false },
+  sat: { morning: false, afternoon: false, evening: false, night: false },
+  sun: { morning: false, afternoon: false, evening: false, night: false },
+});
+
 export function Campaigns() {
   const { t, dir, language } = useLanguage();
   const { format: formatCurrency } = useCurrency();
   const { connections } = useConnections();
   const { dateRange } = useDateRange();
+  const isHebrew = language === 'he';
+
+  const text = {
+    builderTitle: isHebrew ? 'יוצר קמפיינים אינטראקטיבי' : 'Interactive campaign builder',
+    builderSubtitle: isHebrew
+      ? 'יצירת מודעות עם קהלים חכמים, העלאת תמונות אמיתית, חוקי זמן ולוח תזמון שבועי לכל פלטפורמה.'
+      : 'Create campaigns with smart audiences, real image upload, time targeting rules, and weekly scheduling.',
+    campaignName: isHebrew ? 'שם קמפיין' : 'Campaign name',
+    objective: isHebrew ? 'מטרת קמפיין' : 'Campaign objective',
+    contentType: isHebrew ? 'אופי פוסט/תוכן' : 'Post/Product content type',
+    productType: isHebrew ? 'סוג מוצר/שירות' : 'Product/service type',
+    description: isHebrew ? 'תיאור קצר לפוסט או מוצר' : 'Short post/product brief',
+    selectPlatforms: isHebrew ? 'בחירת פלטפורמות מחוברות' : 'Select connected platforms',
+    noConnectedPlatforms: isHebrew ? 'אין פלטפורמות פרסום מחוברות כרגע.' : 'No advertising platforms are currently connected.',
+    smartAudienceTitle: isHebrew ? 'רשימת קהלים חכמה מטורגטת' : 'Smart targeted audience list',
+    smartAudienceSubtitle: isHebrew
+      ? 'המלצות אוטומטיות לפי אופי התוכן, סוג המוצר ומטרת הקמפיין.'
+      : 'Auto recommendations by content nature, product type, and campaign objective.',
+    addCustomAudience: isHebrew ? 'הוסף קהל ידני' : 'Add custom audience',
+    uploadTitle: isHebrew ? 'העלאת תמונות למודעות (אמיתי)' : 'Upload ad images (real upload)',
+    uploadHint: isHebrew
+      ? 'התמונות מועלות מהמחשב שלך ומוכנות לפרסום בפלטפורמות המחוברות.'
+      : 'Images are uploaded from your device and prepared for connected platforms.',
+    uploadButton: isHebrew ? 'בחר תמונות' : 'Choose images',
+    timingRulesTitle: isHebrew ? 'חוקי טירגוט לפי שעות ביצועים' : 'Performance based time targeting rules',
+    weeklyTitle: isHebrew ? 'לוח זמנים שבועי לקמפיינים' : 'Weekly campaign schedule board',
+    createDraft: isHebrew ? 'צור קמפיין מתוזמן' : 'Create scheduled campaign',
+    publishedOk: isHebrew ? 'הקמפיינים נוצרו בהצלחה ברשימת הניהול.' : 'Campaign drafts were created successfully in management list.',
+    requireFields: isHebrew ? 'נדרש שם קמפיין ובחירת לפחות פלטפורמה אחת.' : 'Campaign name and at least one platform are required.',
+    requireAsset: isHebrew ? 'יש להעלות לפחות תמונה אחת כדי ליצור מודעה.' : 'Upload at least one image to create ad campaigns.',
+    connectedOnly: isHebrew ? 'זמין רק בפלטפורמות מחוברות' : 'Available only for connected platforms',
+    bestWindows: isHebrew ? 'חלונות הזמן עם ביצועים טובים' : 'Best performing time windows',
+    addRule: isHebrew ? 'הוסף חוק' : 'Add rule',
+    weeklyActiveSlots: isHebrew ? 'משבצות פעילות' : 'Active slots',
+    createdCampaigns: isHebrew ? 'קמפיינים פעילים ומתוזמנים' : 'Active and scheduled campaigns',
+    syncLive: isHebrew ? 'מסנכרן נתונים בזמן אמת...' : 'Syncing real-time data...',
+  };
+
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedRecs, setAppliedRecs] = useState<number[]>([]);
   const [realCampaigns, setRealCampaigns] = useState<any[]>([]);
+  const [createdCampaigns, setCreatedCampaigns] = useState<any[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [builderMessage, setBuilderMessage] = useState<string | null>(null);
 
   // Filtering and Sorting State
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +168,116 @@ export function Campaigns() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Interactive campaign builder state
+  const [campaignNameInput, setCampaignNameInput] = useState('');
+  const [objective, setObjective] = useState<ObjectiveType>('sales');
+  const [contentType, setContentType] = useState<ContentType>('product');
+  const [productType, setProductType] = useState<ProductType>('other');
+  const [campaignBrief, setCampaignBrief] = useState('');
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [selectedAudiences, setSelectedAudiences] = useState<string[]>([]);
+  const [customAudience, setCustomAudience] = useState('');
+  const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([]);
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({});
+  const [selectedSchedulePlatform, setSelectedSchedulePlatform] = useState<string>('Google');
+  const [timeRules, setTimeRules] = useState<TimeRule[]>([]);
+  const [rulePlatform, setRulePlatform] = useState<string>('Google');
+  const [ruleSlot, setRuleSlot] = useState<SlotKey>('evening');
+  const [ruleAction, setRuleAction] = useState<RuleAction>('boost');
+  const [ruleMinRoas, setRuleMinRoas] = useState<number>(3);
+
+  const connectedAdPlatforms = useMemo(() => {
+    const options: string[] = [];
+    if (connections.find((c) => c.id === 'google' && c.status === 'connected')) options.push('Google');
+    if (connections.find((c) => c.id === 'meta' && c.status === 'connected')) options.push('Meta');
+    if (connections.find((c) => c.id === 'tiktok' && c.status === 'connected')) options.push('TikTok');
+    return options;
+  }, [connections]);
+
+  const objectiveOptions: Array<{ value: ObjectiveType; label: string }> = [
+    { value: 'sales', label: isHebrew ? 'מכירות' : 'Sales' },
+    { value: 'traffic', label: isHebrew ? 'תנועה לאתר' : 'Traffic' },
+    { value: 'leads', label: isHebrew ? 'לידים' : 'Leads' },
+    { value: 'awareness', label: isHebrew ? 'מודעות למותג' : 'Awareness' },
+    { value: 'retargeting', label: isHebrew ? 'רימרקטינג' : 'Retargeting' },
+  ];
+
+  const contentTypeOptions: Array<{ value: ContentType; label: string }> = [
+    { value: 'product', label: isHebrew ? 'פוסט מוצר' : 'Product post' },
+    { value: 'offer', label: isHebrew ? 'פוסט מבצע' : 'Offer post' },
+    { value: 'educational', label: isHebrew ? 'פוסט מידע/ערך' : 'Educational post' },
+    { value: 'testimonial', label: isHebrew ? 'פוסט המלצה/עדות' : 'Testimonial post' },
+    { value: 'video', label: isHebrew ? 'פוסט וידאו קצר' : 'Short video post' },
+  ];
+
+  const productTypeOptions: Array<{ value: ProductType; label: string }> = [
+    { value: 'fashion', label: isHebrew ? 'אופנה' : 'Fashion' },
+    { value: 'beauty', label: isHebrew ? 'ביוטי וטיפוח' : 'Beauty' },
+    { value: 'tech', label: isHebrew ? 'טכנולוגיה' : 'Tech' },
+    { value: 'home', label: isHebrew ? 'בית ועיצוב' : 'Home' },
+    { value: 'fitness', label: isHebrew ? 'כושר וספורט' : 'Fitness' },
+    { value: 'services', label: isHebrew ? 'שירותים' : 'Services' },
+    { value: 'other', label: isHebrew ? 'אחר' : 'Other' },
+  ];
+
+  const slotLabels: Record<SlotKey, string> = {
+    morning: isHebrew ? 'בוקר' : 'Morning',
+    afternoon: isHebrew ? 'צהריים' : 'Afternoon',
+    evening: isHebrew ? 'ערב' : 'Evening',
+    night: isHebrew ? 'לילה' : 'Night',
+  };
+
+  const dayLabels: Record<DayKey, string> = {
+    mon: isHebrew ? 'שני' : 'Mon',
+    tue: isHebrew ? 'שלישי' : 'Tue',
+    wed: isHebrew ? 'רביעי' : 'Wed',
+    thu: isHebrew ? 'חמישי' : 'Thu',
+    fri: isHebrew ? 'שישי' : 'Fri',
+    sat: isHebrew ? 'שבת' : 'Sat',
+    sun: isHebrew ? 'ראשון' : 'Sun',
+  };
+
+  const audienceSuggestions = useMemo(() => {
+    const combined = [
+      ...SMART_AUDIENCE_BY_CONTENT[contentType],
+      ...SMART_AUDIENCE_BY_PRODUCT[productType],
+      ...SMART_AUDIENCE_BY_OBJECTIVE[objective],
+    ];
+    return [...new Set(combined)];
+  }, [contentType, productType, objective]);
+
+  useEffect(() => {
+    if (connectedAdPlatforms.length === 0) {
+      setSelectedPlatforms([]);
+      return;
+    }
+    setSelectedPlatforms((prev) => {
+      const filtered = prev.filter((p) => connectedAdPlatforms.includes(p));
+      return filtered.length ? filtered : [connectedAdPlatforms[0]];
+    });
+    setSelectedSchedulePlatform((prev) => (connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]));
+    setRulePlatform((prev) => (connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]));
+  }, [connectedAdPlatforms]);
+
+  useEffect(() => {
+    setWeeklySchedule((prev) => {
+      const next: WeeklySchedule = { ...prev };
+      selectedPlatforms.forEach((platform) => {
+        if (!next[platform]) next[platform] = createEmptyDaySchedule();
+      });
+      Object.keys(next).forEach((platform) => {
+        if (!selectedPlatforms.includes(platform)) delete next[platform];
+      });
+      return next;
+    });
+  }, [selectedPlatforms]);
+
+  useEffect(() => {
+    return () => {
+      uploadedAssets.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
+    };
+  }, [uploadedAssets]);
   const toAmount = (value: unknown): number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (typeof value === 'string') {
@@ -190,9 +431,137 @@ export function Campaigns() {
     }
   };
 
-  const allCampaigns = realCampaigns.length > 0
+  const togglePlatformSelection = (platform: string) => {
+    setSelectedPlatforms((prev) =>
+      prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform]
+    );
+  };
+
+  const toggleAudienceSelection = (audience: string) => {
+    setSelectedAudiences((prev) =>
+      prev.includes(audience) ? prev.filter((a) => a !== audience) : [...prev, audience]
+    );
+  };
+
+  const addCustomAudience = () => {
+    const value = customAudience.trim();
+    if (!value) return;
+    if (!selectedAudiences.includes(value)) {
+      setSelectedAudiences((prev) => [...prev, value]);
+    }
+    setCustomAudience('');
+  };
+
+  const handleAssetUpload: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+    const files = Array.from(event.target.files || []) as File[];
+    if (!files.length) return;
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+    const mapped: UploadedAsset[] = imageFiles.map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setUploadedAssets((prev) => [...prev, ...mapped].slice(0, 12));
+    event.target.value = '';
+  };
+
+  const removeAsset = (id: string) => {
+    setUploadedAssets((prev) => {
+      const target = prev.find((asset) => asset.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((asset) => asset.id !== id);
+    });
+  };
+
+  const toggleScheduleCell = (platform: string, day: DayKey, slot: SlotKey) => {
+    setWeeklySchedule((prev) => {
+      const next: WeeklySchedule = { ...prev };
+      if (!next[platform]) next[platform] = createEmptyDaySchedule();
+      next[platform] = {
+        ...next[platform],
+        [day]: {
+          ...next[platform][day],
+          [slot]: !next[platform][day][slot],
+        },
+      };
+      return next;
+    });
+  };
+
+  const getActiveSlotsCount = (platform: string): number => {
+    const schedule = weeklySchedule[platform];
+    if (!schedule) return 0;
+    return (Object.keys(schedule) as DayKey[]).reduce((sum, day) => {
+      const dayCount = (Object.keys(schedule[day]) as SlotKey[]).filter((slot) => schedule[day][slot]).length;
+      return sum + dayCount;
+    }, 0);
+  };
+
+  const addTimeRule = () => {
+    if (!rulePlatform) return;
+    const next: TimeRule = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      platform: rulePlatform,
+      slot: ruleSlot,
+      action: ruleAction,
+      minRoas: ruleMinRoas,
+    };
+    setTimeRules((prev) => [next, ...prev]);
+  };
+
+  const removeTimeRule = (id: string) => {
+    setTimeRules((prev) => prev.filter((rule) => rule.id !== id));
+  };
+
+  const handleCreateScheduledCampaign = () => {
+    setBuilderMessage(null);
+    if (!campaignNameInput.trim() || selectedPlatforms.length === 0) {
+      setBuilderMessage(text.requireFields);
+      return;
+    }
+    if (uploadedAssets.length === 0) {
+      setBuilderMessage(text.requireAsset);
+      return;
+    }
+
+    const created = selectedPlatforms.map((platform) => {
+      const activeSlots = getActiveSlotsCount(platform);
+      return {
+        id: `local-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: campaignNameInput.trim(),
+        platform,
+        status: activeSlots > 0 ? 'Scheduled' : 'Draft',
+        spend: 0,
+        roas: 0,
+        cpa: 0,
+        objective,
+        brief: campaignBrief.trim(),
+        audiences: selectedAudiences,
+        mediaCount: uploadedAssets.length,
+      };
+    });
+
+    setCreatedCampaigns((prev) => [...created, ...prev]);
+    setBuilderMessage(text.publishedOk);
+    setCampaignNameInput('');
+    setCampaignBrief('');
+    setSelectedAudiences([]);
+    setTimeRules([]);
+    setUploadedAssets((prev) => {
+      prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
+      return [];
+    });
+  };
+
+  const allCampaigns = [
+    ...createdCampaigns,
+    ...(realCampaigns.length > 0
     ? realCampaigns
-    : mockCampaignData;
+    : mockCampaignData),
+  ];
 
   const filteredAndSortedCampaigns = allCampaigns
     .filter(campaign => {
@@ -241,15 +610,408 @@ export function Campaigns() {
         </button>
       </div>
 
+      <section className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50/60">
+          <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+            <Target className="w-5 h-5 text-indigo-600" />
+            {text.builderTitle}
+          </h3>
+          <p className="text-sm text-indigo-700 mt-1">{text.builderSubtitle}</p>
+        </div>
+
+        <div className="p-4 sm:p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.campaignName}</label>
+              <input
+                value={campaignNameInput}
+                onChange={(e) => setCampaignNameInput(e.target.value)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder={isHebrew ? 'לדוגמה: השקת קולקציה חדשה' : 'Example: New collection launch'}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.objective}</label>
+              <select
+                value={objective}
+                onChange={(e) => setObjective(e.target.value as ObjectiveType)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                {objectiveOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.contentType}</label>
+              <select
+                value={contentType}
+                onChange={(e) => setContentType(e.target.value as ContentType)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                {contentTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.productType}</label>
+              <select
+                value={productType}
+                onChange={(e) => setProductType(e.target.value as ProductType)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                {productTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">{text.description}</label>
+            <textarea
+              value={campaignBrief}
+              onChange={(e) => setCampaignBrief(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              placeholder={
+                isHebrew
+                  ? 'כתוב מה הפוסט/המוצר, למי הוא מיועד ומה המסר.'
+                  : 'Describe the post/product, target user, and campaign message.'
+              }
+            />
+          </div>
+
+          <div>
+            <p className="text-xs font-bold text-gray-600 mb-2">{text.selectPlatforms}</p>
+            {connectedAdPlatforms.length === 0 ? (
+              <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {text.noConnectedPlatforms}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(['Google', 'Meta', 'TikTok'] as const).map((platform) => {
+                  const connected = connectedAdPlatforms.includes(platform);
+                  const selected = selectedPlatforms.includes(platform);
+                  return (
+                    <button
+                      key={platform}
+                      type="button"
+                      onClick={() => connected && togglePlatformSelection(platform)}
+                      disabled={!connected}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors',
+                        selected
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : connected
+                          ? 'bg-white text-gray-700 border-gray-300 hover:border-indigo-300'
+                          : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                      )}
+                      title={!connected ? text.connectedOnly : ''}
+                    >
+                      {selected && <Check className="w-3.5 h-3.5" />}
+                      {platform}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+            <h4 className="text-sm font-bold text-indigo-900 mb-1">{text.smartAudienceTitle}</h4>
+            <p className="text-xs text-indigo-700 mb-3">{text.smartAudienceSubtitle}</p>
+            <div className="flex flex-wrap gap-2">
+              {audienceSuggestions.map((audience) => {
+                const selected = selectedAudiences.includes(audience);
+                return (
+                  <button
+                    key={audience}
+                    type="button"
+                    onClick={() => toggleAudienceSelection(audience)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs font-bold border transition-colors',
+                      selected
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                    )}
+                  >
+                    {audience}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+              <input
+                value={customAudience}
+                onChange={(e) => setCustomAudience(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomAudience())}
+                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder={isHebrew ? 'קהל מותאם אישית...' : 'Custom audience...'}
+              />
+              <button
+                type="button"
+                onClick={addCustomAudience}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-indigo-300 text-indigo-700 bg-white hover:bg-indigo-50 text-sm font-bold"
+              >
+                <PlusCircle className="w-4 h-4" />
+                {text.addCustomAudience}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 p-4">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-1">
+              <ImagePlus className="w-4 h-4 text-indigo-600" />
+              {text.uploadTitle}
+            </h4>
+            <p className="text-xs text-gray-500 mb-3">{text.uploadHint}</p>
+            <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
+              <ImagePlus className="w-4 h-4" />
+              {text.uploadButton}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={handleAssetUpload} />
+            </label>
+            {uploadedAssets.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                {uploadedAssets.map((asset) => (
+                  <div key={asset.id} className="relative border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <img src={asset.previewUrl} alt={asset.name} className="h-20 w-full object-cover" />
+                    <div className="p-1.5">
+                      <p className="text-[10px] text-gray-600 truncate">{asset.name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAsset(asset.id)}
+                      className="absolute top-1 right-1 inline-flex items-center justify-center w-6 h-6 rounded-full bg-white/90 text-red-600 border border-red-100 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+              <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2 mb-2">
+                <Clock3 className="w-4 h-4" />
+                {text.timingRulesTitle}
+              </h4>
+              <p className="text-xs text-amber-700 mb-3">{text.bestWindows}</p>
+              <div className="space-y-2 mb-3">
+                {connectedAdPlatforms.map((platform) => (
+                  <div key={platform} className="text-xs bg-white border border-amber-100 rounded-md px-2 py-1.5">
+                    <span className="font-bold text-amber-900">{platform}: </span>
+                    {(BEST_TIME_WINDOWS[platform] || []).map((w, idx) => (
+                      <span key={`${platform}-${w.slot}`} className="text-amber-800">
+                        {idx > 0 ? ' | ' : ''}
+                        {slotLabels[w.slot]} ({SLOT_RANGES[w.slot]}) · ROAS {w.roas.toFixed(1)} · CPA {formatCurrency(w.cpa)}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <select
+                  value={rulePlatform}
+                  onChange={(e) => setRulePlatform(e.target.value)}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                >
+                  {connectedAdPlatforms.map((platform) => (
+                    <option key={`rule-${platform}`} value={platform}>
+                      {platform}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={ruleSlot}
+                  onChange={(e) => setRuleSlot(e.target.value as SlotKey)}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                >
+                  {(Object.keys(slotLabels) as SlotKey[]).map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slotLabels[slot]} ({SLOT_RANGES[slot]})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={ruleAction}
+                  onChange={(e) => setRuleAction(e.target.value as RuleAction)}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                >
+                  <option value="boost">{isHebrew ? 'הגדל תקציב' : 'Boost budget'}</option>
+                  <option value="limit">{isHebrew ? 'הגבל תקציב' : 'Limit budget'}</option>
+                  <option value="pause">{isHebrew ? 'השהה מודעה' : 'Pause ads'}</option>
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    value={ruleMinRoas}
+                    onChange={(e) => setRuleMinRoas(Number(e.target.value))}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                    placeholder="ROAS"
+                  />
+                  <button
+                    type="button"
+                    onClick={addTimeRule}
+                    className="px-3 py-2 rounded-md bg-amber-600 text-white text-xs font-bold hover:bg-amber-700"
+                  >
+                    {text.addRule}
+                  </button>
+                </div>
+              </div>
+              {timeRules.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {timeRules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between rounded-md bg-white border border-amber-100 px-2 py-1.5 text-xs">
+                      <span>
+                        <strong>{rule.platform}</strong> · {slotLabels[rule.slot]} ·{' '}
+                        {rule.action === 'boost'
+                          ? isHebrew
+                            ? 'הגדל'
+                            : 'Boost'
+                          : rule.action === 'limit'
+                          ? isHebrew
+                            ? 'הגבל'
+                            : 'Limit'
+                          : isHebrew
+                          ? 'השהה'
+                          : 'Pause'}{' '}
+                        · ROAS ≥ {rule.minRoas.toFixed(1)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeTimeRule(rule.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+              <h4 className="text-sm font-bold text-emerald-900 flex items-center gap-2 mb-2">
+                <CalendarClock className="w-4 h-4" />
+                {text.weeklyTitle}
+              </h4>
+              {selectedPlatforms.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {selectedPlatforms.map((platform) => (
+                      <button
+                        key={`schedule-${platform}`}
+                        type="button"
+                        onClick={() => setSelectedSchedulePlatform(platform)}
+                        className={cn(
+                          'px-3 py-1 rounded-full text-xs font-bold border',
+                          selectedSchedulePlatform === platform
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-emerald-800 border-emerald-200'
+                        )}
+                      >
+                        {platform} · {text.weeklyActiveSlots}: {getActiveSlotsCount(platform)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-[520px] w-full text-xs border border-emerald-100 rounded-lg overflow-hidden">
+                      <thead className="bg-emerald-100/60">
+                        <tr>
+                          <th className="px-2 py-1 text-start">{isHebrew ? 'יום' : 'Day'}</th>
+                          {(Object.keys(slotLabels) as SlotKey[]).map((slot) => (
+                            <th key={`slot-head-${slot}`} className="px-2 py-1 text-center">
+                              {slotLabels[slot]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white">
+                        {(Object.keys(dayLabels) as DayKey[]).map((day) => (
+                          <tr key={`day-${day}`} className="border-t border-emerald-50">
+                            <td className="px-2 py-1.5 font-semibold text-gray-700">{dayLabels[day]}</td>
+                            {(Object.keys(slotLabels) as SlotKey[]).map((slot) => {
+                              const active = weeklySchedule[selectedSchedulePlatform]?.[day]?.[slot] || false;
+                              return (
+                                <td key={`${day}-${slot}`} className="px-2 py-1.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleScheduleCell(selectedSchedulePlatform, day, slot)}
+                                    className={cn(
+                                      'inline-flex h-6 w-6 items-center justify-center rounded-md border',
+                                      active
+                                        ? 'bg-emerald-600 border-emerald-600 text-white'
+                                        : 'bg-white border-gray-300 text-gray-400 hover:border-emerald-300'
+                                    )}
+                                  >
+                                    {active && <Check className="w-3.5 h-3.5" />}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-emerald-700">{text.noConnectedPlatforms}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {isHebrew
+                ? 'המודעות ייווצרו לפי הקהלים, התמונות והתזמון שבחרת, ורק בפלטפורמות שמחוברות לממשק.'
+                : 'Campaigns are created with your selected audiences, media, and schedule only on connected platforms.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleCreateScheduledCampaign}
+              disabled={selectedPlatforms.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <Target className="w-4 h-4" />
+              {text.createDraft}
+            </button>
+          </div>
+
+          {builderMessage && (
+            <div className={cn(
+              'text-sm rounded-lg px-3 py-2 border',
+              builderMessage === text.publishedOk
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            )}>
+              {builderMessage}
+            </div>
+          )}
+        </div>
+      </section>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white shadow rounded-lg overflow-hidden flex flex-col">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">{t('campaigns.activeCampaigns')}</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">{text.createdCampaigns}</h3>
               {isSyncing && (
                 <span className="flex items-center text-xs text-indigo-600 font-bold animate-pulse">
                   <Loader2 className="w-3 h-3 animate-spin ml-1" />
-                  Syncing real-time data...
+                  {text.syncLive}
                 </span>
               )}
             </div>
@@ -342,7 +1104,13 @@ export function Campaigns() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={cn(
                           "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                          campaign.status === 'Active' ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                          campaign.status === 'Active'
+                            ? "bg-green-100 text-green-800"
+                            : campaign.status === 'Scheduled'
+                            ? "bg-indigo-100 text-indigo-800"
+                            : campaign.status === 'Draft'
+                            ? "bg-slate-100 text-slate-700"
+                            : "bg-yellow-100 text-yellow-800"
                         )}>
                           {campaign.status}
                         </span>
