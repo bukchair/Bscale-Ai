@@ -31,6 +31,7 @@ import { MarketingArticles } from './pages/MarketingArticles';
 import { SystemMail } from './pages/SystemMail';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SalesBot } from './components/SalesBot';
+import { PublicTopNav } from './components/PublicTopNav';
 import { useLanguage } from './contexts/LanguageContext';
 import { auth, onAuthStateChanged, resolveWorkspaceScope, syncUserProfile } from './lib/firebase';
 import { runAutoAdsIfNeeded } from './lib/autoAdsRunner';
@@ -108,6 +109,7 @@ export default function App() {
   if (path === '/privacy-policy') {
     return (
       <>
+        <PublicTopNav />
         <PrivacyPolicy />
         <SalesBot />
       </>
@@ -116,6 +118,7 @@ export default function App() {
   if (path === '/guide') {
     return (
       <>
+        <PublicTopNav />
         <Guide />
         <SalesBot />
       </>
@@ -124,6 +127,7 @@ export default function App() {
   if (path === '/articles') {
     return (
       <>
+        <PublicTopNav />
         <MarketingArticles />
         <SalesBot />
       </>
@@ -256,6 +260,7 @@ export default function App() {
   if (view === 'landing') {
     return (
       <>
+        <PublicTopNav />
         <Landing
           onEnter={() => {
             setView('auth');
@@ -275,6 +280,7 @@ export default function App() {
   if (view === 'auth') {
     return (
       <>
+        <PublicTopNav />
         <Auth onLogin={() => setView('app')} initialMode={authMode} />
         <SalesBot />
       </>

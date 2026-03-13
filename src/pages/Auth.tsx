@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { BrainCircuit, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { auth, googleProvider, signInWithPopup } from '../lib/firebase';
 
 interface AuthProps {
@@ -42,11 +40,6 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#050505] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative transition-colors duration-300" dir={dir}>
-      <div className="absolute top-4 end-4 z-50 flex items-center gap-2">
-        <ThemeSwitcher />
-        <LanguageSwitcher />
-      </div>
-
       {/* Background Glow */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 dark:bg-indigo-600/20 blur-[120px] rounded-full" />

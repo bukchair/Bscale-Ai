@@ -2,8 +2,6 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, BrainCircuit, BarChart3, Globe, Target, Zap, Mail, Layers, LineChart, Sparkles, ArrowRight, BookOpen, ShoppingBag, Headphones, Building2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 
@@ -125,26 +123,6 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
       </div>
 
       <div className="relative z-10">
-        {/* Navbar */}
-        <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-          <div className="flex items-center gap-2">
-            <BrainCircuit className="w-8 h-8 text-indigo-600 dark:text-indigo-500" />
-            <span className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-              {t('app.name')}
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <ThemeSwitcher />
-            <LanguageSwitcher />
-            <button
-              onClick={onEnter}
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-white/80 dark:hover:text-white transition-colors"
-            >
-              {t('landing.login')}
-            </button>
-          </div>
-        </nav>
-
         {/* Hero Section */}
         <main className="max-w-7xl mx-auto px-6 pt-12 pb-24 text-center lg:text-start lg:flex lg:items-center lg:gap-12">
           <motion.div
