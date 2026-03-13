@@ -14,9 +14,11 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 import { useConnections } from '../contexts/ConnectionsContext';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 export function Settings({ userProfile }: { userProfile?: { role?: string } | null }) {
   const { t, dir } = useLanguage();
+  const { currency, setCurrency, availableCurrencies } = useCurrency();
   const {
     dataAccessMode,
     workspaceOwnerName,
@@ -302,6 +304,29 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                     <label className="text-sm font-medium text-gray-700">כתובת אימייל</label>
                     <input type="email" defaultValue="asher205@gmail.com" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all" dir="ltr" />
                   </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700">מטבע תצוגה במערכת</label>
+                    <div className="relative">
+                      <Globe className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", dir === 'rtl' ? 'right-3' : 'left-3')} />
+                      <select
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        className={cn(
+                          "w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all",
+                          dir === 'rtl' ? 'pr-10' : 'pl-10'
+                        )}
+                      >
+                        {availableCurrencies.map((option) => (
+                          <option key={option.code} value={option.code}>
+                            {option.code} - {option.label} ({option.symbol})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      ניתן לבחור כל מטבע נתמך. הבחירה משפיעה על כל הסכומים במערכת.
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
@@ -362,10 +387,16 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">מטבע</span>
-                      <select className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white">
-                        <option>USD $</option>
-                        <option>EUR €</option>
-                        <option>ILS ₪</option>
+                      <select
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white max-w-[180px]"
+                      >
+                        {availableCurrencies.map((option) => (
+                          <option key={`billing-currency-${option.code}`} value={option.code}>
+                            {option.code} {option.symbol}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
