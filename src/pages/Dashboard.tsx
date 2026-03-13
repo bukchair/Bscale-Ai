@@ -1,6 +1,18 @@
-import React, { useMemo, useEffect, useState, useRef } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DollarSign,
+  Users,
+  ShoppingCart,
+  Megaphone,
+  Search,
+  Sparkles,
+  ArrowRight,
+  Loader2,
+  Activity,
+  Store,
+  Target,
+  Globe,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
@@ -9,189 +21,339 @@ import { generateDashboardData } from '../lib/dataUtils';
 import { fetchGA4Report, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
 import { fetchMetaCampaigns } from '../services/metaService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
-import { fetchWooCommerceRevenue, fetchWooCommerceSalesByRange } from '../services/woocommerceService';
+import { fetchWooCommerceOrdersByRange, fetchWooCommerceSalesByRange, type WooCommerceOrder } from '../services/woocommerceService';
 import { auth } from '../lib/firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 
+type CampaignSnapshot = {
+  id: string | number;
+  name: string;
+  platform: 'Google' | 'Meta' | 'TikTok';
+  status: 'Active' | 'Paused';
+  spend: number;
+  roas: number;
+};
+
+type CampaignSummary = {
+  totalCampaigns: number;
+  activeCampaigns: number;
+  totalSpend: number;
+  avgRoas: number;
+  platformBreakdown: Array<{ platform: 'Google' | 'Meta' | 'TikTok'; count: number }>;
+};
+
+const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
+const DEMO_GSC_STATS = { clicks: 3842, impressions: 48200, avgPosition: 14.3, ctr: 7.97 };
+
+const DEMO_RECENT_ORDERS: WooCommerceOrder[] = [
+  {
+    id: 801,
+    number: '801',
+    status: 'processing',
+    currency: 'ILS',
+    total: 529,
+    total_tax: 0,
+    shipping_total: 25,
+    payment_method: 'card',
+    payment_method_title: 'Credit Card',
+    date_created: new Date(Date.now() - 1000 * 60 * 40).toISOString(),
+    date_modified: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    date_completed: null,
+    customer_note: '',
+    billing: { first_name: 'רועי', last_name: 'לוי', email: 'roy@example.com', phone: '+972501112233' },
+    shipping: { first_name: 'רועי', last_name: 'לוי' },
+    line_items: [],
+    meta_data: [],
+  },
+  {
+    id: 802,
+    number: '802',
+    status: 'completed',
+    currency: 'ILS',
+    total: 249,
+    total_tax: 0,
+    shipping_total: 0,
+    payment_method: 'paypal',
+    payment_method_title: 'PayPal',
+    date_created: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+    date_modified: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+    date_completed: new Date(Date.now() - 1000 * 60 * 80).toISOString(),
+    customer_note: 'נא להשאיר ליד הדלת',
+    billing: { first_name: 'נועה', last_name: 'כהן', email: 'noa@example.com', phone: '+972507778899' },
+    shipping: { first_name: 'נועה', last_name: 'כהן' },
+    line_items: [],
+    meta_data: [],
+  },
+  {
+    id: 803,
+    number: '803',
+    status: 'pending',
+    currency: 'ILS',
+    total: 1090,
+    total_tax: 0,
+    shipping_total: 35,
+    payment_method: 'card',
+    payment_method_title: 'Credit Card',
+    date_created: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+    date_modified: new Date(Date.now() - 1000 * 60 * 138).toISOString(),
+    date_completed: null,
+    customer_note: '',
+    billing: { first_name: 'אור', last_name: 'שחר', email: 'or@example.com', phone: '+972505556677' },
+    shipping: { first_name: 'אור', last_name: 'שחר' },
+    line_items: [],
+    meta_data: [],
+  },
+  {
+    id: 804,
+    number: '804',
+    status: 'completed',
+    currency: 'ILS',
+    total: 339,
+    total_tax: 0,
+    shipping_total: 20,
+    payment_method: 'card',
+    payment_method_title: 'Credit Card',
+    date_created: new Date(Date.now() - 1000 * 60 * 220).toISOString(),
+    date_modified: new Date(Date.now() - 1000 * 60 * 210).toISOString(),
+    date_completed: new Date(Date.now() - 1000 * 60 * 200).toISOString(),
+    customer_note: '',
+    billing: { first_name: 'מיכל', last_name: 'אדרי', email: 'michal@example.com', phone: '+972503339944' },
+    shipping: { first_name: 'מיכל', last_name: 'אדרי' },
+    line_items: [],
+    meta_data: [],
+  },
+  {
+    id: 805,
+    number: '805',
+    status: 'on-hold',
+    currency: 'ILS',
+    total: 799,
+    total_tax: 0,
+    shipping_total: 0,
+    payment_method: 'bank',
+    payment_method_title: 'Bank Transfer',
+    date_created: new Date(Date.now() - 1000 * 60 * 310).toISOString(),
+    date_modified: new Date(Date.now() - 1000 * 60 * 309).toISOString(),
+    date_completed: null,
+    customer_note: '',
+    billing: { first_name: 'דן', last_name: 'מור', email: 'dan@example.com', phone: '+972501234111' },
+    shipping: { first_name: 'דן', last_name: 'מור' },
+    line_items: [],
+    meta_data: [],
+  },
+];
+
+const DEMO_CAMPAIGN_SUMMARY: CampaignSummary = {
+  totalCampaigns: 9,
+  activeCampaigns: 6,
+  totalSpend: 8420,
+  avgRoas: 2.8,
+  platformBreakdown: [
+    { platform: 'Google', count: 4 },
+    { platform: 'Meta', count: 3 },
+    { platform: 'TikTok', count: 2 },
+  ],
+};
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const moneyFromUnknown = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value.replace(/[^\d.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '—');
+
 export function Dashboard() {
-  const { t, dir } = useLanguage();
+  const { dir } = useLanguage();
   const { dateRange } = useDateRange();
   const bounds = useDateRangeBounds();
   const { connections } = useConnections();
   const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
   const hasLoadedRealDataRef = useRef(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
-  const DEMO_GSC_STATS = { clicks: 3842, impressions: 48200, avgPosition: 14.3, ctr: 7.97 };
 
-  const connectedPlatforms = connections.filter(c => c.status === 'connected');
-  const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
-  const isShopifyConnected = connections.find(c => c.id === 'shopify')?.status === 'connected';
+  const connectedPlatforms = connections.filter((c) => c.status === 'connected');
+  const isWooConnected = connections.find((c) => c.id === 'woocommerce')?.status === 'connected';
+  const isShopifyConnected = connections.find((c) => c.id === 'shopify')?.status === 'connected';
   const isStoreConnected = isWooConnected || isShopifyConnected;
 
-  // Fallback synthetic data based on connections and selected date range
   const fallbackData = useMemo(() => {
-    const seedStr = connectedPlatforms.map(c => 
-      Object.values(c.settings || {}).join('')
-    ).join('') || 'default';
-    
+    const seedStr =
+      connectedPlatforms.map((c) => Object.values(c.settings || {}).join('')).join('') || 'default';
     const data = generateDashboardData(seedStr, dateRange);
-    
     if (!isStoreConnected) {
       return {
         ...data,
-        chartData: data.chartData.map(d => ({ ...d, revenue: 0 })),
         totalRevenue: 0,
         roas: '0.00',
-        netProfit: -data.totalSpend
+        netProfit: -data.totalSpend,
       };
     }
-    
     return data;
-  }, [connectedPlatforms, isStoreConnected, dateRange]);
+  }, [connectedPlatforms, dateRange, isStoreConnected]);
 
-  const [chartData, setChartData] = useState(fallbackData.chartData);
+  const [isLoadingOverview, setIsLoadingOverview] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState(fallbackData.totalRevenue);
   const [totalSpend, setTotalSpend] = useState(fallbackData.totalSpend);
-  const [roas, setRoas] = useState(fallbackData.roas);
   const [netProfit, setNetProfit] = useState(fallbackData.netProfit);
+  const [roas, setRoas] = useState(fallbackData.roas);
+  const [ga4Stats, setGa4Stats] = useState(DEMO_GA4_STATS);
+  const [gscStats, setGscStats] = useState(DEMO_GSC_STATS);
+  const [recentOrders, setRecentOrders] = useState<WooCommerceOrder[]>(DEMO_RECENT_ORDERS);
+  const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>(DEMO_CAMPAIGN_SUMMARY);
 
-  const [ga4Stats, setGa4Stats] = useState<{ activeNow: number; totalUsers: number }>(DEMO_GA4_STATS);
-
-  const [gscStats, setGscStats] = useState<{ clicks: number; impressions: number; avgPosition: number; ctr: number }>(
-    DEMO_GSC_STATS
-  );
   const [isFinancialUsingDemo, setIsFinancialUsingDemo] = useState(true);
   const [isGa4UsingDemo, setIsGa4UsingDemo] = useState(true);
+  const [isOrdersUsingDemo, setIsOrdersUsingDemo] = useState(true);
+  const [isCampaignsUsingDemo, setIsCampaignsUsingDemo] = useState(true);
   const [isGscUsingDemo, setIsGscUsingDemo] = useState(true);
 
-  // Detect very narrow/mobile viewports to avoid Recharts width/height -1 issues
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 640); // sm breakpoint
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Sync fallback data when dependencies change
-  useEffect(() => {
-    setChartData(fallbackData.chartData);
     setTotalRevenue(fallbackData.totalRevenue);
     setTotalSpend(fallbackData.totalSpend);
-    setRoas(fallbackData.roas);
     setNetProfit(fallbackData.netProfit);
+    setRoas(fallbackData.roas);
   }, [fallbackData]);
 
-  // Load real metrics from WooCommerce, Google (GA4, GSC, Ads), Meta and TikTok when connections exist
   useEffect(() => {
-    // דואגים שהטעינה תרוץ רק פעם אחת לכל טעינת דף,
-    // כדי למנוע לולאות אינסופיות כשחיבורי Firestore מתחדשים או נכשלים בהרשאות
-    if (hasLoadedRealDataRef.current) {
-      return;
-    }
+    hasLoadedRealDataRef.current = false;
+  }, [bounds.startDate, bounds.endDate]);
+
+  useEffect(() => {
+    if (hasLoadedRealDataRef.current) return;
     hasLoadedRealDataRef.current = true;
 
     let cancelled = false;
 
-    const moneyFromString = (value: string | number | undefined): number => {
-      if (typeof value === 'number') return value;
-      if (!value) return 0;
-      const n = parseFloat(String(value).replace(/[^\d.-]/g, ''));
-      return isNaN(n) ? 0 : n;
+    const buildCampaignSummary = (campaigns: CampaignSnapshot[]): CampaignSummary => {
+      const totalCampaigns = campaigns.length;
+      const activeCampaigns = campaigns.filter((c) => c.status === 'Active').length;
+      const totalSpendLive = campaigns.reduce((sum, c) => sum + c.spend, 0);
+      const roasRows = campaigns.filter((c) => c.roas > 0);
+      const avgRoas =
+        roasRows.length > 0
+          ? roasRows.reduce((sum, c) => sum + c.roas, 0) / roasRows.length
+          : 0;
+      const platformBreakdown = (['Google', 'Meta', 'TikTok'] as const)
+        .map((platform) => ({
+          platform,
+          count: campaigns.filter((c) => c.platform === platform).length,
+        }))
+        .filter((row) => row.count > 0);
+
+      return {
+        totalCampaigns,
+        activeCampaigns,
+        totalSpend: totalSpendLive,
+        avgRoas,
+        platformBreakdown,
+      };
     };
-    const safeFinite = (value: unknown, fallback = 0): number => {
-      const n = typeof value === 'number' ? value : Number(value);
-      return Number.isFinite(n) ? n : fallback;
-    };
 
-    async function load() {
-      if (!connectedPlatforms.length) return;
+    async function loadOverview() {
+      setIsLoadingOverview(true);
 
-      const woo = connections.find(c => c.id === 'woocommerce' && c.status === 'connected');
-      const google = connections.find(c => c.id === 'google' && c.status === 'connected');
-      const meta = connections.find(c => c.id === 'meta' && c.status === 'connected');
-      const tiktok = connections.find(c => c.id === 'tiktok' && c.status === 'connected');
+      const woo = connections.find((c) => c.id === 'woocommerce' && c.status === 'connected');
+      const google = connections.find((c) => c.id === 'google' && c.status === 'connected');
+      const meta = connections.find((c) => c.id === 'meta' && c.status === 'connected');
+      const tiktok = connections.find((c) => c.id === 'tiktok' && c.status === 'connected');
 
-      let realRevenue = 0;
-      let realSpend = 0;
+      let liveRevenue = 0;
+      let liveSpend = 0;
       let hasGa4Live = false;
       let hasGscLive = false;
+      let hasOrdersLive = false;
+      let hasCampaignsLive = false;
+      let ga4Live = DEMO_GA4_STATS;
+      let gscLive = DEMO_GSC_STATS;
+      let latestOrdersLive: WooCommerceOrder[] = [];
+      const campaignRows: CampaignSnapshot[] = [];
 
-      // WooCommerce revenue for the selected date range
+      const startIso = bounds.startDate.toISOString();
+      const endIso = bounds.endDate.toISOString();
+      const startIsoDateOnly = bounds.startDate.toISOString().slice(0, 10);
+      const endIsoDateOnly = bounds.endDate.toISOString().slice(0, 10);
+
       if (woo?.settings?.storeUrl && woo.settings.wooKey && woo.settings.wooSecret) {
         try {
-          const startIso = bounds.startDate.toISOString().slice(0, 10);
-          const endIso = bounds.endDate.toISOString().slice(0, 10);
           const salesRows = await fetchWooCommerceSalesByRange(
+            woo.settings.storeUrl,
+            woo.settings.wooKey,
+            woo.settings.wooSecret,
+            startIsoDateOnly,
+            endIsoDateOnly
+          );
+          const revenueFromRange = salesRows.reduce(
+            (sum, row) => sum + toNumber(row.netSales || row.totalSales, 0),
+            0
+          );
+          if (revenueFromRange > 0) {
+            liveRevenue = revenueFromRange;
+          }
+        } catch (error) {
+          console.warn('Failed to load WooCommerce sales range', error);
+        }
+
+        try {
+          const orders = await fetchWooCommerceOrdersByRange(
             woo.settings.storeUrl,
             woo.settings.wooKey,
             woo.settings.wooSecret,
             startIso,
             endIso
           );
-          const revenueFromWoo = salesRows.reduce(
-            (sum, row) => sum + (row.netSales || row.totalSales),
-            0
-          );
-          if (revenueFromWoo > 0) {
-            realRevenue = revenueFromWoo;
+          if (orders.length > 0) {
+            latestOrdersLive = [...orders]
+              .sort(
+                (a, b) =>
+                  new Date(b.date_created || 0).getTime() - new Date(a.date_created || 0).getTime()
+              )
+              .slice(0, 5);
+            hasOrdersLive = true;
+            if (liveRevenue <= 0) {
+              liveRevenue = orders.reduce((sum, order) => sum + toNumber(order.total, 0), 0);
+            }
           }
-        } catch (e) {
-          console.warn('Failed to load WooCommerce sales range', e);
-          // fall back to existing synthetic data
+        } catch (error) {
+          console.warn('Failed to load latest WooCommerce orders', error);
         }
       }
 
-      // Google: GA4 + Ads + GSC
       if (google?.settings?.googleAccessToken) {
         const token = google.settings.googleAccessToken;
 
-        // GA4 report
         if (google.settings.ga4Id) {
           try {
             const report = await fetchGA4Report(token, google.settings.ga4Id);
             const rows = Array.isArray(report.rows) ? report.rows : [];
             let totalUsers = 0;
-            let totalRevFromGa4 = 0;
-            rows.forEach((r: any) => {
-              const metrics = r.metricValues || r.metrics || [];
-              const activeUsers = moneyFromString(metrics[0]?.value);
-              const totalRevenueMetric = moneyFromString(metrics[3]?.value);
-              totalUsers += activeUsers;
-              totalRevFromGa4 += totalRevenueMetric;
+            let activeNow = 0;
+            rows.forEach((row: any) => {
+              const metrics = row.metricValues || row.metrics || [];
+              totalUsers += moneyFromUnknown(metrics?.[0]?.value);
             });
-            const activeNow = rows.length ? moneyFromString(rows[rows.length - 1]?.metricValues?.[0]?.value) : 0;
-            if (!cancelled) {
-              setGa4Stats({
-                activeNow: safeFinite(activeNow, DEMO_GA4_STATS.activeNow),
-                totalUsers: safeFinite(totalUsers, DEMO_GA4_STATS.totalUsers)
-              });
+            if (rows.length) {
+              const latestMetrics = rows[rows.length - 1]?.metricValues || rows[rows.length - 1]?.metrics || [];
+              activeNow = moneyFromUnknown(latestMetrics?.[0]?.value);
             }
-            hasGa4Live = totalUsers > 0 || activeNow > 0;
-            if (totalRevFromGa4 > 0) {
-              realRevenue = totalRevFromGa4;
-            }
-          } catch (e) {
-            console.warn('Failed to load GA4 report', e);
+            ga4Live = {
+              activeNow: toNumber(activeNow, DEMO_GA4_STATS.activeNow),
+              totalUsers: toNumber(totalUsers, DEMO_GA4_STATS.totalUsers),
+            };
+            hasGa4Live = ga4Live.activeNow > 0 || ga4Live.totalUsers > 0;
+          } catch (error) {
+            console.warn('Failed to load GA4 stats', error);
           }
         }
 
-        // Google Ads campaigns spend
-        if (google.settings.googleAdsId) {
-          try {
-            const googleCampaigns = await fetchGoogleCampaigns(token, google.settings.googleAdsId, google.settings.loginCustomerId);
-            const spendFromGoogle = googleCampaigns.reduce((sum: number, c: any) => sum + moneyFromString(c.spend), 0);
-            realSpend += spendFromGoogle;
-          } catch (e) {
-            console.warn('Failed to load Google Ads campaigns', e);
-          }
-        }
-
-        // GSC data
         if (google.settings.siteUrl) {
           try {
             const gsc = await fetchGSCData(token, google.settings.siteUrl);
@@ -199,121 +361,158 @@ export function Dashboard() {
             let clicks = 0;
             let impressions = 0;
             let positionSum = 0;
-            rows.forEach((r: any) => {
-              clicks += Number(r.clicks || 0);
-              impressions += Number(r.impressions || 0);
-              positionSum += Number(r.position || 0);
+            rows.forEach((row: any) => {
+              clicks += toNumber(row.clicks, 0);
+              impressions += toNumber(row.impressions, 0);
+              positionSum += toNumber(row.position, 0);
             });
             const avgPosition = rows.length ? positionSum / rows.length : 0;
             const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-            if (!cancelled) {
-              setGscStats({
-                clicks: safeFinite(clicks, DEMO_GSC_STATS.clicks),
-                impressions: safeFinite(impressions, DEMO_GSC_STATS.impressions),
-                avgPosition: safeFinite(avgPosition, DEMO_GSC_STATS.avgPosition),
-                ctr: safeFinite(ctr, DEMO_GSC_STATS.ctr)
+            gscLive = {
+              clicks: toNumber(clicks, DEMO_GSC_STATS.clicks),
+              impressions: toNumber(impressions, DEMO_GSC_STATS.impressions),
+              avgPosition: toNumber(avgPosition, DEMO_GSC_STATS.avgPosition),
+              ctr: toNumber(ctr, DEMO_GSC_STATS.ctr),
+            };
+            hasGscLive = gscLive.clicks > 0 || gscLive.impressions > 0;
+          } catch (error) {
+            console.warn('Failed to load GSC stats', error);
+          }
+        }
+
+        if (google.settings.googleAdsId) {
+          try {
+            const googleCampaigns = await fetchGoogleCampaigns(
+              token,
+              google.settings.googleAdsId,
+              google.settings.loginCustomerId
+            );
+            googleCampaigns.forEach((campaign: any) => {
+              const spend = moneyFromUnknown(campaign.spend);
+              const roasValue = moneyFromUnknown(campaign.roas);
+              campaignRows.push({
+                id: campaign.id,
+                name: campaign.name || 'Google Campaign',
+                platform: 'Google',
+                status: campaign.status === 'Active' ? 'Active' : 'Paused',
+                spend,
+                roas: roasValue,
               });
+              liveSpend += spend;
+            });
+            if (googleCampaigns.length > 0) {
+              hasCampaignsLive = true;
             }
-            hasGscLive = clicks > 0 || impressions > 0;
-          } catch (e) {
-            console.warn('Failed to load GSC data', e);
+          } catch (error) {
+            console.warn('Failed to load Google campaigns', error);
           }
         }
       }
 
-      // Meta campaigns spend
       if (meta?.settings?.metaToken && meta.settings.metaAdsId) {
         try {
           const metaCampaigns = await fetchMetaCampaigns(meta.settings.metaToken, meta.settings.metaAdsId);
-          const spendFromMeta = metaCampaigns.reduce((sum: number, c: any) => sum + moneyFromString(c.spend), 0);
-          realSpend += spendFromMeta;
-        } catch (e) {
-          console.warn('Failed to load Meta campaigns', e);
+          metaCampaigns.forEach((campaign: any) => {
+            const spend = moneyFromUnknown(campaign.spend);
+            const roasValue = moneyFromUnknown(campaign.roas);
+            campaignRows.push({
+              id: campaign.id,
+              name: campaign.name || 'Meta Campaign',
+              platform: 'Meta',
+              status: campaign.status === 'Active' ? 'Active' : 'Paused',
+              spend,
+              roas: roasValue,
+            });
+            liveSpend += spend;
+          });
+          if (metaCampaigns.length > 0) {
+            hasCampaignsLive = true;
+          }
+        } catch (error) {
+          console.warn('Failed to load Meta campaigns', error);
         }
       }
 
-      // TikTok campaigns spend
       if (tiktok?.settings?.tiktokToken && tiktok.settings.tiktokAdvertiserId) {
         try {
-          const tiktokCampaigns = await fetchTikTokCampaigns(tiktok.settings.tiktokToken, tiktok.settings.tiktokAdvertiserId);
-          const spendFromTikTok = (Array.isArray(tiktokCampaigns) ? tiktokCampaigns : []).reduce((sum: number, c: any) => {
-            return sum + moneyFromString(c.stat_cost || c.spend || c.cost);
-          }, 0);
-          realSpend += spendFromTikTok;
-        } catch (e) {
-          console.warn('Failed to load TikTok campaigns', e);
+          const tiktokCampaigns = await fetchTikTokCampaigns(
+            tiktok.settings.tiktokToken,
+            tiktok.settings.tiktokAdvertiserId
+          );
+          (Array.isArray(tiktokCampaigns) ? tiktokCampaigns : []).forEach((campaign: any) => {
+            const spend = moneyFromUnknown(
+              campaign.stat_cost ?? campaign.spend ?? campaign.cost ?? campaign.metrics?.spend
+            );
+            const roasValue = moneyFromUnknown(
+              campaign.roas ?? campaign.stat_roas ?? campaign.metrics?.roas
+            );
+            campaignRows.push({
+              id: campaign.campaign_id || campaign.id || `tiktok-${campaign.campaign_name || 'campaign'}`,
+              name: campaign.campaign_name || campaign.name || 'TikTok Campaign',
+              platform: 'TikTok',
+              status: campaign.operation_status === 'ENABLE' ? 'Active' : 'Paused',
+              spend,
+              roas: roasValue,
+            });
+            liveSpend += spend;
+          });
+          if ((Array.isArray(tiktokCampaigns) ? tiktokCampaigns.length : 0) > 0) {
+            hasCampaignsLive = true;
+          }
+        } catch (error) {
+          console.warn('Failed to load TikTok campaigns', error);
         }
       }
 
       if (cancelled) return;
 
-      if (!hasGa4Live) {
-        setGa4Stats(DEMO_GA4_STATS);
-      }
-      if (!hasGscLive) {
-        setGscStats(DEMO_GSC_STATS);
-      }
+      const finalRevenue = liveRevenue > 0 ? liveRevenue : toNumber(fallbackData.totalRevenue, 0);
+      const finalSpend = liveSpend > 0 ? liveSpend : toNumber(fallbackData.totalSpend, 0);
+      const finalRoas = finalSpend > 0 ? (finalRevenue / finalSpend).toFixed(2) : '0.00';
+      const finalNetProfit = finalRevenue - finalSpend;
+
+      setTotalRevenue(finalRevenue);
+      setTotalSpend(finalSpend);
+      setRoas(finalRoas);
+      setNetProfit(finalNetProfit);
+      setIsFinancialUsingDemo(!(liveRevenue > 0 || liveSpend > 0));
+
+      setGa4Stats(hasGa4Live ? ga4Live : DEMO_GA4_STATS);
       setIsGa4UsingDemo(!hasGa4Live);
+
+      setGscStats(hasGscLive ? gscLive : DEMO_GSC_STATS);
       setIsGscUsingDemo(!hasGscLive);
-      setIsFinancialUsingDemo(!(realRevenue > 0 || realSpend > 0));
 
-      // Update main financial metrics if we have at least some real data
-      if (realRevenue > 0 || realSpend > 0) {
-        const finalRevenue = realRevenue > 0 ? realRevenue : safeFinite(totalRevenue, fallbackData.totalRevenue);
-        const finalSpend = realSpend > 0 ? realSpend : safeFinite(totalSpend, fallbackData.totalSpend);
-        const finalRoas = finalSpend > 0 ? (finalRevenue / finalSpend).toFixed(2) : '0.00';
-        const finalNetProfit = finalRevenue - finalSpend;
+      setRecentOrders(hasOrdersLive ? latestOrdersLive : DEMO_RECENT_ORDERS);
+      setIsOrdersUsingDemo(!hasOrdersLive);
 
-        setTotalRevenue(finalRevenue);
-        setTotalSpend(finalSpend);
-        setRoas(finalRoas);
-        setNetProfit(finalNetProfit);
-
-        // Simple 30-point chart based on aggregated totals
-        const points = chartData.length || 30;
-        const perDayRevenue = finalRevenue / points;
-        const perDaySpend = finalSpend / points;
-        const realChart = Array.from({ length: points }).map((_, idx) => ({
-          name: chartData[idx]?.name || String(idx + 1),
-          revenue: Math.round(perDayRevenue * (0.8 + Math.random() * 0.4)),
-          spend: Math.round(perDaySpend * (0.8 + Math.random() * 0.4))
-        }));
-        setChartData(realChart);
-      }
+      setCampaignSummary(hasCampaignsLive ? buildCampaignSummary(campaignRows) : DEMO_CAMPAIGN_SUMMARY);
+      setIsCampaignsUsingDemo(!hasCampaignsLive);
+      setIsLoadingOverview(false);
     }
 
-    load();
+    loadOverview().catch(() => {
+      if (!cancelled) {
+        setIsLoadingOverview(false);
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [connections, bounds.startDate, bounds.endDate, fallbackData.totalRevenue, fallbackData.totalSpend, totalRevenue, totalSpend]);
+  }, [
+    bounds.endDate,
+    bounds.startDate,
+    connections,
+    fallbackData.netProfit,
+    fallbackData.roas,
+    fallbackData.totalRevenue,
+    fallbackData.totalSpend,
+  ]);
 
-  const quickActions = [
-    { id: 'ai-recs', title: t('dashboard.viewAiRecs'), icon: Zap, color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400', desc: t('dashboard.viewAiRecsDesc') },
-    { id: 'create-ad', title: t('dashboard.createAdAi'), icon: Megaphone, color: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400', desc: t('dashboard.createAdAiDesc') },
-    { id: 'seo-fix', title: t('dashboard.fixSeoIssues'), icon: LineChart, color: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400', desc: t('dashboard.fixSeoIssuesDesc') },
-  ];
-
-  const dateRangeLabel = 
-    dateRange === 'today' ? t('dashboard.today') :
-    dateRange === '7days' ? t('dashboard.last7Days') :
-    dateRange === '30days' ? t('dashboard.last30Days') :
-    t('dashboard.customRange');
-  const safeNumber = (value: unknown, fallback = 0) => {
-    const n = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const safeChartData = Array.isArray(chartData) && chartData.length
-    ? chartData.map((point, idx) => ({
-        name: point?.name || fallbackData.chartData[idx]?.name || String(idx + 1),
-        revenue: safeNumber(point?.revenue, safeNumber(fallbackData.chartData[idx]?.revenue, 0)),
-        spend: safeNumber(point?.spend, safeNumber(fallbackData.chartData[idx]?.spend, 0)),
-      }))
-    : fallbackData.chartData;
-  const safeTotalRevenue = safeNumber(totalRevenue, fallbackData.totalRevenue);
-  const safeTotalSpend = safeNumber(totalSpend, fallbackData.totalSpend);
-  const safeNetProfit = safeNumber(netProfit, fallbackData.netProfit);
+  const safeTotalRevenue = toNumber(totalRevenue, fallbackData.totalRevenue);
+  const safeTotalSpend = toNumber(totalSpend, fallbackData.totalSpend);
+  const safeNetProfit = toNumber(netProfit, fallbackData.netProfit);
   const safeRoas = (() => {
     const parsed = Number(roas);
     if (Number.isFinite(parsed)) return parsed.toFixed(2);
@@ -321,272 +520,344 @@ export function Dashboard() {
     return '0.00';
   })();
   const safeGa4Stats = {
-    activeNow: safeNumber(ga4Stats.activeNow, DEMO_GA4_STATS.activeNow),
-    totalUsers: safeNumber(ga4Stats.totalUsers, DEMO_GA4_STATS.totalUsers),
+    activeNow: toNumber(ga4Stats.activeNow, DEMO_GA4_STATS.activeNow),
+    totalUsers: toNumber(ga4Stats.totalUsers, DEMO_GA4_STATS.totalUsers),
   };
   const safeGscStats = {
-    clicks: safeNumber(gscStats.clicks, DEMO_GSC_STATS.clicks),
-    impressions: safeNumber(gscStats.impressions, DEMO_GSC_STATS.impressions),
-    avgPosition: safeNumber(gscStats.avgPosition, DEMO_GSC_STATS.avgPosition),
-    ctr: safeNumber(gscStats.ctr, DEMO_GSC_STATS.ctr),
+    clicks: toNumber(gscStats.clicks, DEMO_GSC_STATS.clicks),
+    impressions: toNumber(gscStats.impressions, DEMO_GSC_STATS.impressions),
+    avgPosition: toNumber(gscStats.avgPosition, DEMO_GSC_STATS.avgPosition),
+    ctr: toNumber(gscStats.ctr, DEMO_GSC_STATS.ctr),
   };
+
+  const siteSeoScore = useMemo(() => {
+    const ctrScore = Math.min(30, safeGscStats.ctr * 3);
+    const positionScore = Math.max(0, 35 - safeGscStats.avgPosition * 1.2);
+    const trafficScore = Math.min(35, Math.log10(safeGa4Stats.totalUsers + 1) * 9);
+    return Math.round(ctrScore + positionScore + trafficScore);
+  }, [safeGa4Stats.totalUsers, safeGscStats.avgPosition, safeGscStats.ctr]);
+
+  const searchConsoleSeoScore = useMemo(() => {
+    const clickScore = Math.min(40, Math.log10(safeGscStats.clicks + 1) * 10);
+    const impressionScore = Math.min(25, Math.log10(safeGscStats.impressions + 1) * 5.5);
+    const positionScore = Math.max(0, 35 - safeGscStats.avgPosition * 1.4);
+    return Math.round(clickScore + impressionScore + positionScore);
+  }, [safeGscStats.avgPosition, safeGscStats.clicks, safeGscStats.impressions]);
+
+  const optimizationRecommendations = useMemo(() => {
+    const recommendations: string[] = [];
+
+    if (Number(safeRoas) < 2) {
+      recommendations.push('להגדיל תקציב רק בקמפיינים עם המרות בפועל ולעצור קבוצות מודעות חלשות.');
+    }
+    if (safeGscStats.avgPosition > 12) {
+      recommendations.push('לחזק SEO בדפי קטגוריה ומוצר עם כותרות H1 מדויקות וקישורים פנימיים.');
+    }
+    if (safeGscStats.ctr < 2.5) {
+      recommendations.push('לשפר Meta Title ו Meta Description בדפים עם חשיפות גבוהות ו CTR נמוך.');
+    }
+    if (safeGa4Stats.activeNow > 0 && recentOrders.length < 3) {
+      recommendations.push('לבדוק משפך רכישה ועמודי Checkout כדי לשפר יחס המרה מתנועה להזמנה.');
+    }
+    if (campaignSummary.activeCampaigns < campaignSummary.totalCampaigns) {
+      recommendations.push('להפעיל מחדש רק קמפיינים מושהים עם עלות לרכישה יציבה וללא שחיקת ROAS.');
+    }
+
+    if (!recommendations.length) {
+      recommendations.push('הנתונים יציבים. מומלץ לבצע A B Testing לכותרות מודעה ולהשאיר את הקמפיינים המובילים פעילים.');
+    }
+
+    return recommendations.slice(0, 5);
+  }, [campaignSummary.activeCampaigns, campaignSummary.totalCampaigns, recentOrders.length, safeGa4Stats.activeNow, safeGscStats.avgPosition, safeGscStats.ctr, safeRoas]);
+
+  const goToPath = (path: string) => {
+    if (typeof window === 'undefined') return;
+    window.history.pushState({}, '', path);
+    try {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } catch {
+      window.dispatchEvent(new Event('popstate'));
+    }
+  };
+
+  const DemoTag = ({ show }: { show: boolean }) =>
+    show ? (
+      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+        Demo data
+      </span>
+    ) : null;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Personalized Welcome */}
-      <div className="mb-8">
-        <h1 className="ui-display text-2xl sm:text-3xl text-gray-900 dark:text-white">
-          {t('dashboard.welcome')}, {currentUser?.displayName?.split(' ')[0] || 'User'}! 👋
-        </h1>
-        <p className="ui-subtitle text-gray-500 dark:text-gray-400 mt-1">
-          {t('dashboard.welcomeSubtitle')}
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="ui-display text-2xl sm:text-3xl text-gray-900 dark:text-white">
+            סקירה כללית, {currentUser?.displayName?.split(' ')[0] || 'User'} 👋
+          </h1>
+          <p className="ui-subtitle text-gray-500 dark:text-gray-400 mt-1">
+            נתונים מרכזיים מהחנות, מהקמפיינים, מ GA4 ומ Search Console במקום אחד.
+          </p>
+        </div>
+        {isLoadingOverview && (
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            מסנכרן נתונים חיים...
+          </div>
+        )}
       </div>
 
-      {/* Quick Smart Actions */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-4">
-          <Zap className="w-5 h-5 text-amber-500" />
-          <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.quickSmartActions')}</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {quickActions.map((action) => (
-            <button key={action.id} className="bg-white dark:bg-[#111] p-5 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all flex items-start gap-4 text-start group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight className={cn("w-4 h-4 text-indigo-500", dir === 'rtl' ? "rotate-180" : "")} />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <DollarSign className="w-5 h-5" />
               </div>
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110", action.color)}>
-                <action.icon className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="ui-section-title text-base text-gray-900 dark:text-white mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{action.title}</h3>
-                <p className="ui-body-copy text-sm text-gray-500 dark:text-gray-400">{action.desc}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
+              <h2 className="font-bold text-gray-900 dark:text-white">הכנסות</h2>
+            </div>
+            <DemoTag show={isFinancialUsingDemo} />
+          </div>
 
-      {/* Financial Analysis */}
-      <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm p-6 transition-colors duration-300">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-              <DollarSign className="w-5 h-5" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">סה"כ הכנסות</span>
+              <span className="font-extrabold text-emerald-700">{formatCurrency(safeTotalRevenue)}</span>
             </div>
-            <div>
-              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.financialAnalysis')}</h2>
-              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.wooCommerceRevenueVsCampaignSpend')} <span className="font-bold text-indigo-600 dark:text-indigo-400">({dateRangeLabel})</span></p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">סה"כ הוצאות פרסום</span>
+              <span className="font-bold text-red-600">{formatCurrency(safeTotalSpend)}</span>
             </div>
-          </div>
-          <div className="text-end">
-            <p className="ui-kpi-label text-gray-400">{t('dashboard.netProfit')}</p>
-            <p className="ui-kpi-value text-2xl text-indigo-600 dark:text-indigo-400">{formatCurrency(safeNetProfit)}</p>
-            {isFinancialUsingDemo && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Demo data</p>
-            )}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
-            <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="ui-kpi-label text-emerald-800 dark:text-emerald-400 mb-2">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="ui-kpi-value text-4xl text-emerald-900 dark:text-emerald-50">{formatCurrency(safeTotalRevenue)}</p>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">רווח נקי</span>
+              <span className="font-bold text-indigo-600">{formatCurrency(safeNetProfit)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">ROAS</span>
+              <span className="font-black text-gray-900 dark:text-white">{safeRoas}x</span>
             </div>
           </div>
-          
-          <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
-            <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="ui-kpi-label text-red-800 dark:text-red-400 mb-2">{t('dashboard.campaignSpend')}</p>
-            <p className="ui-kpi-value text-4xl text-red-900 dark:text-red-50">{formatCurrency(safeTotalSpend)}</p>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
-              <span className="text-xs text-red-600 dark:text-red-400 font-medium">Google, Meta, TikTok</span>
-            </div>
-          </div>
-          
-          <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-xl border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden group hover:shadow-md transition-all">
-            <TrendingUp className={cn("absolute -bottom-4 w-24 h-24 text-indigo-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
-            <p className="ui-kpi-label text-indigo-800 dark:text-indigo-400 mb-2">{t('dashboard.roas')}</p>
-            <p className="ui-kpi-value text-4xl text-indigo-900 dark:text-indigo-50">{safeRoas}x</p>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
-              <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">POAS: 1.8x</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* GA4 Section */}
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm p-6 transition-colors duration-300">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.realtimeTrafficGa4')}</h2>
-              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.activeUsersAndSources')}</p>
-            </div>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-500/5 p-6 rounded-xl border border-blue-100 dark:border-blue-500/10 relative overflow-hidden">
-              <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full animate-ping", dir === 'rtl' ? "left-3" : "right-3")} />
-              <div className={cn("absolute top-3 w-2 h-2 bg-blue-500 rounded-full", dir === 'rtl' ? "left-3" : "right-3")} />
-              <div>
-                <p className="ui-kpi-label text-blue-800 dark:text-blue-300 mb-1">{t('dashboard.activeNow')}</p>
-                <p className="ui-kpi-value text-5xl text-blue-600 dark:text-blue-400">{safeGa4Stats.activeNow}</p>
-              </div>
-              <div className="text-end">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('dashboard.totalUsers')}</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{safeGa4Stats.totalUsers.toLocaleString()}</p>
-                {isGa4UsingDemo && (
-                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Demo data</p>
-                )}
-              </div>
-            </div>
-
-            {isMobile ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                תצוגת הפילוח המלאה של GA4 זמינה במסכים רחבים. במובייל מוצגים רק המספרים המרכזיים.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="ui-kpi-label text-gray-900 dark:text-white">{t('dashboard.topPages')}</h3>
-                  <div className="space-y-3">
-                    {[
-                      { name: t('dashboard.homePage'), percent: 41 },
-                      { name: t('dashboard.products'), percent: 28 },
-                      { name: t('dashboard.promotions'), percent: 18 },
-                    ].map((page, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm">
-                        <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{page.name}</span>
-                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-indigo-500 dark:bg-indigo-400 rounded-full" style={{ width: `${page.percent}%` }} />
-                        </div>
-                        <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{page.percent}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="ui-kpi-label text-gray-900 dark:text-white">{t('dashboard.trafficSources')}</h3>
-                  <div className="space-y-3">
-                    {[
-                      { name: t('dashboard.organicSearch'), percent: 45, color: 'bg-emerald-500' },
-                      { name: t('dashboard.paidSearch'), percent: 30, color: 'bg-blue-500' },
-                      { name: t('dashboard.direct'), percent: 15, color: 'bg-purple-500' },
-                    ].map((source, i) => (
-                      <div key={i} className="flex items-center gap-3 text-sm">
-                        <div className={cn("w-2 h-2 rounded-full", source.color)} />
-                        <span className="w-24 font-medium text-gray-700 dark:text-gray-300 truncate">{source.name}</span>
-                        <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                          <div className={cn("h-full rounded-full", source.color)} style={{ width: `${source.percent}%` }} />
-                        </div>
-                        <span className="w-8 font-bold text-gray-500 dark:text-gray-400 text-xs">{source.percent}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Growth Chart */}
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm p-6 transition-colors duration-300">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-600 dark:text-purple-400">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.businessGrowth')}</h2>
-              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.businessGrowthDesc')} {dateRangeLabel}</p>
-            </div>
-          </div>
-          
-          {isMobile ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-              גרף הצמיחה מוצג במלואו במסכים רחבים. במובייל מוצגים רק המספרים המרכזיים כדי לשמור על יציבות התצוגה.
-            </p>
-          ) : (
-            <div className="h-72 mt-6">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                <AreaChart data={safeChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1f2937', color: '#fff' }}
-                    itemStyle={{ fontWeight: 600, color: '#fff' }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }} />
-                  <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={t('dashboard.revenue')} />
-                  <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" name={t('dashboard.spend')} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* SEO Section */}
-      <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm p-6 transition-colors duration-300">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-500/20 rounded-lg flex items-center justify-center text-orange-600 dark:text-orange-400">
-              <Search className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="ui-section-title text-lg text-gray-900 dark:text-white">{t('dashboard.seoOverview')}</h2>
-              <p className="ui-subtitle text-sm text-gray-500 dark:text-gray-400">{t('dashboard.performanceDataFromGsc')}</p>
-            </div>
-          </div>
-          <button className="text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
-            {t('dashboard.goToSeoCenter')}
-            <ArrowRight className={cn("w-4 h-4", dir === 'rtl' ? "rotate-180" : "")} />
+          <button
+            onClick={() => goToPath('/orders')}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
+          >
+            מעבר לרשימת הזמנות
+            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
           </button>
         </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-blue-200 dark:hover:border-blue-500/30 transition-colors cursor-pointer group">
-            <MousePointerClick className="w-6 h-6 text-blue-500 dark:text-blue-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.clicks.toLocaleString()}</p>
-            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.clicks')}</p>
+
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Users className="w-5 h-5" />
+              </div>
+              <h2 className="font-bold text-gray-900 dark:text-white">מצב גולשים מהאתר GA4</h2>
+            </div>
+            <DemoTag show={isGa4UsingDemo} />
           </div>
-          <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-purple-200 dark:hover:border-purple-500/30 transition-colors cursor-pointer group">
-            <Eye className="w-6 h-6 text-purple-500 dark:text-purple-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.impressions.toLocaleString()}</p>
-            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.impressions')}</p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+              <p className="text-[11px] font-semibold text-blue-700">פעילים עכשיו</p>
+              <p className="text-3xl font-black text-blue-600 mt-1">{safeGa4Stats.activeNow}</p>
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
+              <p className="text-[11px] font-semibold text-indigo-700">סה"כ משתמשים</p>
+              <p className="text-3xl font-black text-indigo-600 mt-1">{safeGa4Stats.totalUsers.toLocaleString()}</p>
+            </div>
           </div>
-          <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-orange-200 dark:hover:border-orange-500/30 transition-colors cursor-pointer group">
-            <Target className="w-6 h-6 text-orange-500 dark:text-orange-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">#{safeGscStats.avgPosition.toFixed(1)}</p>
-            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.avgPosition')}</p>
+
+          <p className="text-xs text-gray-500">
+            מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <h2 className="font-bold text-gray-900 dark:text-white">5 הזמנות אחרונות</h2>
+            </div>
+            <DemoTag show={isOrdersUsingDemo} />
           </div>
-          <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 rounded-xl border border-gray-100 dark:border-white/5 text-center hover:border-emerald-200 dark:hover:border-emerald-500/30 transition-colors cursor-pointer group">
-            <TrendingUp className="w-6 h-6 text-emerald-500 dark:text-emerald-400 mx-auto mb-3 transition-transform group-hover:scale-110" />
-            <p className="ui-kpi-value text-3xl text-gray-900 dark:text-white mb-1">{safeGscStats.ctr.toFixed(2)}%</p>
-            <p className="ui-kpi-label text-gray-500 dark:text-gray-400">{t('dashboard.ctr')}</p>
-            {isGscUsingDemo && (
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mt-1">Demo data</p>
-            )}
+
+          <div className="space-y-2">
+            {recentOrders.slice(0, 5).map((order) => {
+              const customerName =
+                `${order.billing.first_name || ''} ${order.billing.last_name || ''}`.trim() || 'לקוח';
+              return (
+                <div key={order.id} className="rounded-xl border border-gray-200 p-2.5 bg-gray-50/60">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-gray-900">#{order.number}</p>
+                    <span className="text-[11px] text-gray-500">{formatDate(order.date_created)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-xs text-gray-700 truncate">{customerName}</p>
+                    <p className="text-xs font-extrabold text-indigo-700 whitespace-nowrap">
+                      {formatCurrency(order.total)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => goToPath('/orders')}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
+          >
+            מעבר להזמנות
+            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Megaphone className="w-5 h-5" />
+              </div>
+              <h2 className="font-bold text-gray-900 dark:text-white">מצב קמפיינים מהפלטפורמות</h2>
+            </div>
+            <DemoTag show={isCampaignsUsingDemo} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <p className="text-gray-500 text-xs">סה"כ קמפיינים</p>
+              <p className="text-xl font-black text-gray-900">{campaignSummary.totalCampaigns}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <p className="text-gray-500 text-xs">פעילים כרגע</p>
+              <p className="text-xl font-black text-emerald-600">{campaignSummary.activeCampaigns}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <p className="text-gray-500 text-xs">הוצאה כוללת</p>
+              <p className="text-xl font-black text-red-600">{formatCurrency(campaignSummary.totalSpend)}</p>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <p className="text-gray-500 text-xs">ROAS / ROS</p>
+              <p className="text-xl font-black text-indigo-600">{campaignSummary.avgRoas.toFixed(2)}x</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {campaignSummary.platformBreakdown.map((row) => (
+              <span
+                key={row.platform}
+                className="text-[11px] font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full"
+              >
+                {row.platform}: {row.count}
+              </span>
+            ))}
+          </div>
+
+          <button
+            onClick={() => goToPath('/campaigns')}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
+          >
+            מעבר לקמפיינים
+            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                <Search className="w-5 h-5" />
+              </div>
+              <h2 className="font-bold text-gray-900 dark:text-white">מצב SEO באתר מול Search Console</h2>
+            </div>
+            <DemoTag show={isGscUsingDemo} />
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
+                <span className="font-black text-gray-900">{siteSeoScore}/100</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
+                <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+              <p className="text-gray-500">קליקים</p>
+              <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+              <p className="text-gray-500">חשיפות</p>
+              <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+              <p className="text-gray-500">CTR</p>
+              <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
+            </div>
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+              <p className="text-gray-500">מיקום ממוצע</p>
+              <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => goToPath('/seo')}
+            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
+          >
+            מעבר ל SEO
+            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <h2 className="font-bold text-gray-900 dark:text-white">המלצות לאופטימיזציה</h2>
+          </div>
+
+          <div className="space-y-2.5">
+            {optimizationRecommendations.map((rec, idx) => (
+              <div key={idx} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
+                <div className="flex items-start gap-2">
+                  <Activity className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-gray-800 leading-relaxed">{rec}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => goToPath('/ai-recommendations')}
+              className="inline-flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
+            >
+              המלצות AI
+              <ArrowRight className={cn('w-3.5 h-3.5', dir === 'rtl' ? 'rotate-180' : '')} />
+            </button>
+            <button
+              onClick={() => goToPath('/campaigns')}
+              className="inline-flex items-center justify-center gap-2 text-xs font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl py-2"
+            >
+              אופטימיזציית קמפיינים
+              <Target className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
