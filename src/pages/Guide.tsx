@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { SiteLegalNotice } from '../components/SiteLegalNotice';
 
 type GuideSection = {
   title: string;
@@ -528,11 +529,11 @@ export function Guide() {
           </section>
         ))}
 
-        <footer className="pt-4 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+        <footer className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center text-xs text-gray-500">
           <a href="/" className="text-indigo-600 hover:underline">
             {content.backHome}
           </a>
-          <span>BScale AI © {new Date().getFullYear()}</span>
+          <SiteLegalNotice compact className="text-[11px] sm:text-xs text-gray-500" />
         </footer>
       </div>
     </div>

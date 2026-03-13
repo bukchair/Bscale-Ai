@@ -4,6 +4,7 @@ import { ArrowLeft, BrainCircuit, BarChart3, Globe, Target, Zap, Mail, Layers, L
 import { useLanguage } from '../contexts/LanguageContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
+import { SiteLegalNotice } from '../components/SiteLegalNotice';
 
 interface LandingProps {
   onEnter: () => void;
@@ -464,6 +465,7 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 {privacyLabel}
               </a>
             </div>
+            <SiteLegalNotice centered compact className="pt-2 text-gray-500 dark:text-gray-400" />
           </div>
         </section>
       </div>

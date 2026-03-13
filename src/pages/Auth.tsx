@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrainCircuit, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { auth, googleProvider, signInWithPopup } from '../lib/firebase';
+import { SiteLegalNotice } from '../components/SiteLegalNotice';
 
 interface AuthProps {
   onLogin: () => void;
@@ -179,6 +180,7 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
             </button>
           </div>
         </div>
+        <SiteLegalNotice centered compact className="mt-4 text-gray-500 dark:text-gray-400" />
       </div>
     </div>
   );

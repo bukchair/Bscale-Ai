@@ -32,6 +32,7 @@ import { SystemMail } from './pages/SystemMail';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SalesBot } from './components/SalesBot';
 import { PublicTopNav } from './components/PublicTopNav';
+import { SiteLegalNotice } from './components/SiteLegalNotice';
 import { useLanguage } from './contexts/LanguageContext';
 import { auth, onAuthStateChanged, resolveWorkspaceScope, syncUserProfile } from './lib/firebase';
 import { runAutoAdsIfNeeded } from './lib/autoAdsRunner';
@@ -366,6 +367,9 @@ export default function App() {
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-[#050505] p-4 sm:p-6 lg:p-8 transition-colors duration-300">
             {renderContent()}
           </main>
+          <footer className="shrink-0 border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#0b0b0b] px-4 sm:px-6 py-3">
+            <SiteLegalNotice compact centered />
+          </footer>
         </div>
       </div>
       <SalesBot />

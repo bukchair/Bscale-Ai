@@ -3,6 +3,7 @@ import { Lock, Mail, ArrowRight, LogOut } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { SiteLegalNotice } from '../components/SiteLegalNotice';
 import { auth, signOut, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
@@ -123,6 +124,7 @@ export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProp
             {t('subscription.logout')}
           </button>
         </div>
+        <SiteLegalNotice centered compact className="mt-5" />
       </div>
     </div>
   );
