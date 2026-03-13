@@ -290,6 +290,7 @@ export default function App() {
   const hasAccess =
     userProfile?.role === 'admin' ||
     userProfile?.subscriptionStatus === 'active' ||
+    userProfile?.subscriptionStatus === 'free' ||
     userProfile?.subscriptionStatus === 'demo' ||
     userProfile?.subscriptionStatus === undefined;
   if (view === 'app' && !hasAccess) {

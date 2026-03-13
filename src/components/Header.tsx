@@ -6,13 +6,37 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 interface HeaderProps {
   onMenuClick: () => void;
   userProfile?: any;
 }
+
+type PendingUserApproval = {
+  uid: string;
+  name: string;
+  email: string;
+  createdAt?: string;
+  role?: string;
+  subscriptionStatus?: string;
+  approvalReadBy?: Record<string, string>;
+};
+
+type NotificationItem = {
+  id: string | number;
+  type: string;
+  title: string;
+  desc: string;
+  time: string;
+  icon: React.ElementType;
+  color: string;
+  unread: boolean;
+  actionLabel?: string;
+  actionClassName?: string;
+  onAction?: () => void;
+};
 
 export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const { t, dir } = useLanguage();
@@ -22,6 +46,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [liveLeadToast, setLiveLeadToast] = useState<{ id: string; name: string; contact: string } | null>(null);
+  const [livePendingUserToast, setLivePendingUserToast] = useState<{ uid: string; name: string; email: string } | null>(null);
   const [leadNotifications, setLeadNotifications] = useState<Array<{
     id: string;
     name: string;
@@ -31,11 +56,15 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     sourcePath?: string;
     readBy?: Record<string, string>;
   }>>([]);
+  const [pendingUserApprovals, setPendingUserApprovals] = useState<PendingUserApproval[]>([]);
   const isDemo = userProfile?.subscriptionStatus === 'demo';
   const canViewLeads = userProfile?.role === 'admin';
+  const canApproveUsers = userProfile?.role === 'admin';
   const currentUid = auth.currentUser?.uid;
   const previousNewestLeadRef = useRef<string | null>(null);
+  const previousNewestPendingUserRef = useRef<string | null>(null);
   const hasInitializedLeadFeed = useRef(false);
+  const hasInitializedPendingFeed = useRef(false);
 
   const tr = (key: string, fallback: string) => {
     const translated = t(key);
@@ -73,6 +102,42 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
     return () => unsubscribe();
   }, [canViewLeads]);
+
+  useEffect(() => {
+    if (!canApproveUsers) {
+      setPendingUserApprovals([]);
+      return;
+    }
+
+    const pendingUsersQuery = query(
+      collection(db, 'users'),
+      where('subscriptionStatus', '==', 'demo'),
+      limit(50)
+    );
+    const unsubscribe = onSnapshot(
+      pendingUsersQuery,
+      (snapshot) => {
+        const pendingUsers = snapshot.docs
+          .map((userDoc) => ({ uid: userDoc.id, ...(userDoc.data() as any) }) as PendingUserApproval)
+          .filter((user) => user.role !== 'admin')
+          .sort((a, b) => {
+            const aTime = new Date(a.createdAt || 0).getTime();
+            const bTime = new Date(b.createdAt || 0).getTime();
+            return bTime - aTime;
+          });
+        if (!hasInitializedPendingFeed.current) {
+          hasInitializedPendingFeed.current = true;
+          previousNewestPendingUserRef.current = pendingUsers[0]?.uid || null;
+        }
+        setPendingUserApprovals(pendingUsers);
+      },
+      (error) => {
+        console.error('Failed to subscribe to pending user approvals:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [canApproveUsers]);
 
   const playLeadAlertSound = () => {
     try {
@@ -114,15 +179,54 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   }, [canViewLeads, leadNotifications]);
 
   useEffect(() => {
+    if (!canApproveUsers || !hasInitializedPendingFeed.current || pendingUserApprovals.length === 0) return;
+    const newestPendingUser = pendingUserApprovals[0];
+    if (previousNewestPendingUserRef.current !== newestPendingUser.uid) {
+      setLivePendingUserToast({
+        uid: newestPendingUser.uid,
+        name: newestPendingUser.name || 'User',
+        email: newestPendingUser.email || '—',
+      });
+      playLeadAlertSound();
+      previousNewestPendingUserRef.current = newestPendingUser.uid;
+    }
+  }, [canApproveUsers, pendingUserApprovals]);
+
+  useEffect(() => {
     if (!liveLeadToast) return;
     const timeout = window.setTimeout(() => setLiveLeadToast(null), 6000);
     return () => window.clearTimeout(timeout);
   }, [liveLeadToast]);
 
+  useEffect(() => {
+    if (!livePendingUserToast) return;
+    const timeout = window.setTimeout(() => setLivePendingUserToast(null), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [livePendingUserToast]);
+
+  const handleApproveUserAsFree = async (userId: string) => {
+    if (!currentUid) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        subscriptionStatus: 'free',
+        plan: 'free_by_admin',
+        approvedByAdminUid: currentUid,
+        approvedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to approve user from demo to free:', error);
+    }
+  };
+
   const unreadLeadCount = useMemo(() => {
     if (!currentUid) return 0;
     return leadNotifications.filter((lead) => !lead.readBy?.[currentUid]).length;
   }, [currentUid, leadNotifications]);
+
+  const unreadPendingUserCount = useMemo(() => {
+    if (!currentUid) return 0;
+    return pendingUserApprovals.filter((user) => !user.approvalReadBy?.[currentUid]).length;
+  }, [currentUid, pendingUserApprovals]);
 
   const leadNotificationItems = useMemo(
     () =>
@@ -138,10 +242,31 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
       })),
     [currentUid, dir, leadNotifications]
   );
+  const pendingUserNotificationItems = useMemo(
+    () =>
+      pendingUserApprovals.map((pendingUser) => ({
+        id: `pending-user-${pendingUser.uid}`,
+        type: 'pending-user',
+        title: tr('notifications.newUserApprovalTitle', 'משתמש חדש ממתין לאישור'),
+        desc: `${pendingUser.name || 'User'} • ${pendingUser.email || '—'}`,
+        time: pendingUser.createdAt
+          ? new Date(pendingUser.createdAt).toLocaleString(dir === 'rtl' ? 'he-IL' : 'en-US')
+          : '--',
+        icon: User,
+        color: 'text-amber-600',
+        unread: currentUid ? !pendingUser.approvalReadBy?.[currentUid] : false,
+        actionLabel: tr('notifications.approveFreeAction', 'אשר כחשבון ללא תשלום'),
+        actionClassName:
+          'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100',
+        onAction: () => handleApproveUserAsFree(pendingUser.uid),
+      })),
+    [currentUid, dir, pendingUserApprovals]
+  );
 
-  const notifications = canViewLeads
-    ? leadNotificationItems
+  const notifications: NotificationItem[] = canViewLeads
+    ? [...pendingUserNotificationItems, ...leadNotificationItems]
     : fallbackNotifications.map((item) => ({ ...item, unread: false }));
+  const unreadNotificationsCount = unreadLeadCount + unreadPendingUserCount;
 
   const handleToggleNotifications = async () => {
     const nextState = !isNotificationsOpen;
@@ -160,6 +285,17 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           [`readBy.${currentUid}`]: new Date().toISOString(),
         }).catch((error) => {
           console.warn('Failed to mark lead notification as read:', error);
+        })
+      )
+    );
+
+    const unreadPendingUsers = pendingUserApprovals.filter((pendingUser) => !pendingUser.approvalReadBy?.[currentUid]);
+    await Promise.all(
+      unreadPendingUsers.map((pendingUser) =>
+        updateDoc(doc(db, 'users', pendingUser.uid), {
+          [`approvalReadBy.${currentUid}`]: new Date().toISOString(),
+        }).catch((error) => {
+          console.warn('Failed to mark pending user notification as read:', error);
         })
       )
     );
@@ -339,7 +475,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
             )}
           >
             <Bell className="w-6 h-6" />
-            {unreadLeadCount > 0 && (
+            {unreadNotificationsCount > 0 && (
               <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
             )}
           </button>
@@ -354,21 +490,33 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
                   <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t('notifications.title')}</h4>
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
                     {canViewLeads
-                      ? tr('notifications.leadSubtitle', 'כל ליד חדש יופיע כאן בזמן אמת.')
+                      ? tr('notifications.leadSubtitle', 'כל ליד חדש וכל משתמש דמו חדש יופיעו כאן בזמן אמת.')
                       : t('notifications.subtitle')}
                   </p>
                 </div>
                 {canViewLeads ? (
-                  <button
-                    className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-                    onClick={() => {
-                      window.history.pushState({}, '', '/leads');
-                      window.dispatchEvent(new PopStateEvent('popstate'));
-                      setIsNotificationsOpen(false);
-                    }}
-                  >
-                    {tr('notifications.viewLeads', 'ניהול לידים')}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      onClick={() => {
+                        window.history.pushState({}, '', '/users');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                        setIsNotificationsOpen(false);
+                      }}
+                    >
+                      {tr('notifications.manageUsers', 'ניהול משתמשים')}
+                    </button>
+                    <button
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      onClick={() => {
+                        window.history.pushState({}, '', '/leads');
+                        window.dispatchEvent(new PopStateEvent('popstate'));
+                        setIsNotificationsOpen(false);
+                      }}
+                    >
+                      {tr('notifications.viewLeads', 'ניהול לידים')}
+                    </button>
+                  </div>
                 ) : (
                   <button className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                     {t('notifications.clearAll')}
@@ -380,7 +528,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
                 {notifications.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-white/5">
                     {notifications.map((notif) => (
-                      <button 
+                      <div
                         key={notif.id}
                         className="w-full p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-start"
                       >
@@ -398,8 +546,23 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
                           <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed line-clamp-2">
                             {notif.desc}
                           </p>
+                          {notif.onAction && (
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                notif.onAction?.();
+                              }}
+                              className={cn(
+                                'mt-2 inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold transition-colors',
+                                notif.actionClassName ||
+                                  'text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100'
+                              )}
+                            >
+                              {notif.actionLabel}
+                            </button>
+                          )}
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -425,6 +588,19 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
             <p className="text-xs font-black uppercase tracking-wider mb-1">{tr('notifications.newLeadTitle', 'ליד חדש מהאתר')}</p>
             <p className="text-sm font-bold">{liveLeadToast.name}</p>
             <p className="text-xs text-indigo-100">{liveLeadToast.contact}</p>
+          </div>
+        </div>
+      )}
+      {livePendingUserToast && (
+        <div className={cn("fixed top-36 z-[90] w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[320px]", dir === 'rtl' ? 'left-4 sm:left-6' : 'right-4 sm:right-6')}>
+          <div className="bg-amber-500 text-white px-4 py-3 rounded-2xl shadow-2xl border border-amber-400">
+            <p className="text-xs font-black uppercase tracking-wider mb-1">
+              {tr('notifications.newUserApprovalTitle', 'משתמש חדש ממתין לאישור')}
+            </p>
+            <p className="text-sm font-bold">{livePendingUserToast.name}</p>
+            <p className="text-xs text-amber-100" dir="ltr">
+              {livePendingUserToast.email}
+            </p>
           </div>
         </div>
       )}

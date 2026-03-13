@@ -56,11 +56,22 @@ export function Users() {
     }
   };
 
-  const handleSubscriptionChange = async (userId: string, grantAccess: boolean) => {
+  const handleSubscriptionChange = async (
+    userId: string,
+    nextStatus: 'active' | 'demo' | 'free'
+  ) => {
     try {
+      const nextPlan =
+        nextStatus === 'active'
+          ? 'granted_by_admin'
+          : nextStatus === 'free'
+            ? 'free_by_admin'
+            : 'demo';
       await updateDoc(doc(db, 'users', userId), {
-        subscriptionStatus: grantAccess ? 'active' : 'demo',
-        plan: grantAccess ? 'granted_by_admin' : 'demo',
+        subscriptionStatus: nextStatus,
+        plan: nextPlan,
+        approvedAt: nextStatus === 'demo' ? null : new Date().toISOString(),
+        approvedByAdminUid: nextStatus === 'demo' ? null : auth.currentUser?.uid || null,
       });
     } catch (error) {
       console.error("Error updating subscription:", error);
@@ -241,19 +252,36 @@ export function Users() {
                       {user.role === 'admin' ? (
                         <span className="text-gray-400 text-xs font-medium">—</span>
                       ) : (
+                        (() => {
+                          const statusValue =
+                            user.subscriptionStatus === 'active' ||
+                            user.subscriptionStatus === 'free' ||
+                            user.subscriptionStatus === 'demo'
+                              ? (user.subscriptionStatus as 'active' | 'free' | 'demo')
+                              : 'demo';
+                          const isPaidOrFree = statusValue === 'active' || statusValue === 'free';
+                          return (
                         <select
-                          value={user.subscriptionStatus === 'active' ? 'active' : 'demo'}
-                          onChange={(e) => handleSubscriptionChange(user.uid, e.target.value === 'active')}
+                          value={statusValue}
+                          onChange={(e) =>
+                            handleSubscriptionChange(
+                              user.uid,
+                              e.target.value as 'active' | 'demo' | 'free'
+                            )
+                          }
                           className={cn(
                             "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
-                            user.subscriptionStatus === 'active'
+                            isPaidOrFree
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-amber-50 text-amber-700 border-amber-200"
                           )}
                         >
                           <option value="active">{t('users.accessActive')}</option>
+                          <option value="free">ללא תשלום</option>
                           <option value="demo">{t('users.accessDemo')}</option>
                         </select>
+                          );
+                        })()
                       )}
                     </td>
                     <td className="px-6 py-4">
