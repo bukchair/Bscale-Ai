@@ -30,6 +30,8 @@ export function Orders() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [syncTick, setSyncTick] = useState(0);
 
   const wooConnection = connections.find((c) => c.id === 'woocommerce');
   const isConnected = wooConnection?.status === 'connected';
@@ -37,6 +39,25 @@ export function Orders() {
 
   const isoMin = useMemo(() => startDate.toISOString(), [startDate]);
   const isoMax = useMemo(() => endDate.toISOString(), [endDate]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSyncTick((prev) => prev + 1);
+    }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSyncedAt) return 'טרם סונכרן';
+    const diffMs = Date.now() - lastSyncedAt.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+    if (diffSeconds < 60) return `לפני ${diffSeconds} שניות`;
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return `לפני ${diffMinutes} דקות`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `לפני ${diffHours} שעות`;
+    return lastSyncedAt.toLocaleString();
+  }, [lastSyncedAt, syncTick]);
 
   const loadOrders = async () => {
     if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
@@ -53,6 +74,7 @@ export function Orders() {
     try {
       const data = await fetchWooCommerceOrdersByRange(storeUrl, wooKey, wooSecret, isoMin, isoMax);
       setOrders(data);
+      setLastSyncedAt(new Date());
     } catch (e) {
       console.error(e);
       const message = e instanceof Error ? e.message : 'שגיאה לא ידועה';
@@ -190,6 +212,9 @@ export function Orders() {
           <p className="text-sm text-gray-500 mt-1">
             טאב ייעודי לניהול הזמנות, סטטוסים, הערות ויצוא דוחות. הסכומים כאן מסונכרנים לטווח התאריכים של דוחות
             הרווחיות.
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {isLoading ? 'מסנכרן עכשיו...' : `סנכרון אחרון: ${lastSyncLabel}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
