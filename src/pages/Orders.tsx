@@ -26,12 +26,148 @@ import {
 const ORDER_STATUSES = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 type StatusFilter = 'all' | OrderStatus;
+const COPY = {
+  he: {
+    notSynced: 'טרם סונכרן',
+    secondsAgo: 'לפני {{n}} שניות',
+    minutesAgo: 'לפני {{n}} דקות',
+    hoursAgo: 'לפני {{n}} שעות',
+    missingWooConfig: 'חיבור WooCommerce קיים אך חסרים Store URL או מפתחות API.',
+    unknownError: 'שגיאה לא ידועה',
+    loadOrdersErrorPrefix: 'שגיאה בטעינת הזמנות מ‑WooCommerce',
+    updateOrderStatusErrorPrefix: 'שגיאה בעדכון סטטוס הזמנה',
+    notConnectedTitle: 'WooCommerce לא מחובר',
+    notConnectedDesc: 'חבר את חנות ה‑WooCommerce שלך במסך החיבורים כדי לראות רשימת הזמנות מלאה, סטטוסים וסיכומי הכנסות.',
+    pageTitle: 'הזמנות WooCommerce',
+    pageSubtitle: 'טאב ייעודי לניהול הזמנות, סטטוסים, הערות ויצוא דוחות. הסכומים כאן מסונכרנים לטווח התאריכים של דוחות הרווחיות.',
+    syncingNow: 'מסנכרן עכשיו...',
+    lastSyncPrefix: 'סנכרון אחרון',
+    refresh: 'רענון נתונים',
+    exportCsv: 'יצוא CSV',
+    totalOrders: 'סה"כ הזמנות',
+    totalRevenue: 'סה"כ הכנסות לפי הזמנות',
+    dateRange: 'טווח תאריכים',
+    totalShipping: 'סה"כ משלוח',
+    status: 'סטטוס',
+    viewOnly: 'צפייה בלבד',
+    all: 'הכל',
+    searchPlaceholder: 'חיפוש לפי שם לקוח, אימייל או מוצר...',
+    loadingOrders: 'טוען הזמנות מ‑WooCommerce...',
+    noOrdersFound: 'לא נמצאו הזמנות לטווח תאריכים זה או לפי הפילטרים הנוכחיים.',
+    details: 'פרטים',
+    open: 'פתח',
+    close: 'הסתר',
+    hide: 'הסתר',
+    payment: 'תשלום',
+    email: 'אימייל',
+    orderDetails: 'פרטי הזמנה',
+    internalId: 'מזהה פנימי',
+    createdAt: 'נוצר בתאריך',
+    updatedAt: 'עודכן בתאריך',
+    completedAt: 'הושלם בתאריך',
+    currency: 'מטבע',
+    orderTotal: 'סה"כ הזמנה',
+    shippingTotal: 'סה"כ משלוח',
+    taxTotal: 'סה"כ מס',
+    billingAddress: 'כתובת חיוב',
+    shippingAddress: 'כתובת משלוח',
+    noBillingAddress: 'אין נתוני כתובת חיוב',
+    noShippingAddress: 'אין נתוני כתובת משלוח',
+    products: 'מוצרים',
+    noProducts: 'אין מוצרים בהזמנה זו',
+    customerNote: 'הערת לקוח',
+    qty: 'כמות',
+    total: 'סה"כ',
+    updating: 'מעדכן...',
+    tableDate: 'תאריך',
+    tableCustomer: 'לקוח',
+    tableEmail: 'אימייל',
+    tableStatus: 'סטטוס',
+    tableAmount: 'סכום',
+    tablePaymentMethod: 'שיטת תשלום',
+    tableProducts: 'מוצרים',
+    tableNotes: 'הערות',
+    tableDetails: 'פרטים',
+    updateStatusAria: 'עדכון סטטוס הזמנה {{n}}',
+  },
+  en: {
+    notSynced: 'Not synced yet',
+    secondsAgo: '{{n}} seconds ago',
+    minutesAgo: '{{n}} minutes ago',
+    hoursAgo: '{{n}} hours ago',
+    missingWooConfig: 'WooCommerce connection exists but Store URL or API keys are missing.',
+    unknownError: 'Unknown error',
+    loadOrdersErrorPrefix: 'Error loading orders from WooCommerce',
+    updateOrderStatusErrorPrefix: 'Error updating order status',
+    notConnectedTitle: 'WooCommerce not connected',
+    notConnectedDesc: 'Connect your WooCommerce store in integrations to view the full orders list, statuses and revenue totals.',
+    pageTitle: 'WooCommerce Orders',
+    pageSubtitle: 'Dedicated tab for managing orders, statuses, notes and CSV export. Values are synced to the profitability date range.',
+    syncingNow: 'Syncing now...',
+    lastSyncPrefix: 'Last sync',
+    refresh: 'Refresh data',
+    exportCsv: 'Export CSV',
+    totalOrders: 'Total orders',
+    totalRevenue: 'Total revenue from orders',
+    dateRange: 'Date range',
+    totalShipping: 'Total shipping',
+    status: 'Status',
+    viewOnly: 'View only',
+    all: 'All',
+    searchPlaceholder: 'Search by customer name, email or product...',
+    loadingOrders: 'Loading orders from WooCommerce...',
+    noOrdersFound: 'No orders found for this date range or current filters.',
+    details: 'Details',
+    open: 'Open',
+    close: 'Hide',
+    hide: 'Hide',
+    payment: 'Payment',
+    email: 'Email',
+    orderDetails: 'Order details',
+    internalId: 'Internal ID',
+    createdAt: 'Created at',
+    updatedAt: 'Updated at',
+    completedAt: 'Completed at',
+    currency: 'Currency',
+    orderTotal: 'Order total',
+    shippingTotal: 'Shipping total',
+    taxTotal: 'Tax total',
+    billingAddress: 'Billing address',
+    shippingAddress: 'Shipping address',
+    noBillingAddress: 'No billing address data',
+    noShippingAddress: 'No shipping address data',
+    products: 'Products',
+    noProducts: 'No products in this order',
+    customerNote: 'Customer note',
+    qty: 'Qty',
+    total: 'Total',
+    updating: 'Updating...',
+    tableDate: 'Date',
+    tableCustomer: 'Customer',
+    tableEmail: 'Email',
+    tableStatus: 'Status',
+    tableAmount: 'Amount',
+    tablePaymentMethod: 'Payment method',
+    tableProducts: 'Products',
+    tableNotes: 'Notes',
+    tableDetails: 'Details',
+    updateStatusAria: 'Update order status {{n}}',
+  },
+  ru: {} as Record<string, string>,
+  pt: {} as Record<string, string>,
+  fr: {} as Record<string, string>,
+} as const;
 
 export function Orders() {
   const { connections, isWorkspaceReadOnly } = useConnections();
-  const { t, dir } = useLanguage();
+  const { language, dir } = useLanguage();
   const { format: formatCurrency } = useCurrency();
   const { startDate, endDate } = useDateRangeBounds();
+  const baseText = COPY.en;
+  const localizedText = COPY[language as keyof typeof COPY] as Record<string, string>;
+  const text = { ...baseText, ...localizedText };
+  const interpolate = (template: string, value: number) => template.replace('{{n}}', String(value));
+  const interpolateText = (template: string, value: string | number) => template.replace('{{n}}', String(value));
 
   const [orders, setOrders] = useState<WooCommerceOrder[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -63,22 +199,22 @@ export function Orders() {
   }, []);
 
   const lastSyncLabel = useMemo(() => {
-    if (!lastSyncedAt) return 'טרם סונכרן';
+    if (!lastSyncedAt) return text.notSynced;
     const diffMs = Date.now() - lastSyncedAt.getTime();
     const diffSeconds = Math.floor(diffMs / 1000);
-    if (diffSeconds < 60) return `לפני ${diffSeconds} שניות`;
+    if (diffSeconds < 60) return interpolate(text.secondsAgo, diffSeconds);
     const diffMinutes = Math.floor(diffSeconds / 60);
-    if (diffMinutes < 60) return `לפני ${diffMinutes} דקות`;
+    if (diffMinutes < 60) return interpolate(text.minutesAgo, diffMinutes);
     const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `לפני ${diffHours} שעות`;
+    if (diffHours < 24) return interpolate(text.hoursAgo, diffHours);
     return lastSyncedAt.toLocaleString();
-  }, [lastSyncedAt, syncTick]);
+  }, [lastSyncedAt, syncTick, text.notSynced, text.secondsAgo, text.minutesAgo, text.hoursAgo]);
 
   const loadOrders = async () => {
     if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
       setOrders([]);
       if (isConnected) {
-        setError('חיבור WooCommerce קיים אך חסרים Store URL או מפתחות API.');
+        setError(text.missingWooConfig);
       } else {
         setError(null);
       }
@@ -92,8 +228,8 @@ export function Orders() {
       setLastSyncedAt(new Date());
     } catch (e) {
       console.error(e);
-      const message = e instanceof Error ? e.message : 'שגיאה לא ידועה';
-      setError(`שגיאה בטעינת הזמנות מ‑WooCommerce: ${cleanError(message)}`);
+      const message = e instanceof Error ? e.message : text.unknownError;
+      setError(`${text.loadOrdersErrorPrefix}: ${cleanError(message)}`);
     } finally {
       setIsLoading(false);
     }
@@ -116,11 +252,11 @@ export function Orders() {
       await updateWooCommerceOrderStatus(storeUrl, wooKey, wooSecret, orderId, nextStatus);
       setLastSyncedAt(new Date());
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'שגיאה לא ידועה';
+      const message = e instanceof Error ? e.message : text.unknownError;
       setOrders((prev) =>
         prev.map((order) => (order.id === orderId ? { ...order, status: prevStatus } : order))
       );
-      setError(`שגיאה בעדכון סטטוס הזמנה #${targetOrder.number}: ${cleanError(message)}`);
+      setError(`${text.updateOrderStatusErrorPrefix} #${targetOrder.number}: ${cleanError(message)}`);
     } finally {
       setUpdatingOrderId(null);
     }
@@ -270,9 +406,9 @@ export function Orders() {
     return (
       <div className="flex flex-col items-center justify-center h-[600px] bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center">
         <Receipt className="w-16 h-16 text-gray-300 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900 mb-2">WooCommerce לא מחובר</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">{text.notConnectedTitle}</h2>
         <p className="text-gray-500 mb-6 max-w-md">
-          חבר את חנות ה‑WooCommerce שלך במסך החיבורים כדי לראות רשימת הזמנות מלאה, סטטוסים וסיכומי הכנסות.
+          {text.notConnectedDesc}
         </p>
       </div>
     );
@@ -285,7 +421,7 @@ export function Orders() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <Receipt className="w-6 h-6 text-indigo-600" />
-              הזמנות WooCommerce
+              {text.pageTitle}
             </h1>
             <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -293,11 +429,10 @@ export function Orders() {
             </span>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            טאב ייעודי לניהול הזמנות, סטטוסים, הערות ויצוא דוחות. הסכומים כאן מסונכרנים לטווח התאריכים של דוחות
-            הרווחיות.
+            {text.pageSubtitle}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {isLoading ? 'מסנכרן עכשיו...' : `סנכרון אחרון: ${lastSyncLabel}`}
+            {isLoading ? text.syncingNow : `${text.lastSyncPrefix}: ${lastSyncLabel}`}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -307,7 +442,7 @@ export function Orders() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm disabled:opacity-60"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Filter className="w-4 h-4" />}
-            רענון נתונים
+            {text.refresh}
           </button>
           <button
             onClick={exportCsv}
@@ -315,7 +450,7 @@ export function Orders() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm disabled:opacity-40"
           >
             <Download className="w-4 h-4" />
-            יצוא CSV
+            {text.exportCsv}
           </button>
         </div>
       </div>
@@ -333,7 +468,7 @@ export function Orders() {
             <FileText className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">סה"כ הזמנות</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{text.totalOrders}</p>
             <p className="text-xl font-black text-gray-900">{totals.count}</p>
           </div>
         </div>
@@ -342,7 +477,7 @@ export function Orders() {
             <CreditCard className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">סה"כ הכנסות לפי הזמנות</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{text.totalRevenue}</p>
             <p className="text-xl font-black text-gray-900">{formatCurrency(totals.totalRevenue)}</p>
           </div>
         </div>
@@ -351,7 +486,7 @@ export function Orders() {
             <CalendarDays className="w-5 h-5 text-sky-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">טווח תאריכים</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{text.dateRange}</p>
             <p className="text-xs font-bold text-gray-900">
               {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
             </p>
@@ -362,7 +497,7 @@ export function Orders() {
             <CreditCard className="w-5 h-5 text-amber-600" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">סה"כ משלוח</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{text.totalShipping}</p>
             <p className="text-xl font-black text-gray-900">{formatCurrency(totals.totalShipping)}</p>
           </div>
         </div>
@@ -371,10 +506,10 @@ export function Orders() {
       <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 space-y-4">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">סטטוס</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{text.status}</span>
             {isWorkspaceReadOnly && (
               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                צפייה בלבד
+                {text.viewOnly}
               </span>
             )}
             <div className="flex flex-wrap gap-1.5">
@@ -390,7 +525,7 @@ export function Orders() {
                         : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                     )}
                   >
-                    {status === 'all' ? 'הכל' : status}
+                    {status === 'all' ? text.all : status}
                   </button>
                 )
               )}
@@ -405,7 +540,7 @@ export function Orders() {
             />
             <input
               type="text"
-              placeholder="חיפוש לפי שם לקוח, אימייל או מוצר..."
+              placeholder={text.searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={cn(
@@ -420,19 +555,19 @@ export function Orders() {
           {isLoading && !orders.length ? (
             <div className="px-3 py-8 text-center text-gray-400 text-sm">
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-              טוען הזמנות מ‑WooCommerce...
+              {text.loadingOrders}
             </div>
           ) : !filtered.length ? (
             <div className="px-3 py-8 text-center text-gray-400 text-sm">
-              לא נמצאו הזמנות לטווח תאריכים זה או לפי הפילטרים הנוכחיים.
+              {text.noOrdersFound}
             </div>
           ) : (
             filtered.map((o) => {
               const customerName = `${o.billing.first_name || ''} ${o.billing.last_name || ''}`.trim() || '—';
               const itemLines = o.line_items.map((li) => {
                 const sku = li.sku ? ` | SKU: ${li.sku}` : '';
-                const itemTotal = li.total ? ` | סה"כ: ${li.total} ${o.currency}` : '';
-                return `${li.name}${sku} | כמות: ${li.quantity}${itemTotal}`;
+                const itemTotal = li.total ? ` | ${text.total}: ${li.total} ${o.currency}` : '';
+                return `${li.name}${sku} | ${text.qty}: ${li.quantity}${itemTotal}`;
               });
               const customerNote = (o.customer_note || '').trim();
               const isUpdatingStatus = updatingOrderId === o.id;
@@ -458,21 +593,21 @@ export function Orders() {
                       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 shrink-0"
                     >
                       {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      {isExpanded ? 'הסתר' : 'פרטים'}
+                      {isExpanded ? text.hide : text.details}
                     </button>
                   </div>
 
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="text-gray-500">סה"כ</span>
+                      <span className="text-gray-500">{text.total}</span>
                       <span className="font-extrabold text-gray-900">{formatCurrency(o.total)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 text-xs">
-                      <span className="text-gray-500">תשלום</span>
+                      <span className="text-gray-500">{text.payment}</span>
                       <span className="text-gray-800 text-end break-words">{o.payment_method_title || o.payment_method || '—'}</span>
                     </div>
                     <div className="flex items-start justify-between gap-3 text-xs">
-                      <span className="text-gray-500 mt-0.5">אימייל</span>
+                      <span className="text-gray-500 mt-0.5">{text.email}</span>
                       <span className="text-gray-800 text-end break-all">{o.billing.email || '—'}</span>
                     </div>
                     <div className="space-y-1.5 pt-1">
@@ -482,7 +617,7 @@ export function Orders() {
                         onChange={(e) => handleOrderStatusChange(o.id, e.target.value as OrderStatus)}
                         disabled={isUpdatingStatus || isWorkspaceReadOnly}
                         className="w-full border border-gray-200 bg-white rounded-lg px-2 py-1.5 text-xs text-gray-700 font-semibold disabled:opacity-60"
-                        aria-label={`עדכון סטטוס הזמנה ${o.number}`}
+                        aria-label={interpolateText(text.updateStatusAria, o.number)}
                       >
                         {!statusValue && (
                           <option value="" disabled>
@@ -498,7 +633,7 @@ export function Orders() {
                       {isUpdatingStatus && (
                         <div className="flex items-center gap-1 text-[10px] text-gray-500">
                           <Loader2 className="w-3 h-3 animate-spin" />
-                          מעדכן...
+                          {text.updating}
                         </div>
                       )}
                     </div>
@@ -507,18 +642,18 @@ export function Orders() {
                   {isExpanded && (
                     <div className="mt-3 space-y-3 border-t border-gray-100 pt-3">
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-xs">
-                        <p className="font-bold text-gray-900">פרטי הזמנה</p>
-                        <p className="text-gray-700">מזהה פנימי: {o.id}</p>
-                        <p className="text-gray-700">נוצר בתאריך: {formatOrderDate(o.date_created)}</p>
-                        <p className="text-gray-700">עודכן בתאריך: {formatOrderDate(o.date_modified)}</p>
-                        <p className="text-gray-700">הושלם בתאריך: {formatOrderDate(o.date_completed)}</p>
-                        <p className="text-gray-700">מטבע: {o.currency || '—'}</p>
-                        <p className="text-gray-700">סה"כ משלוח: {formatCurrency(o.shipping_total)}</p>
-                        <p className="text-gray-700">סה"כ מס: {formatCurrency(o.total_tax)}</p>
+                        <p className="font-bold text-gray-900">{text.orderDetails}</p>
+                        <p className="text-gray-700">{text.internalId}: {o.id}</p>
+                        <p className="text-gray-700">{text.createdAt}: {formatOrderDate(o.date_created)}</p>
+                        <p className="text-gray-700">{text.updatedAt}: {formatOrderDate(o.date_modified)}</p>
+                        <p className="text-gray-700">{text.completedAt}: {formatOrderDate(o.date_completed)}</p>
+                        <p className="text-gray-700">{text.currency}: {o.currency || '—'}</p>
+                        <p className="text-gray-700">{text.shippingTotal}: {formatCurrency(o.shipping_total)}</p>
+                        <p className="text-gray-700">{text.taxTotal}: {formatCurrency(o.total_tax)}</p>
                       </div>
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-xs">
-                        <p className="font-bold text-gray-900">כתובת חיוב</p>
+                        <p className="font-bold text-gray-900">{text.billingAddress}</p>
                         {billingLines.length ? (
                           billingLines.map((line, idx) => (
                             <p key={`mobile-billing-${o.id}-${idx}`} className="text-gray-700 break-words">
@@ -526,12 +661,12 @@ export function Orders() {
                             </p>
                           ))
                         ) : (
-                          <p className="text-gray-400">אין נתוני כתובת חיוב</p>
+                          <p className="text-gray-400">{text.noBillingAddress}</p>
                         )}
                       </div>
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-xs">
-                        <p className="font-bold text-gray-900">כתובת משלוח</p>
+                        <p className="font-bold text-gray-900">{text.shippingAddress}</p>
                         {shippingLines.length ? (
                           shippingLines.map((line, idx) => (
                             <p key={`mobile-shipping-${o.id}-${idx}`} className="text-gray-700 break-words">
@@ -539,12 +674,12 @@ export function Orders() {
                             </p>
                           ))
                         ) : (
-                          <p className="text-gray-400">אין נתוני כתובת משלוח</p>
+                          <p className="text-gray-400">{text.noShippingAddress}</p>
                         )}
                       </div>
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-xs">
-                        <p className="font-bold text-gray-900">מוצרים</p>
+                        <p className="font-bold text-gray-900">{text.products}</p>
                         {itemLines.length ? (
                           <div className="space-y-1">
                             {itemLines.map((itemLine, idx) => (
@@ -554,12 +689,12 @@ export function Orders() {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-gray-400">אין מוצרים בהזמנה זו</p>
+                          <p className="text-gray-400">{text.noProducts}</p>
                         )}
                       </div>
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-xs">
-                        <p className="font-bold text-gray-900">הערת לקוח</p>
+                        <p className="font-bold text-gray-900">{text.customerNote}</p>
                         <p className={customerNote ? 'text-gray-700 break-words' : 'text-gray-400'}>
                           {customerNote || '—'}
                         </p>
@@ -577,15 +712,15 @@ export function Orders() {
             <thead>
               <tr className="bg-gray-50 text-gray-500 border-b border-gray-200">
                 <th className="px-3 py-2 text-start font-semibold">#</th>
-                <th className="px-3 py-2 text-start font-semibold">תאריך</th>
-                <th className="px-3 py-2 text-start font-semibold">לקוח</th>
-                <th className="px-3 py-2 text-start font-semibold">אימייל</th>
-                <th className="px-3 py-2 text-start font-semibold">סטטוס</th>
-                <th className="px-3 py-2 text-start font-semibold">סכום</th>
-                <th className="px-3 py-2 text-start font-semibold">שיטת תשלום</th>
-                <th className="px-3 py-2 text-start font-semibold">מוצרים</th>
-                <th className="px-3 py-2 text-start font-semibold">הערות</th>
-                <th className="px-3 py-2 text-start font-semibold">פרטים</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableDate}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableCustomer}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableEmail}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableStatus}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableAmount}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tablePaymentMethod}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableProducts}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableNotes}</th>
+                <th className="px-3 py-2 text-start font-semibold">{text.tableDetails}</th>
               </tr>
             </thead>
             <tbody>
@@ -593,13 +728,13 @@ export function Orders() {
                 <tr>
                   <td colSpan={10} className="px-3 py-8 text-center text-gray-400">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                    טוען הזמנות מ‑WooCommerce...
+                    {text.loadingOrders}
                   </td>
                 </tr>
               ) : !filtered.length ? (
                 <tr>
                   <td colSpan={10} className="px-3 py-8 text-center text-gray-400">
-                    לא נמצאו הזמנות לטווח תאריכים זה או לפי הפילטרים הנוכחיים.
+                    {text.noOrdersFound}
                   </td>
                 </tr>
               ) : (
@@ -607,8 +742,8 @@ export function Orders() {
                   const customerName = `${o.billing.first_name || ''} ${o.billing.last_name || ''}`.trim() || '—';
                   const itemLines = o.line_items.map((li) => {
                     const sku = li.sku ? ` | SKU: ${li.sku}` : '';
-                    const itemTotal = li.total ? ` | סה"כ: ${li.total} ${o.currency}` : '';
-                    return `${li.name}${sku} | כמות: ${li.quantity}${itemTotal}`;
+                    const itemTotal = li.total ? ` | ${text.total}: ${li.total} ${o.currency}` : '';
+                    return `${li.name}${sku} | ${text.qty}: ${li.quantity}${itemTotal}`;
                   });
                   const customerNote = (o.customer_note || '').trim();
                   const isUpdatingStatus = updatingOrderId === o.id;
@@ -635,7 +770,7 @@ export function Orders() {
                               onChange={(e) => handleOrderStatusChange(o.id, e.target.value as OrderStatus)}
                               disabled={isUpdatingStatus || isWorkspaceReadOnly}
                               className="w-full border border-gray-200 bg-white rounded-lg px-2 py-1 text-[11px] text-gray-700 font-semibold disabled:opacity-60"
-                              aria-label={`עדכון סטטוס הזמנה ${o.number}`}
+                              aria-label={interpolateText(text.updateStatusAria, o.number)}
                             >
                               {!statusValue && (
                                 <option value="" disabled>
@@ -651,7 +786,7 @@ export function Orders() {
                             {isUpdatingStatus && (
                               <div className="flex items-center gap-1 text-[10px] text-gray-500">
                                 <Loader2 className="w-3 h-3 animate-spin" />
-                                מעדכן...
+                                {text.updating}
                               </div>
                             )}
                           </div>
@@ -682,7 +817,7 @@ export function Orders() {
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border border-gray-200 text-gray-700 hover:bg-gray-50"
                           >
                             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            {isExpanded ? 'הסתר' : 'פתח'}
+                            {isExpanded ? text.close : text.open}
                           </button>
                         </td>
                       </tr>
@@ -691,20 +826,20 @@ export function Orders() {
                           <td colSpan={10} className="px-3 py-4">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs sm:text-sm">
                               <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1">
-                                <p className="font-bold text-gray-900">פרטי הזמנה</p>
-                                <p className="text-gray-700">מספר הזמנה: #{o.number}</p>
-                                <p className="text-gray-700">מזהה פנימי: {o.id}</p>
-                                <p className="text-gray-700">נוצר בתאריך: {formatOrderDate(o.date_created)}</p>
-                                <p className="text-gray-700">עודכן בתאריך: {formatOrderDate(o.date_modified)}</p>
-                                <p className="text-gray-700">הושלם בתאריך: {formatOrderDate(o.date_completed)}</p>
-                                <p className="text-gray-700">מטבע: {o.currency || '—'}</p>
-                                <p className="text-gray-700">סה"כ הזמנה: {formatCurrency(o.total)}</p>
-                                <p className="text-gray-700">סה"כ משלוח: {formatCurrency(o.shipping_total)}</p>
-                                <p className="text-gray-700">סה"כ מס: {formatCurrency(o.total_tax)}</p>
-                                <p className="text-gray-700">תשלום: {o.payment_method_title || o.payment_method || '—'}</p>
+                                <p className="font-bold text-gray-900">{text.orderDetails}</p>
+                                <p className="text-gray-700"># {o.number}</p>
+                                <p className="text-gray-700">{text.internalId}: {o.id}</p>
+                                <p className="text-gray-700">{text.createdAt}: {formatOrderDate(o.date_created)}</p>
+                                <p className="text-gray-700">{text.updatedAt}: {formatOrderDate(o.date_modified)}</p>
+                                <p className="text-gray-700">{text.completedAt}: {formatOrderDate(o.date_completed)}</p>
+                                <p className="text-gray-700">{text.currency}: {o.currency || '—'}</p>
+                                <p className="text-gray-700">{text.orderTotal}: {formatCurrency(o.total)}</p>
+                                <p className="text-gray-700">{text.shippingTotal}: {formatCurrency(o.shipping_total)}</p>
+                                <p className="text-gray-700">{text.taxTotal}: {formatCurrency(o.total_tax)}</p>
+                                <p className="text-gray-700">{text.payment}: {o.payment_method_title || o.payment_method || '—'}</p>
                               </div>
                               <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1">
-                                <p className="font-bold text-gray-900">כתובת חיוב</p>
+                                <p className="font-bold text-gray-900">{text.billingAddress}</p>
                                 {billingLines.length ? (
                                   billingLines.map((line, idx) => (
                                     <p key={`billing-${o.id}-${idx}`} className="text-gray-700 break-words">
@@ -712,11 +847,11 @@ export function Orders() {
                                     </p>
                                   ))
                                 ) : (
-                                  <p className="text-gray-400">אין נתוני כתובת חיוב</p>
+                                  <p className="text-gray-400">{text.noBillingAddress}</p>
                                 )}
                               </div>
                               <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-1">
-                                <p className="font-bold text-gray-900">כתובת משלוח</p>
+                                <p className="font-bold text-gray-900">{text.shippingAddress}</p>
                                 {shippingLines.length ? (
                                   shippingLines.map((line, idx) => (
                                     <p key={`shipping-${o.id}-${idx}`} className="text-gray-700 break-words">
@@ -724,7 +859,7 @@ export function Orders() {
                                     </p>
                                   ))
                                 ) : (
-                                  <p className="text-gray-400">אין נתוני כתובת משלוח</p>
+                                  <p className="text-gray-400">{text.noShippingAddress}</p>
                                 )}
                               </div>
                             </div>

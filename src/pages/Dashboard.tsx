@@ -182,25 +182,7 @@ const moneyFromUnknown = (value: unknown): number => {
 
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '—');
 const orderStatusLabel = (status: string): string => {
-  const normalized = (status || '').toLowerCase();
-  switch (normalized) {
-    case 'completed':
-      return 'הושלמה';
-    case 'processing':
-      return 'בטיפול';
-    case 'pending':
-      return 'ממתינה';
-    case 'on-hold':
-      return 'בהמתנה';
-    case 'cancelled':
-      return 'בוטלה';
-    case 'refunded':
-      return 'הוחזרה';
-    case 'failed':
-      return 'נכשלה';
-    default:
-      return status || '—';
-  }
+  return status || '—';
 };
 const orderStatusBadgeClass = (status: string) => {
   const normalized = (status || '').toLowerCase();
@@ -212,14 +194,301 @@ const orderStatusBadgeClass = (status: string) => {
   }
   return 'bg-gray-100 text-gray-700';
 };
+const STATUS_LABELS = {
+  he: {
+    completed: 'הושלמה',
+    processing: 'בטיפול',
+    pending: 'ממתינה',
+    'on-hold': 'בהמתנה',
+    cancelled: 'בוטלה',
+    refunded: 'הוחזרה',
+    failed: 'נכשלה',
+  },
+  en: {
+    completed: 'Completed',
+    processing: 'Processing',
+    pending: 'Pending',
+    'on-hold': 'On hold',
+    cancelled: 'Cancelled',
+    refunded: 'Refunded',
+    failed: 'Failed',
+  },
+  ru: {
+    completed: 'Завершен',
+    processing: 'В обработке',
+    pending: 'Ожидает',
+    'on-hold': 'На удержании',
+    cancelled: 'Отменен',
+    refunded: 'Возврат',
+    failed: 'Ошибка',
+  },
+  pt: {
+    completed: 'Concluído',
+    processing: 'Processando',
+    pending: 'Pendente',
+    'on-hold': 'Em espera',
+    cancelled: 'Cancelado',
+    refunded: 'Reembolsado',
+    failed: 'Falhou',
+  },
+  fr: {
+    completed: 'Terminée',
+    processing: 'En cours',
+    pending: 'En attente',
+    'on-hold': 'En pause',
+    cancelled: 'Annulée',
+    refunded: 'Remboursée',
+    failed: 'Échouée',
+  },
+} as const;
+
+const COPY = {
+  he: {
+    title: 'סקירה כללית',
+    subtitle: 'נתונים מרכזיים מהחנות, מהקמפיינים, מ GA4 ומ Search Console במקום אחד.',
+    syncing: 'מסנכרן נתונים חיים...',
+    revenueCard: 'הכנסות',
+    totalRevenue: 'סה"כ הכנסות',
+    totalSpend: 'סה"כ הוצאות פרסום',
+    netProfit: 'רווח נקי',
+    roas: 'ROAS',
+    noFinanceData: 'עדיין אין נתונים חיים להכנסות או הוצאות פרסום לטווח התאריכים שנבחר.',
+    goOrders: 'מעבר לרשימת הזמנות',
+    ga4Card: 'מצב גולשים מהאתר GA4',
+    activeNow: 'פעילים עכשיו',
+    totalUsers: 'סה"כ משתמשים',
+    ga4Desc: 'מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.',
+    noGa4: 'אין כרגע נתוני GA4 חיים להצגה.',
+    latestOrdersCard: '5 הזמנות אחרונות',
+    customerFallback: 'לקוח',
+    noOrders: 'אין כרגע נתוני הזמנות חיים להצגה.',
+    goOrdersShort: 'מעבר להזמנות',
+    campaignsCard: 'מצב קמפיינים מהפלטפורמות',
+    totalCampaigns: 'סה"כ קמפיינים',
+    activeCampaigns: 'פעילים כרגע',
+    totalCampaignSpend: 'הוצאה כוללת',
+    roasRos: 'ROAS / ROS',
+    noCampaigns: 'אין כרגע נתוני קמפיינים חיים להצגה.',
+    goCampaigns: 'מעבר לקמפיינים',
+    seoCard: 'מצב SEO באתר מול Search Console',
+    siteSeo: 'SEO באתר',
+    scSeo: 'SEO ב Search Console',
+    clicks: 'קליקים',
+    impressions: 'חשיפות',
+    ctr: 'CTR',
+    avgPosition: 'מיקום ממוצע',
+    noSeo: 'אין כרגע נתוני SEO חיים להצגה.',
+    goSeo: 'מעבר ל SEO',
+    optimizationCard: 'המלצות לאופטימיזציה',
+    noFreshRecs: 'יש כרגע מעט נתונים חיים ולכן אין המלצות חדשות לאופטימיזציה.',
+    noRecsData: 'אין כרגע מספיק נתונים חיים כדי ליצור המלצות אופטימיזציה.',
+    aiRecs: 'המלצות AI',
+    campaignOptimization: 'אופטימיזציית קמפיינים',
+    recLowRoas: 'להגדיל תקציב רק בקמפיינים עם המרות בפועל ולעצור קבוצות מודעות חלשות.',
+    recSeoStructure: 'לחזק SEO בדפי קטגוריה ומוצר עם כותרות H1 מדויקות וקישורים פנימיים.',
+    recMetaCtr: 'לשפר Meta Title ו Meta Description בדפים עם חשיפות גבוהות ו CTR נמוך.',
+    recFunnel: 'לבדוק משפך רכישה ועמודי Checkout כדי לשפר יחס המרה מתנועה להזמנה.',
+    recPausedCampaigns: 'להפעיל מחדש רק קמפיינים מושהים עם עלות לרכישה יציבה וללא שחיקת ROAS.',
+  },
+  en: {
+    title: 'Overview',
+    subtitle: 'Key store, campaign, GA4 and Search Console data in one place.',
+    syncing: 'Syncing live data...',
+    revenueCard: 'Revenue',
+    totalRevenue: 'Total revenue',
+    totalSpend: 'Total ad spend',
+    netProfit: 'Net profit',
+    roas: 'ROAS',
+    noFinanceData: 'No live revenue or ad spend data for the selected date range yet.',
+    goOrders: 'Go to orders list',
+    ga4Card: 'Website traffic status (GA4)',
+    activeNow: 'Active now',
+    totalUsers: 'Total users',
+    ga4Desc: 'Shows real time site traffic so you can understand whether campaigns are bringing visitors now.',
+    noGa4: 'No live GA4 data to display right now.',
+    latestOrdersCard: 'Latest 5 orders',
+    customerFallback: 'Customer',
+    noOrders: 'No live order data to display right now.',
+    goOrdersShort: 'Go to orders',
+    campaignsCard: 'Campaign status across platforms',
+    totalCampaigns: 'Total campaigns',
+    activeCampaigns: 'Currently active',
+    totalCampaignSpend: 'Total spend',
+    roasRos: 'ROAS / ROS',
+    noCampaigns: 'No live campaign data to display right now.',
+    goCampaigns: 'Go to campaigns',
+    seoCard: 'Website SEO vs Search Console',
+    siteSeo: 'On-site SEO',
+    scSeo: 'Search Console SEO',
+    clicks: 'Clicks',
+    impressions: 'Impressions',
+    ctr: 'CTR',
+    avgPosition: 'Avg position',
+    noSeo: 'No live SEO data to display right now.',
+    goSeo: 'Go to SEO',
+    optimizationCard: 'Optimization recommendations',
+    noFreshRecs: 'Live data is currently partial, so there are no new optimization recommendations.',
+    noRecsData: 'Not enough live data yet to generate optimization recommendations.',
+    aiRecs: 'AI recommendations',
+    campaignOptimization: 'Campaign optimization',
+    recLowRoas: 'Increase budget only for campaigns with real conversions and pause weak ad groups.',
+    recSeoStructure: 'Strengthen category and product SEO with precise H1 titles and internal links.',
+    recMetaCtr: 'Improve meta titles and descriptions on high impression pages with low CTR.',
+    recFunnel: 'Review checkout and conversion funnel to improve traffic to order conversion rate.',
+    recPausedCampaigns: 'Reactivate paused campaigns only when CPA is stable and ROAS is not eroding.',
+  },
+  ru: {
+    title: 'Обзор',
+    subtitle: 'Ключевые данные магазина, кампаний, GA4 и Search Console в одном месте.',
+    syncing: 'Синхронизация live данных...',
+    revenueCard: 'Доход',
+    totalRevenue: 'Общий доход',
+    totalSpend: 'Расходы на рекламу',
+    netProfit: 'Чистая прибыль',
+    roas: 'ROAS',
+    noFinanceData: 'Пока нет live данных по доходу или расходам за выбранный период.',
+    goOrders: 'Перейти к списку заказов',
+    ga4Card: 'Состояние трафика сайта (GA4)',
+    activeNow: 'Сейчас активны',
+    totalUsers: 'Всего пользователей',
+    ga4Desc: 'Показывает трафик сайта в реальном времени.',
+    noGa4: 'Сейчас нет live данных GA4.',
+    latestOrdersCard: 'Последние 5 заказов',
+    customerFallback: 'Клиент',
+    noOrders: 'Сейчас нет live данных заказов.',
+    goOrdersShort: 'К заказам',
+    campaignsCard: 'Состояние кампаний по платформам',
+    totalCampaigns: 'Всего кампаний',
+    activeCampaigns: 'Активных сейчас',
+    totalCampaignSpend: 'Общие расходы',
+    roasRos: 'ROAS / ROS',
+    noCampaigns: 'Сейчас нет live данных по кампаниям.',
+    goCampaigns: 'К кампаниям',
+    seoCard: 'SEO сайта vs Search Console',
+    siteSeo: 'SEO на сайте',
+    scSeo: 'SEO Search Console',
+    clicks: 'Клики',
+    impressions: 'Показы',
+    ctr: 'CTR',
+    avgPosition: 'Средняя позиция',
+    noSeo: 'Сейчас нет live SEO данных.',
+    goSeo: 'К SEO',
+    optimizationCard: 'Рекомендации по оптимизации',
+    noFreshRecs: 'Сейчас мало live данных, поэтому новых рекомендаций нет.',
+    noRecsData: 'Недостаточно live данных для рекомендаций.',
+    aiRecs: 'AI рекомендации',
+    campaignOptimization: 'Оптимизация кампаний',
+    recLowRoas: 'Увеличивайте бюджет только для кампаний с реальными конверсиями.',
+    recSeoStructure: 'Усильте SEO категорий и товаров с точными H1 и внутренними ссылками.',
+    recMetaCtr: 'Улучшите meta title и description на страницах с высоким показом и низким CTR.',
+    recFunnel: 'Проверьте воронку и checkout для повышения конверсии.',
+    recPausedCampaigns: 'Возобновляйте только кампании со стабильной стоимостью привлечения.',
+  },
+  pt: {
+    title: 'Visão geral',
+    subtitle: 'Dados principais da loja, campanhas, GA4 e Search Console em um só lugar.',
+    syncing: 'Sincronizando dados ao vivo...',
+    revenueCard: 'Receita',
+    totalRevenue: 'Receita total',
+    totalSpend: 'Gasto total em anúncios',
+    netProfit: 'Lucro líquido',
+    roas: 'ROAS',
+    noFinanceData: 'Ainda não há dados ao vivo de receita ou gasto no período selecionado.',
+    goOrders: 'Ir para lista de pedidos',
+    ga4Card: 'Status de tráfego do site (GA4)',
+    activeNow: 'Ativos agora',
+    totalUsers: 'Usuários totais',
+    ga4Desc: 'Mostra o tráfego em tempo real para entender se as campanhas estão trazendo visitas.',
+    noGa4: 'Não há dados GA4 ao vivo para mostrar no momento.',
+    latestOrdersCard: '5 pedidos mais recentes',
+    customerFallback: 'Cliente',
+    noOrders: 'Não há dados de pedidos ao vivo para mostrar no momento.',
+    goOrdersShort: 'Ir para pedidos',
+    campaignsCard: 'Status de campanhas por plataforma',
+    totalCampaigns: 'Total de campanhas',
+    activeCampaigns: 'Ativas agora',
+    totalCampaignSpend: 'Gasto total',
+    roasRos: 'ROAS / ROS',
+    noCampaigns: 'Não há dados de campanhas ao vivo para mostrar no momento.',
+    goCampaigns: 'Ir para campanhas',
+    seoCard: 'SEO do site vs Search Console',
+    siteSeo: 'SEO no site',
+    scSeo: 'SEO no Search Console',
+    clicks: 'Cliques',
+    impressions: 'Impressões',
+    ctr: 'CTR',
+    avgPosition: 'Posição média',
+    noSeo: 'Não há dados SEO ao vivo para mostrar no momento.',
+    goSeo: 'Ir para SEO',
+    optimizationCard: 'Recomendações de otimização',
+    noFreshRecs: 'Há poucos dados ao vivo no momento, sem novas recomendações.',
+    noRecsData: 'Dados ao vivo insuficientes para gerar recomendações.',
+    aiRecs: 'Recomendações AI',
+    campaignOptimization: 'Otimização de campanhas',
+    recLowRoas: 'Aumente orçamento apenas em campanhas com conversões reais.',
+    recSeoStructure: 'Reforce SEO de categorias e produtos com H1 correto e links internos.',
+    recMetaCtr: 'Melhore meta title e description em páginas com alta impressão e CTR baixo.',
+    recFunnel: 'Revise checkout e funil para melhorar conversão de tráfego em pedido.',
+    recPausedCampaigns: 'Reative campanhas pausadas apenas com CPA estável e sem erosão de ROAS.',
+  },
+  fr: {
+    title: 'Vue d’ensemble',
+    subtitle: 'Données clés de la boutique, des campagnes, de GA4 et de Search Console au même endroit.',
+    syncing: 'Synchronisation des données en direct...',
+    revenueCard: 'Revenus',
+    totalRevenue: 'Revenu total',
+    totalSpend: 'Dépenses publicitaires',
+    netProfit: 'Bénéfice net',
+    roas: 'ROAS',
+    noFinanceData: 'Aucune donnée en direct de revenu ou de dépense pour la période sélectionnée.',
+    goOrders: 'Aller à la liste des commandes',
+    ga4Card: 'Statut du trafic du site (GA4)',
+    activeNow: 'Actifs maintenant',
+    totalUsers: 'Utilisateurs totaux',
+    ga4Desc: 'Affiche le trafic en temps réel pour comprendre si les campagnes apportent des visiteurs.',
+    noGa4: 'Aucune donnée GA4 en direct à afficher pour le moment.',
+    latestOrdersCard: '5 dernières commandes',
+    customerFallback: 'Client',
+    noOrders: 'Aucune donnée de commande en direct à afficher pour le moment.',
+    goOrdersShort: 'Aller aux commandes',
+    campaignsCard: 'Statut des campagnes par plateforme',
+    totalCampaigns: 'Total campagnes',
+    activeCampaigns: 'Actives actuellement',
+    totalCampaignSpend: 'Dépense totale',
+    roasRos: 'ROAS / ROS',
+    noCampaigns: 'Aucune donnée campagne en direct à afficher pour le moment.',
+    goCampaigns: 'Aller aux campagnes',
+    seoCard: 'SEO du site vs Search Console',
+    siteSeo: 'SEO du site',
+    scSeo: 'SEO Search Console',
+    clicks: 'Clics',
+    impressions: 'Impressions',
+    ctr: 'CTR',
+    avgPosition: 'Position moyenne',
+    noSeo: 'Aucune donnée SEO en direct à afficher pour le moment.',
+    goSeo: 'Aller au SEO',
+    optimizationCard: 'Recommandations d’optimisation',
+    noFreshRecs: 'Les données en direct sont partielles, pas de nouvelles recommandations.',
+    noRecsData: 'Pas assez de données en direct pour générer des recommandations.',
+    aiRecs: 'Recommandations AI',
+    campaignOptimization: 'Optimisation des campagnes',
+    recLowRoas: 'Augmenter le budget uniquement sur les campagnes avec de vraies conversions.',
+    recSeoStructure: 'Renforcer le SEO des catégories et produits avec des H1 précis et des liens internes.',
+    recMetaCtr: 'Améliorer les meta title et descriptions sur les pages à forte impression et faible CTR.',
+    recFunnel: 'Analyser le checkout et l’entonnoir pour améliorer la conversion.',
+    recPausedCampaigns: 'Réactiver seulement les campagnes en pause avec un CPA stable.',
+  },
+} as const;
 
 export function Dashboard() {
-  const { dir } = useLanguage();
+  const { dir, language } = useLanguage();
   const { dateRange } = useDateRange();
   const bounds = useDateRangeBounds();
   const { connections } = useConnections();
   const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
+  const text = COPY[language] || COPY.en;
+  const statusLabels = STATUS_LABELS[language] || STATUS_LABELS.en;
   const hasLoadedRealDataRef = useRef(false);
 
   const connectedPlatforms = connections.filter((c) => c.status === 'connected');
@@ -665,23 +934,23 @@ export function Dashboard() {
     const recommendations: string[] = [];
 
     if (financialAvailability.roas && Number(safeRoas) < 2) {
-      recommendations.push('להגדיל תקציב רק בקמפיינים עם המרות בפועל ולעצור קבוצות מודעות חלשות.');
+      recommendations.push(text.recLowRoas);
     }
     if (hasGscData && safeGscStats.avgPosition > 12) {
-      recommendations.push('לחזק SEO בדפי קטגוריה ומוצר עם כותרות H1 מדויקות וקישורים פנימיים.');
+      recommendations.push(text.recSeoStructure);
     }
     if (hasGscData && safeGscStats.ctr < 2.5) {
-      recommendations.push('לשפר Meta Title ו Meta Description בדפים עם חשיפות גבוהות ו CTR נמוך.');
+      recommendations.push(text.recMetaCtr);
     }
     if (hasGa4Data && hasOrdersData && safeGa4Stats.activeNow > 0 && recentOrders.length < 3) {
-      recommendations.push('לבדוק משפך רכישה ועמודי Checkout כדי לשפר יחס המרה מתנועה להזמנה.');
+      recommendations.push(text.recFunnel);
     }
     if (hasCampaignData && campaignSummary.activeCampaigns < campaignSummary.totalCampaigns) {
-      recommendations.push('להפעיל מחדש רק קמפיינים מושהים עם עלות לרכישה יציבה וללא שחיקת ROAS.');
+      recommendations.push(text.recPausedCampaigns);
     }
 
     return recommendations.slice(0, 5);
-  }, [campaignSummary.activeCampaigns, campaignSummary.totalCampaigns, financialAvailability.roas, hasCampaignData, hasGa4Data, hasGscData, hasOrdersData, recentOrders.length, safeGa4Stats.activeNow, safeGscStats.avgPosition, safeGscStats.ctr, safeRoas]);
+  }, [campaignSummary.activeCampaigns, campaignSummary.totalCampaigns, financialAvailability.roas, hasCampaignData, hasGa4Data, hasGscData, hasOrdersData, recentOrders.length, safeGa4Stats.activeNow, safeGscStats.avgPosition, safeGscStats.ctr, safeRoas, text]);
   const hasAnyOptimizationInput =
     financialAvailability.revenue ||
     financialAvailability.spend ||
@@ -712,16 +981,16 @@ export function Dashboard() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="ui-display text-2xl sm:text-3xl text-gray-900 dark:text-white">
-            סקירה כללית, {currentUser?.displayName?.split(' ')[0] || 'User'} 👋
+            {text.title}, {currentUser?.displayName?.split(' ')[0] || 'User'} 👋
           </h1>
           <p className="ui-subtitle text-gray-500 dark:text-gray-400 mt-1">
-            נתונים מרכזיים מהחנות, מהקמפיינים, מ GA4 ומ Search Console במקום אחד.
+            {text.subtitle}
           </p>
         </div>
         {isLoadingOverview && (
           <div className="inline-flex items-center gap-2 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            מסנכרן נתונים חיים...
+            {text.syncing}
           </div>
         )}
       </div>
@@ -733,38 +1002,38 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <DollarSign className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">הכנסות</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">{text.revenueCard}</h2>
             </div>
           </div>
 
           <div className="space-y-2">
             {financialAvailability.revenue && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">סה"כ הכנסות</span>
+                <span className="text-gray-500">{text.totalRevenue}</span>
                 <span className="font-extrabold text-emerald-700">{formatCurrency(safeTotalRevenue)}</span>
               </div>
             )}
             {financialAvailability.spend && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">סה"כ הוצאות פרסום</span>
+                <span className="text-gray-500">{text.totalSpend}</span>
                 <span className="font-bold text-red-600">{formatCurrency(safeTotalSpend)}</span>
               </div>
             )}
             {financialAvailability.netProfit && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">רווח נקי</span>
+                <span className="text-gray-500">{text.netProfit}</span>
                 <span className="font-bold text-indigo-600">{formatCurrency(safeNetProfit)}</span>
               </div>
             )}
             {financialAvailability.roas && (
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">ROAS</span>
+                <span className="text-gray-500">{text.roas}</span>
                 <span className="font-black text-gray-900 dark:text-white">{safeRoas}x</span>
               </div>
             )}
             {!financialAvailability.revenue && !financialAvailability.spend && (
               <p className="text-xs text-gray-500">
-                עדיין אין נתונים חיים להכנסות או הוצאות פרסום לטווח התאריכים שנבחר.
+                {text.noFinanceData}
               </p>
             )}
           </div>
@@ -773,7 +1042,7 @@ export function Dashboard() {
             onClick={() => goToPath('/orders')}
             className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
           >
-            מעבר לרשימת הזמנות
+            {text.goOrders}
             <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
           </button>
         </div>
@@ -784,7 +1053,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Users className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">מצב גולשים מהאתר GA4</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">{text.ga4Card}</h2>
             </div>
             <DemoTag show={isGa4UsingDemo} />
           </div>
@@ -794,24 +1063,24 @@ export function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 {ga4Availability.activeNow && (
                   <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                    <p className="text-[11px] font-semibold text-blue-700">פעילים עכשיו</p>
+                    <p className="text-[11px] font-semibold text-blue-700">{text.activeNow}</p>
                     <p className="text-3xl font-black text-blue-600 mt-1">{safeGa4Stats.activeNow}</p>
                   </div>
                 )}
                 {ga4Availability.totalUsers && (
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
-                    <p className="text-[11px] font-semibold text-indigo-700">סה"כ משתמשים</p>
+                    <p className="text-[11px] font-semibold text-indigo-700">{text.totalUsers}</p>
                     <p className="text-3xl font-black text-indigo-600 mt-1">{safeGa4Stats.totalUsers.toLocaleString()}</p>
                   </div>
                 )}
               </div>
               <p className="text-xs text-gray-500">
-                מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.
+                {text.ga4Desc}
               </p>
             </>
           ) : (
             <p className="text-xs text-gray-500">
-              אין כרגע נתוני GA4 חיים להצגה.
+              {text.noGa4}
             </p>
           )}
         </div>
@@ -822,7 +1091,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
                 <ShoppingCart className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">5 הזמנות אחרונות</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">{text.latestOrdersCard}</h2>
             </div>
             <DemoTag show={isOrdersUsingDemo} />
           </div>
@@ -831,7 +1100,7 @@ export function Dashboard() {
             {recentOrders.length ? (
               recentOrders.slice(0, 5).map((order) => {
                 const customerName =
-                  `${order.billing.first_name || ''} ${order.billing.last_name || ''}`.trim() || 'לקוח';
+                  `${order.billing.first_name || ''} ${order.billing.last_name || ''}`.trim() || text.customerFallback;
                 return (
                   <div key={order.id} className="rounded-xl border border-gray-200 p-2.5 bg-gray-50/60">
                     <div className="flex items-center justify-between gap-2">
@@ -843,7 +1112,7 @@ export function Dashboard() {
                             orderStatusBadgeClass(order.status)
                           )}
                         >
-                          {orderStatusLabel(order.status)}
+                          {statusLabels[(order.status || '').toLowerCase() as keyof typeof statusLabels] || orderStatusLabel(order.status)}
                         </span>
                       </div>
                       <span className="text-[11px] text-gray-500">{formatDate(order.date_created)}</span>
@@ -858,7 +1127,7 @@ export function Dashboard() {
                 );
               })
             ) : (
-              <p className="text-xs text-gray-500">אין כרגע נתוני הזמנות חיים להצגה.</p>
+              <p className="text-xs text-gray-500">{text.noOrders}</p>
             )}
           </div>
 
@@ -866,7 +1135,7 @@ export function Dashboard() {
             onClick={() => goToPath('/orders')}
             className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
           >
-            מעבר להזמנות
+            {text.goOrdersShort}
             <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
           </button>
         </div>
@@ -877,7 +1146,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
                 <Megaphone className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">מצב קמפיינים מהפלטפורמות</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">{text.campaignsCard}</h2>
             </div>
             <DemoTag show={isCampaignsUsingDemo} />
           </div>
@@ -887,25 +1156,25 @@ export function Dashboard() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {campaignAvailability.totalCampaigns && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">סה"כ קמפיינים</p>
+                    <p className="text-gray-500 text-xs">{text.totalCampaigns}</p>
                     <p className="text-xl font-black text-gray-900">{campaignSummary.totalCampaigns}</p>
                   </div>
                 )}
                 {campaignAvailability.activeCampaigns && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">פעילים כרגע</p>
+                    <p className="text-gray-500 text-xs">{text.activeCampaigns}</p>
                     <p className="text-xl font-black text-emerald-600">{campaignSummary.activeCampaigns}</p>
                   </div>
                 )}
                 {campaignAvailability.spend && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">הוצאה כוללת</p>
+                    <p className="text-gray-500 text-xs">{text.totalCampaignSpend}</p>
                     <p className="text-xl font-black text-red-600">{formatCurrency(campaignSummary.totalSpend)}</p>
                   </div>
                 )}
                 {campaignAvailability.roas && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">ROAS / ROS</p>
+                    <p className="text-gray-500 text-xs">{text.roasRos}</p>
                     <p className="text-xl font-black text-indigo-600">{campaignSummary.avgRoas.toFixed(2)}x</p>
                   </div>
                 )}
@@ -925,14 +1194,14 @@ export function Dashboard() {
               )}
             </>
           ) : (
-            <p className="text-xs text-gray-500">אין כרגע נתוני קמפיינים חיים להצגה.</p>
+            <p className="text-xs text-gray-500">{text.noCampaigns}</p>
           )}
 
           <button
             onClick={() => goToPath('/campaigns')}
             className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
           >
-            מעבר לקמפיינים
+            {text.goCampaigns}
             <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
           </button>
         </div>
@@ -943,7 +1212,7 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
                 <Search className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">מצב SEO באתר מול Search Console</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">{text.seoCard}</h2>
             </div>
             <DemoTag show={isGscUsingDemo} />
           </div>
@@ -954,7 +1223,7 @@ export function Dashboard() {
                 {seoAvailability.siteScore && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> SEO באתר</span>
+                      <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> {text.siteSeo}</span>
                       <span className="font-black text-gray-900">{siteSeoScore}/100</span>
                     </div>
                     <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
@@ -965,7 +1234,7 @@ export function Dashboard() {
                 {seoAvailability.searchConsoleScore && (
                   <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SEO ב Search Console</span>
+                      <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {text.scSeo}</span>
                       <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
                     </div>
                     <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
@@ -978,39 +1247,39 @@ export function Dashboard() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {seoAvailability.clicks && (
                   <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">קליקים</p>
+                    <p className="text-gray-500">{text.clicks}</p>
                     <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
                   </div>
                 )}
                 {seoAvailability.impressions && (
                   <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">חשיפות</p>
+                    <p className="text-gray-500">{text.impressions}</p>
                     <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
                   </div>
                 )}
                 {seoAvailability.ctr && (
                   <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">CTR</p>
+                    <p className="text-gray-500">{text.ctr}</p>
                     <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
                   </div>
                 )}
                 {seoAvailability.avgPosition && (
                   <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">מיקום ממוצע</p>
+                    <p className="text-gray-500">{text.avgPosition}</p>
                     <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <p className="text-xs text-gray-500">אין כרגע נתוני SEO חיים להצגה.</p>
+            <p className="text-xs text-gray-500">{text.noSeo}</p>
           )}
 
           <button
             onClick={() => goToPath('/seo')}
             className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
           >
-            מעבר ל SEO
+            {text.goSeo}
             <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
           </button>
         </div>
@@ -1020,7 +1289,7 @@ export function Dashboard() {
             <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
               <Sparkles className="w-5 h-5" />
             </div>
-            <h2 className="font-bold text-gray-900 dark:text-white">המלצות לאופטימיזציה</h2>
+            <h2 className="font-bold text-gray-900 dark:text-white">{text.optimizationCard}</h2>
           </div>
 
           <div className="space-y-2.5">
@@ -1034,9 +1303,9 @@ export function Dashboard() {
                 </div>
               ))
             ) : hasAnyOptimizationInput ? (
-              <p className="text-xs text-gray-500">יש כרגע מעט נתונים חיים ולכן אין המלצות חדשות לאופטימיזציה.</p>
+              <p className="text-xs text-gray-500">{text.noFreshRecs}</p>
             ) : (
-              <p className="text-xs text-gray-500">אין כרגע מספיק נתונים חיים כדי ליצור המלצות אופטימיזציה.</p>
+              <p className="text-xs text-gray-500">{text.noRecsData}</p>
             )}
           </div>
 
@@ -1045,14 +1314,14 @@ export function Dashboard() {
               onClick={() => goToPath('/ai-recommendations')}
               className="inline-flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
             >
-              המלצות AI
+              {text.aiRecs}
               <ArrowRight className={cn('w-3.5 h-3.5', dir === 'rtl' ? 'rotate-180' : '')} />
             </button>
             <button
               onClick={() => goToPath('/campaigns')}
               className="inline-flex items-center justify-center gap-2 text-xs font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl py-2"
             >
-              אופטימיזציית קמפיינים
+              {text.campaignOptimization}
               <Target className="w-3.5 h-3.5" />
             </button>
           </div>

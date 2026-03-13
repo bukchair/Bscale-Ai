@@ -11,13 +11,23 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const STORAGE_KEY = 'bscale_language';
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguage] = useState<Language>('he');
 
   useEffect(() => {
-    const browserLang = navigator.language.split('-')[0];
     const supportedLanguages: Language[] = ['en', 'he', 'ru', 'pt', 'fr'];
+    try {
+      const savedLanguage = localStorage.getItem(STORAGE_KEY) as Language | null;
+      if (savedLanguage && supportedLanguages.includes(savedLanguage)) {
+        setLanguage(savedLanguage);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    const browserLang = navigator.language.split('-')[0];
     if (supportedLanguages.includes(browserLang as Language)) {
       setLanguage(browserLang as Language);
     } else {
@@ -25,20 +35,37 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, language);
+    } catch {
+      // ignore
+    }
+  }, [language]);
+
   const t = (key: string) => {
     const keys = key.split('.');
-    const currentTranslations = translations[language as keyof typeof translations];
-    if (!currentTranslations) return key;
-    
-    let value: any = currentTranslations;
-    for (const k of keys) {
-      if (value && typeof value === 'object' && k in value) {
-        value = value[k];
-      } else {
-        return key; // fallback
+    const resolveFromLanguage = (lang: Language): string | null => {
+      const langTranslations = translations[lang as keyof typeof translations];
+      if (!langTranslations) return null;
+      let value: any = langTranslations;
+      for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+          value = value[k];
+        } else {
+          return null;
+        }
       }
-    }
-    return typeof value === 'string' ? value : key;
+      return typeof value === 'string' ? value : null;
+    };
+
+    const direct = resolveFromLanguage(language);
+    if (direct) return direct;
+    const fallbackEn = resolveFromLanguage('en');
+    if (fallbackEn) return fallbackEn;
+    const fallbackHe = resolveFromLanguage('he');
+    if (fallbackHe) return fallbackHe;
+    return key;
   };
 
   const dir = language === 'he' ? 'rtl' : 'ltr';
