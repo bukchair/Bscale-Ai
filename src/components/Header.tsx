@@ -271,17 +271,23 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     return () => window.clearTimeout(timeout);
   }, [liveSupportToast]);
 
-  const handleApproveUserAsFree = async (userId: string) => {
+  const handleApproveUserNoPayment = async (
+    userId: string,
+    mode: 'active' | 'free' = 'active'
+  ) => {
     if (!currentUid) return;
     try {
       await updateDoc(doc(db, 'users', userId), {
-        subscriptionStatus: 'free',
-        plan: 'free_by_admin',
+        subscriptionStatus: mode,
+        plan: mode === 'active' ? 'granted_by_admin' : 'free_by_admin',
         approvedByAdminUid: currentUid,
         approvedAt: new Date().toISOString(),
+        trialStartedAt: null,
+        trialEndsAt: null,
+        trialExpiredAt: null,
       });
     } catch (error) {
-      console.error('Failed to approve user from demo to free:', error);
+      console.error('Failed to approve user to a no-payment subscription:', error);
     }
   };
 
@@ -332,10 +338,10 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
         icon: User,
         color: 'text-amber-600',
         unread: currentUid ? !pendingUser.approvalReadBy?.[currentUid] : false,
-        actionLabel: tr('notifications.approveFreeAction', 'אשר כחשבון ללא תשלום'),
+        actionLabel: tr('notifications.approveNoPaymentAction', 'אשר מנוי ללא תשלום'),
         actionClassName:
           'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100',
-        onAction: () => handleApproveUserAsFree(pendingUser.uid),
+        onAction: () => handleApproveUserNoPayment(pendingUser.uid, 'active'),
       })),
     [currentUid, dir, pendingUserApprovals]
   );

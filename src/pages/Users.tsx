@@ -84,6 +84,10 @@ export function Users() {
     }
   };
 
+  const handleGrantSubscriptionNoPayment = async (userId: string) => {
+    await handleSubscriptionChange(userId, 'active');
+  };
+
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleDeleteUser = async (userId: string) => {
@@ -268,26 +272,36 @@ export function Users() {
                               : 'demo';
                           const isPaidOrFree = statusValue === 'active' || statusValue === 'free' || statusValue === 'trial';
                           return (
-                        <select
-                          value={statusValue}
-                          onChange={(e) =>
-                            handleSubscriptionChange(
-                              user.uid,
-                              e.target.value as 'active' | 'trial' | 'demo' | 'free'
-                            )
-                          }
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
-                            isPaidOrFree
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
+                        <div className="flex flex-col items-start gap-2">
+                          <select
+                            value={statusValue}
+                            onChange={(e) =>
+                              handleSubscriptionChange(
+                                user.uid,
+                                e.target.value as 'active' | 'trial' | 'demo' | 'free'
+                              )
+                            }
+                            className={cn(
+                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border outline-none cursor-pointer transition-colors",
+                              isPaidOrFree
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            )}
+                          >
+                            <option value="active">{t('users.accessActive')}</option>
+                            <option value="trial">{t('users.accessTrial') || 'Trial (3 days)'}</option>
+                            <option value="free">{t('users.accessFree') || 'Free'}</option>
+                            <option value="demo">{t('users.accessDemo')}</option>
+                          </select>
+                          {(statusValue === 'demo' || statusValue === 'trial') && (
+                            <button
+                              onClick={() => handleGrantSubscriptionNoPayment(user.uid)}
+                              className="px-2.5 py-1 rounded-md text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                            >
+                              {t('users.grantNoPayment') || 'Grant subscription (no payment)'}
+                            </button>
                           )}
-                        >
-                          <option value="active">{t('users.accessActive')}</option>
-                          <option value="trial">{t('users.accessTrial') || 'Trial (3 days)'}</option>
-                          <option value="free">{t('users.accessFree') || 'Free'}</option>
-                          <option value="demo">{t('users.accessDemo')}</option>
-                        </select>
+                        </div>
                           );
                         })()
                       )}
