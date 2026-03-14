@@ -6,7 +6,7 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
-import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 interface HeaderProps {
@@ -40,6 +40,9 @@ type NotificationItem = {
 
 type SupportThreadNotification = {
   id: string;
+  ownerUid: string;
+  docId: string;
+  kind?: 'support_thread';
   subject: string;
   createdByName?: string;
   createdByEmail?: string;
@@ -163,14 +166,26 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
       return;
     }
 
-    const supportQuery = query(collection(db, 'supportThreads'), orderBy('updatedAt', 'desc'), limit(25));
+    const supportQuery = query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50));
     const unsubscribe = onSnapshot(
       supportQuery,
       (snapshot) => {
-        const rows = snapshot.docs.map((threadDoc) => ({
-          id: threadDoc.id,
-          ...(threadDoc.data() as any),
-        })) as SupportThreadNotification[];
+        const rows = snapshot.docs
+          .map((threadDoc) => {
+            const ownerUid = threadDoc.ref.parent.parent?.id || '';
+            return {
+              id: threadDoc.id,
+              docId: threadDoc.id,
+              ownerUid,
+              ...(threadDoc.data() as any),
+            } as SupportThreadNotification;
+          })
+          .filter((row) => Boolean(row.ownerUid))
+          .sort((a, b) => {
+            const aTime = new Date(a.updatedAt || a.lastMessageAt || 0).getTime();
+            const bTime = new Date(b.updatedAt || b.lastMessageAt || 0).getTime();
+            return bTime - aTime;
+          });
         if (!hasInitializedSupportFeed.current) {
           hasInitializedSupportFeed.current = true;
           previousNewestSupportRef.current = rows[0]?.id || null;
@@ -419,7 +434,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
     await Promise.all(
       unreadSupportThreads.map((thread) =>
-        updateDoc(doc(db, 'supportThreads', thread.id), {
+        updateDoc(doc(db, 'users', thread.ownerUid, 'settings', thread.docId), {
           adminSeenAt: new Date().toISOString(),
         }).catch((error) => {
           console.warn('Failed to mark support notification as read:', error);

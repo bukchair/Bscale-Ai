@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDoc, collection, doc, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { MessageSquare, Send, LifeBuoy, CheckCircle2, Clock3, AlertCircle } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { cn } from '../lib/utils';
@@ -10,6 +10,9 @@ type SenderRole = 'user' | 'admin';
 
 type SupportThreadRow = {
   id: string;
+  ownerUid: string;
+  docId: string;
+  kind?: 'support_thread';
   subject: string;
   createdByUid: string;
   createdByName?: string;
@@ -22,6 +25,7 @@ type SupportThreadRow = {
   lastMessageText: string;
   adminSeenAt?: string;
   userSeenAt?: string;
+  messages?: SupportMessageRow[];
 };
 
 type SupportMessageRow = {
@@ -241,26 +245,60 @@ export function Support({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const mapFirebaseError = (raw: unknown, fallback: string) => {
+    const message = raw instanceof Error ? raw.message : '';
+    if (/permission|denied|missing or insufficient/i.test(message)) {
+      return language === 'he' ? 'אין הרשאת כתיבה לתמיכה בחשבון הנוכחי.' : `${fallback} (permission denied)`;
+    }
+    return fallback;
+  };
 
   useEffect(() => {
     if (!currentUid) return;
-    const baseRef = collection(db, 'supportThreads');
-    const q = isAdmin
-      ? query(baseRef, orderBy('updatedAt', 'desc'))
-      : query(baseRef, where('createdByUid', '==', currentUid));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const rows = snapshot.docs
-          .map((row) => ({ id: row.id, ...(row.data() as any) }) as SupportThreadRow)
-          .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-        setThreads(rows);
-        setSelectedThreadId((prev) => prev || rows[0]?.id || null);
-      },
-      (snapshotError) => {
-        console.error('Failed to load support threads:', snapshotError);
-      }
-    );
+
+    const unsubscribe = isAdmin
+      ? onSnapshot(
+          query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread')),
+          (snapshot) => {
+            const rows = snapshot.docs
+              .map((row) => {
+                const ownerUid = row.ref.parent.parent?.id || '';
+                return {
+                  id: row.id,
+                  ownerUid,
+                  docId: row.id,
+                  ...(row.data() as any),
+                } as SupportThreadRow;
+              })
+              .filter((row) => Boolean(row.ownerUid))
+              .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+            setThreads(rows);
+            setSelectedThreadId((prev) => prev || rows[0]?.id || null);
+          },
+          (snapshotError) => {
+            console.error('Failed to load support threads:', snapshotError);
+          }
+        )
+      : onSnapshot(
+          collection(db, 'users', currentUid, 'settings'),
+          (snapshot) => {
+            const rows = snapshot.docs
+              .map((row) => ({
+                id: row.id,
+                ownerUid: currentUid,
+                docId: row.id,
+                ...(row.data() as any),
+              }))
+              .filter((row) => row.kind === 'support_thread')
+              .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()) as SupportThreadRow[];
+            setThreads(rows);
+            setSelectedThreadId((prev) => prev || rows[0]?.id || null);
+          },
+          (snapshotError) => {
+            console.error('Failed to load support threads:', snapshotError);
+          }
+        );
+
     return () => unsubscribe();
   }, [currentUid, isAdmin]);
 
@@ -269,24 +307,21 @@ export function Support({
       setMessages([]);
       return;
     }
-    const q = query(collection(db, 'supportThreads', selectedThreadId, 'messages'), orderBy('createdAt', 'asc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const rows = snapshot.docs.map((row) => ({ id: row.id, ...(row.data() as any) }) as SupportMessageRow);
-        setMessages(rows);
-      },
-      (snapshotError) => {
-        console.error('Failed to load support messages:', snapshotError);
-      }
-    );
-    return () => unsubscribe();
-  }, [selectedThreadId]);
+    const thread = threads.find((item) => item.id === selectedThreadId);
+    const rows = (thread?.messages || []).slice().sort((a, b) => {
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    });
+    setMessages(rows);
+  }, [selectedThreadId, threads]);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.id === selectedThreadId) || null,
     [selectedThreadId, threads]
   );
+
+  const getThreadDocRef = (thread: SupportThreadRow) => {
+    return doc(db, 'users', thread.ownerUid || thread.createdByUid, 'settings', thread.docId || thread.id);
+  };
 
   useEffect(() => {
     if (!selectedThread) return;
@@ -296,7 +331,7 @@ export function Support({
         const seenAt = isAdmin ? selectedThread.adminSeenAt : selectedThread.userSeenAt;
         if (!selectedThread.lastMessageAt) return;
         if (seenAt && new Date(seenAt).getTime() >= new Date(selectedThread.lastMessageAt).getTime()) return;
-        await updateDoc(doc(db, 'supportThreads', selectedThread.id), { [field]: new Date().toISOString() });
+        await updateDoc(getThreadDocRef(selectedThread), { [field]: new Date().toISOString() });
       } catch (updateError) {
         console.warn('Failed to mark support thread as seen:', updateError);
       }
@@ -342,7 +377,19 @@ export function Support({
     setSuccess(null);
     try {
       const now = new Date().toISOString();
-      const threadRef = await addDoc(collection(db, 'supportThreads'), {
+      const threadRef = doc(collection(db, 'users', currentUid, 'settings'));
+      const firstSupportMessage: SupportMessageRow = {
+        id: `msg_${Date.now()}`,
+        threadId: threadRef.id,
+        text: firstMessage.trim().slice(0, 4000),
+        senderUid: currentUid,
+        senderRole: 'user',
+        senderName: currentDisplayName,
+        createdAt: now,
+      };
+
+      await setDoc(threadRef, {
+        kind: 'support_thread',
         subject: subject.trim().slice(0, 180),
         createdByUid: currentUid,
         createdByName: currentDisplayName,
@@ -355,14 +402,7 @@ export function Support({
         lastMessageText: firstMessage.trim().slice(0, 300),
         adminSeenAt: '',
         userSeenAt: now,
-      });
-      await addDoc(collection(db, 'supportThreads', threadRef.id, 'messages'), {
-        threadId: threadRef.id,
-        text: firstMessage.trim().slice(0, 4000),
-        senderUid: currentUid,
-        senderRole: 'user' as SenderRole,
-        senderName: currentDisplayName,
-        createdAt: now,
+        messages: [firstSupportMessage],
       });
       setSubject('');
       setFirstMessage('');
@@ -370,7 +410,7 @@ export function Support({
       setSuccess(copy.createSuccess);
     } catch (createError) {
       console.error('Failed creating support thread:', createError);
-      setError(copy.createError);
+      setError(mapFirebaseError(createError, copy.createError));
     } finally {
       setIsCreating(false);
     }
@@ -389,15 +429,17 @@ export function Support({
     try {
       const now = new Date().toISOString();
       const senderRole: SenderRole = isAdmin ? 'admin' : 'user';
-      await addDoc(collection(db, 'supportThreads', selectedThread.id, 'messages'), {
+      const nextMessage: SupportMessageRow = {
+        id: `msg_${Date.now()}`,
         threadId: selectedThread.id,
         text: clean.slice(0, 4000),
         senderUid: currentUid,
         senderRole,
         senderName: currentDisplayName || (isAdmin ? 'Admin' : 'User'),
         createdAt: now,
-      });
-      await updateDoc(doc(db, 'supportThreads', selectedThread.id), {
+      };
+      await updateDoc(getThreadDocRef(selectedThread), {
+        messages: [...(selectedThread.messages || []), nextMessage],
         updatedAt: now,
         lastMessageAt: now,
         lastMessageFrom: senderRole,
@@ -408,7 +450,7 @@ export function Support({
       setReply('');
     } catch (sendError) {
       console.error('Failed sending support reply:', sendError);
-      setError(copy.sendError);
+      setError(mapFirebaseError(sendError, copy.sendError));
     } finally {
       setIsSending(false);
     }
@@ -417,7 +459,7 @@ export function Support({
   const updateThreadStatus = async (status: SupportStatus) => {
     if (!selectedThread || !isAdmin) return;
     try {
-      await updateDoc(doc(db, 'supportThreads', selectedThread.id), {
+      await updateDoc(getThreadDocRef(selectedThread), {
         status,
         updatedAt: new Date().toISOString(),
       });
