@@ -546,10 +546,23 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
       // Show a more realistic verification process
       await updateConnectionSettings(id, settingsToSave);
       setExpandedId(null);
-      setSuccess(t('integrations.success', { name: connections.find(c => c.id === id)?.name || '' }));
+      const connectionName = connections.find((c) => c.id === id)?.name || '';
+      const successTemplate = t('integrations.success');
+      setSuccess(
+        successTemplate.includes('{{name}}')
+          ? successTemplate.replace('{{name}}', connectionName)
+          : `${successTemplate} ${connectionName}`.trim()
+      );
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError({ id, message: t('integrations.error', { name: connections.find(c => c.id === id)?.name || '' }) });
+      const connectionName = connections.find((c) => c.id === id)?.name || '';
+      const errorTemplate = t('integrations.error');
+      setError({
+        id,
+        message: errorTemplate.includes('{{name}}')
+          ? errorTemplate.replace('{{name}}', connectionName)
+          : `${errorTemplate} ${connectionName}`.trim(),
+      });
     }
   };
 
@@ -1641,7 +1654,15 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
             <div className="flex items-start gap-3">
               <AlertCircle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-sm font-bold text-red-800">{t('integrations.error', { name: connections.find(i => i.id === error.id)?.name || '' })}</h3>
+                <h3 className="text-sm font-bold text-red-800">
+                  {(() => {
+                    const connectionName = connections.find((i) => i.id === error.id)?.name || '';
+                    const errorTemplate = t('integrations.error');
+                    return errorTemplate.includes('{{name}}')
+                      ? errorTemplate.replace('{{name}}', connectionName)
+                      : `${errorTemplate} ${connectionName}`.trim();
+                  })()}
+                </h3>
                 <p className="text-sm text-red-700 mt-1">{error.message}</p>
                 {error.id === 'google' && (
                   <p className="text-sm text-amber-700 mt-2 font-medium">{t('integrations.googleReconnectHint')}</p>

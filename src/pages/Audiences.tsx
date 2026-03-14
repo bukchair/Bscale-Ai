@@ -203,7 +203,7 @@ export function Audiences() {
         status: 'draft',
       });
     } else if (prefill) {
-      setForm((prev) => ({ ...prev, ...prefill }));
+      setForm((prev) => ({ ...prev, ...(prefill as Partial<typeof prev>) }));
     } else {
       setForm({
         name: '',
