@@ -247,6 +247,8 @@ const COPY = {
     title: 'סקירה כללית',
     subtitle: 'נתונים מרכזיים מהחנות, מהקמפיינים, מ GA4 ומ Search Console במקום אחד.',
     syncing: 'מסנכרן נתונים חיים...',
+    sourceLive: 'Live',
+    sourceMissing: 'Missing metric',
     revenueCard: 'הכנסות',
     totalRevenue: 'סה"כ הכנסות',
     totalSpend: 'סה"כ הוצאות פרסום',
@@ -294,6 +296,8 @@ const COPY = {
     title: 'Overview',
     subtitle: 'Key store, campaign, GA4 and Search Console data in one place.',
     syncing: 'Syncing live data...',
+    sourceLive: 'Live',
+    sourceMissing: 'Missing metric',
     revenueCard: 'Revenue',
     totalRevenue: 'Total revenue',
     totalSpend: 'Total ad spend',
@@ -341,6 +345,8 @@ const COPY = {
     title: 'Обзор',
     subtitle: 'Ключевые данные магазина, кампаний, GA4 и Search Console в одном месте.',
     syncing: 'Синхронизация live данных...',
+    sourceLive: 'Live',
+    sourceMissing: 'Missing metric',
     revenueCard: 'Доход',
     totalRevenue: 'Общий доход',
     totalSpend: 'Расходы на рекламу',
@@ -388,6 +394,8 @@ const COPY = {
     title: 'Visão geral',
     subtitle: 'Dados principais da loja, campanhas, GA4 e Search Console em um só lugar.',
     syncing: 'Sincronizando dados ao vivo...',
+    sourceLive: 'Live',
+    sourceMissing: 'Missing metric',
     revenueCard: 'Receita',
     totalRevenue: 'Receita total',
     totalSpend: 'Gasto total em anúncios',
@@ -435,6 +443,8 @@ const COPY = {
     title: 'Vue d’ensemble',
     subtitle: 'Données clés de la boutique, des campagnes, de GA4 et de Search Console au même endroit.',
     syncing: 'Synchronisation des données en direct...',
+    sourceLive: 'Live',
+    sourceMissing: 'Missing metric',
     revenueCard: 'Revenus',
     totalRevenue: 'Revenu total',
     totalSpend: 'Dépenses publicitaires',
@@ -920,6 +930,24 @@ export function Dashboard() {
     ctr: hasGscData,
     avgPosition: hasGscData,
   };
+  const ga4LiveAvailability = {
+    activeNow: !isGa4UsingDemo && ga4Availability.activeNow,
+    totalUsers: !isGa4UsingDemo && ga4Availability.totalUsers,
+  };
+  const campaignLiveAvailability = {
+    totalCampaigns: !isCampaignsUsingDemo && campaignAvailability.totalCampaigns,
+    activeCampaigns: !isCampaignsUsingDemo && campaignAvailability.activeCampaigns,
+    spend: !isCampaignsUsingDemo && campaignAvailability.spend,
+    roas: !isCampaignsUsingDemo && campaignAvailability.roas,
+  };
+  const seoLiveAvailability = {
+    siteScore: !isGa4UsingDemo && seoAvailability.siteScore,
+    searchConsoleScore: !isGscUsingDemo && seoAvailability.searchConsoleScore,
+    clicks: !isGscUsingDemo && seoAvailability.clicks,
+    impressions: !isGscUsingDemo && seoAvailability.impressions,
+    ctr: !isGscUsingDemo && seoAvailability.ctr,
+    avgPosition: !isGscUsingDemo && seoAvailability.avgPosition,
+  };
 
   const siteSeoScore = useMemo(() => {
     const ctrScore = Math.min(30, safeGscStats.ctr * 3);
@@ -980,6 +1008,18 @@ export function Dashboard() {
         Demo data
       </span>
     ) : null;
+  const SourceTag = ({ live }: { live: boolean }) => (
+    <span
+      className={cn(
+        'text-[10px] font-bold px-1.5 py-0.5 rounded-full border',
+        live
+          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+          : 'text-gray-600 bg-gray-100 border-gray-200'
+      )}
+    >
+      {live ? text.sourceLive : text.sourceMissing}
+    </span>
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -1012,34 +1052,44 @@ export function Dashboard() {
           </div>
 
           <div className="space-y-2">
-            {financialAvailability.revenue && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{text.totalRevenue}</span>
-                <span className="font-extrabold text-emerald-700">{formatCurrency(safeTotalRevenue)}</span>
-              </div>
-            )}
-            {financialAvailability.spend && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{text.totalSpend}</span>
-                <span className="font-bold text-red-600">{formatCurrency(safeTotalSpend)}</span>
-              </div>
-            )}
-            {financialAvailability.netProfit && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{text.netProfit}</span>
-                <span className="font-bold text-indigo-600">{formatCurrency(safeNetProfit)}</span>
-              </div>
-            )}
-            {financialAvailability.roas && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{text.roas}</span>
-                <span className="font-black text-gray-900 dark:text-white">{safeRoas}x</span>
-              </div>
-            )}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 inline-flex items-center gap-1.5">
+                {text.totalRevenue}
+                <SourceTag live={financialAvailability.revenue} />
+              </span>
+              <span className="font-extrabold text-emerald-700">
+                {financialAvailability.revenue ? formatCurrency(safeTotalRevenue) : '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 inline-flex items-center gap-1.5">
+                {text.totalSpend}
+                <SourceTag live={financialAvailability.spend} />
+              </span>
+              <span className="font-bold text-red-600">
+                {financialAvailability.spend ? formatCurrency(safeTotalSpend) : '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 inline-flex items-center gap-1.5">
+                {text.netProfit}
+                <SourceTag live={financialAvailability.netProfit} />
+              </span>
+              <span className="font-bold text-indigo-600">
+                {financialAvailability.netProfit ? formatCurrency(safeNetProfit) : '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 inline-flex items-center gap-1.5">
+                {text.roas}
+                <SourceTag live={financialAvailability.roas} />
+              </span>
+              <span className="font-black text-gray-900 dark:text-white">
+                {financialAvailability.roas ? `${safeRoas}x` : '—'}
+              </span>
+            </div>
             {!financialAvailability.revenue && !financialAvailability.spend && (
-              <p className="text-xs text-gray-500">
-                {text.noFinanceData}
-              </p>
+              <p className="text-xs text-gray-500">{text.noFinanceData}</p>
             )}
           </div>
 
@@ -1066,18 +1116,24 @@ export function Dashboard() {
           {hasGa4Data ? (
             <>
               <div className="grid grid-cols-2 gap-3">
-                {ga4Availability.activeNow && (
-                  <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                    <p className="text-[11px] font-semibold text-blue-700">{text.activeNow}</p>
-                    <p className="text-3xl font-black text-blue-600 mt-1">{safeGa4Stats.activeNow}</p>
-                  </div>
-                )}
-                {ga4Availability.totalUsers && (
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
-                    <p className="text-[11px] font-semibold text-indigo-700">{text.totalUsers}</p>
-                    <p className="text-3xl font-black text-indigo-600 mt-1">{safeGa4Stats.totalUsers.toLocaleString()}</p>
-                  </div>
-                )}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+                  <p className="text-[11px] font-semibold text-blue-700 inline-flex items-center gap-1.5">
+                    {text.activeNow}
+                    <SourceTag live={ga4LiveAvailability.activeNow} />
+                  </p>
+                  <p className="text-3xl font-black text-blue-600 mt-1">
+                    {ga4Availability.activeNow ? safeGa4Stats.activeNow : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
+                  <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
+                    {text.totalUsers}
+                    <SourceTag live={ga4LiveAvailability.totalUsers} />
+                  </p>
+                  <p className="text-3xl font-black text-indigo-600 mt-1">
+                    {ga4Availability.totalUsers ? safeGa4Stats.totalUsers.toLocaleString() : '—'}
+                  </p>
+                </div>
               </div>
               <p className="text-xs text-gray-500">
                 {text.ga4Desc}
@@ -1111,6 +1167,7 @@ export function Dashboard() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <p className="text-xs font-bold text-gray-900">#{order.number}</p>
+                        <SourceTag live={!isOrdersUsingDemo} />
                         <span
                           className={cn(
                             'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap',
@@ -1159,30 +1216,42 @@ export function Dashboard() {
           {hasCampaignData || campaignAvailability.spend || campaignAvailability.roas ? (
             <>
               <div className="grid grid-cols-2 gap-2 text-sm">
-                {campaignAvailability.totalCampaigns && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">{text.totalCampaigns}</p>
-                    <p className="text-xl font-black text-gray-900">{campaignSummary.totalCampaigns}</p>
-                  </div>
-                )}
-                {campaignAvailability.activeCampaigns && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">{text.activeCampaigns}</p>
-                    <p className="text-xl font-black text-emerald-600">{campaignSummary.activeCampaigns}</p>
-                  </div>
-                )}
-                {campaignAvailability.spend && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">{text.totalCampaignSpend}</p>
-                    <p className="text-xl font-black text-red-600">{formatCurrency(campaignSummary.totalSpend)}</p>
-                  </div>
-                )}
-                {campaignAvailability.roas && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <p className="text-gray-500 text-xs">{text.roasRos}</p>
-                    <p className="text-xl font-black text-indigo-600">{campaignSummary.avgRoas.toFixed(2)}x</p>
-                  </div>
-                )}
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
+                    {text.totalCampaigns}
+                    <SourceTag live={campaignLiveAvailability.totalCampaigns} />
+                  </p>
+                  <p className="text-xl font-black text-gray-900">
+                    {campaignAvailability.totalCampaigns ? campaignSummary.totalCampaigns : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
+                    {text.activeCampaigns}
+                    <SourceTag live={campaignLiveAvailability.activeCampaigns} />
+                  </p>
+                  <p className="text-xl font-black text-emerald-600">
+                    {campaignAvailability.activeCampaigns ? campaignSummary.activeCampaigns : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
+                    {text.totalCampaignSpend}
+                    <SourceTag live={campaignLiveAvailability.spend} />
+                  </p>
+                  <p className="text-xl font-black text-red-600">
+                    {campaignAvailability.spend ? formatCurrency(campaignSummary.totalSpend) : '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
+                    {text.roasRos}
+                    <SourceTag live={campaignLiveAvailability.roas} />
+                  </p>
+                  <p className="text-xl font-black text-indigo-600">
+                    {campaignAvailability.roas ? `${campaignSummary.avgRoas.toFixed(2)}x` : '—'}
+                  </p>
+                </div>
               </div>
 
               {campaignSummary.platformBreakdown.length > 0 && (
@@ -1225,55 +1294,79 @@ export function Dashboard() {
           {seoAvailability.siteScore || seoAvailability.searchConsoleScore || seoAvailability.clicks ? (
             <>
               <div className="space-y-3">
-                {seoAvailability.siteScore && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 inline-flex items-center gap-1"><Store className="w-3.5 h-3.5" /> {text.siteSeo}</span>
-                      <span className="font-black text-gray-900">{siteSeoScore}/100</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(siteSeoScore, 100)}%` }} />
-                    </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 inline-flex items-center gap-1">
+                      <Store className="w-3.5 h-3.5" /> {text.siteSeo}
+                      <SourceTag live={seoLiveAvailability.siteScore} />
+                    </span>
+                    <span className="font-black text-gray-900">
+                      {seoAvailability.siteScore ? `${siteSeoScore}/100` : '—'}
+                    </span>
                   </div>
-                )}
-                {seoAvailability.searchConsoleScore && (
-                  <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500 inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> {text.scSeo}</span>
-                      <span className="font-black text-gray-900">{searchConsoleSeoScore}/100</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(searchConsoleSeoScore, 100)}%` }} />
-                    </div>
+                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-500 rounded-full"
+                      style={{ width: `${seoAvailability.siteScore ? Math.min(siteSeoScore, 100) : 0}%` }}
+                    />
                   </div>
-                )}
+                </div>
+                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-500 inline-flex items-center gap-1">
+                      <Globe className="w-3.5 h-3.5" /> {text.scSeo}
+                      <SourceTag live={seoLiveAvailability.searchConsoleScore} />
+                    </span>
+                    <span className="font-black text-gray-900">
+                      {seoAvailability.searchConsoleScore ? `${searchConsoleSeoScore}/100` : '—'}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full"
+                      style={{ width: `${seoAvailability.searchConsoleScore ? Math.min(searchConsoleSeoScore, 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                {seoAvailability.clicks && (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">{text.clicks}</p>
-                    <p className="font-bold text-gray-900">{safeGscStats.clicks.toLocaleString()}</p>
-                  </div>
-                )}
-                {seoAvailability.impressions && (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">{text.impressions}</p>
-                    <p className="font-bold text-gray-900">{safeGscStats.impressions.toLocaleString()}</p>
-                  </div>
-                )}
-                {seoAvailability.ctr && (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">{text.ctr}</p>
-                    <p className="font-bold text-gray-900">{safeGscStats.ctr.toFixed(2)}%</p>
-                  </div>
-                )}
-                {seoAvailability.avgPosition && (
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                    <p className="text-gray-500">{text.avgPosition}</p>
-                    <p className="font-bold text-gray-900">#{safeGscStats.avgPosition.toFixed(1)}</p>
-                  </div>
-                )}
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500 inline-flex items-center gap-1.5">
+                    {text.clicks}
+                    <SourceTag live={seoLiveAvailability.clicks} />
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {seoAvailability.clicks ? safeGscStats.clicks.toLocaleString() : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500 inline-flex items-center gap-1.5">
+                    {text.impressions}
+                    <SourceTag live={seoLiveAvailability.impressions} />
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {seoAvailability.impressions ? safeGscStats.impressions.toLocaleString() : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500 inline-flex items-center gap-1.5">
+                    {text.ctr}
+                    <SourceTag live={seoLiveAvailability.ctr} />
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {seoAvailability.ctr ? `${safeGscStats.ctr.toFixed(2)}%` : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
+                  <p className="text-gray-500 inline-flex items-center gap-1.5">
+                    {text.avgPosition}
+                    <SourceTag live={seoLiveAvailability.avgPosition} />
+                  </p>
+                  <p className="font-bold text-gray-900">
+                    {seoAvailability.avgPosition ? `#${safeGscStats.avgPosition.toFixed(1)}` : '—'}
+                  </p>
+                </div>
               </div>
             </>
           ) : (
