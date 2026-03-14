@@ -108,6 +108,10 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const hasInitializedLeadFeed = useRef(false);
   const hasInitializedPendingFeed = useRef(false);
   const hasInitializedSupportFeed = useRef(false);
+  const dateRangeRef = useRef<HTMLDivElement | null>(null);
+  const connectionsRef = useRef<HTMLDivElement | null>(null);
+  const supportRef = useRef<HTMLDivElement | null>(null);
+  const notificationsRef = useRef<HTMLDivElement | null>(null);
   const [liveSupportToast, setLiveSupportToast] = useState<{ id: string; subject: string; user: string } | null>(null);
 
   const tr = (key: string, fallback: string) => {
@@ -504,6 +508,42 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     : fallbackNotifications.map((item) => ({ ...item, unread: false }));
   const unreadNotificationsCount = unreadLeadCount + unreadPendingUserCount + unreadSupportCount;
 
+  useEffect(() => {
+    if (!isDatePickerOpen && !isConnectionsOpen && !isSupportOpen && !isNotificationsOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      const containers = [dateRangeRef.current, connectionsRef.current, supportRef.current, notificationsRef.current].filter(
+        Boolean
+      ) as HTMLElement[];
+      const clickedInsideAnyBubble = containers.some((container) => container.contains(target));
+      if (clickedInsideAnyBubble) return;
+
+      setIsDatePickerOpen(false);
+      setIsConnectionsOpen(false);
+      setIsSupportOpen(false);
+      setIsNotificationsOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIsDatePickerOpen(false);
+      setIsConnectionsOpen(false);
+      setIsSupportOpen(false);
+      setIsNotificationsOpen(false);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isConnectionsOpen, isDatePickerOpen, isNotificationsOpen, isSupportOpen]);
+
   const handleToggleNotifications = async () => {
     const nextState = !isNotificationsOpen;
     setIsNotificationsOpen(nextState);
@@ -695,8 +735,8 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/10 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 transition-colors duration-300">
-      <div className="flex items-center flex-1 gap-3">
+    <header className="bg-white dark:bg-[#111] border-b border-gray-200 dark:border-white/10 min-h-16 py-2 flex items-center justify-between px-3 sm:px-6 lg:px-8 transition-colors duration-300">
+      <div className="flex items-center flex-1 gap-2 sm:gap-3 min-w-0">
         <div className="flex items-center gap-2">
           <button
             onClick={onMenuClick}
@@ -733,7 +773,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           </button>
         )}
 
-        <div className="hidden sm:flex items-center gap-2 relative ms-2">
+        <div ref={dateRangeRef} className="hidden sm:flex items-center gap-2 relative ms-2">
           <div className="flex items-center bg-gray-100 dark:bg-[#1a1a1a] rounded-lg p-1">
             <button 
               onClick={() => handleDateClick('today')}
@@ -763,7 +803,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           </div>
 
           {isDatePickerOpen && dateRange === 'custom' && (
-            <div className="absolute top-full mt-2 left-0 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4 flex gap-4">
+            <div className="absolute top-full mt-2 left-0 w-[calc(100vw-2rem)] max-w-[520px] sm:w-auto bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{t('header.startDate')}</label>
                 <input 
@@ -785,7 +825,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
             </div>
           )}
 
-          <div className="relative ms-4">
+          <div ref={connectionsRef} className="relative ms-4">
             <button 
               onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
               className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-lg hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
@@ -803,7 +843,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
             </button>
 
             {isConnectionsOpen && (
-              <div className={cn("absolute top-full mt-2 w-80 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4", dir === 'rtl' ? "right-0" : "left-0")}>
+              <div className={cn("absolute top-full mt-2 w-[calc(100vw-1rem)] max-w-80 sm:w-80 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4", dir === 'rtl' ? "right-0" : "left-0")}>
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t('dashboard.connectionQuality')}</h4>
                   <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{connectedCount} {t('nav.connections')}</span>
@@ -846,11 +886,11 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <ThemeSwitcher />
         <LanguageSwitcher />
 
-        <div className="relative">
+        <div ref={supportRef} className="relative">
           <button
             onClick={handleToggleSupport}
             className={cn(
@@ -868,7 +908,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           {isSupportOpen && (
             <div
               className={cn(
-                "absolute top-full mt-2 w-80 sm:w-[360px] bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
+                "absolute top-full mt-2 w-[calc(100vw-1rem)] max-w-[360px] sm:w-[360px] bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
                 dir === 'rtl' ? "left-0" : "right-0"
               )}
             >
@@ -1013,7 +1053,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           )}
         </div>
         
-        <div className="relative">
+        <div ref={notificationsRef} className="relative">
           <button 
             onClick={handleToggleNotifications}
             className={cn(
@@ -1029,7 +1069,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
           {isNotificationsOpen && (
             <div className={cn(
-              "absolute top-full mt-2 w-80 sm:w-96 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
+              "absolute top-full mt-2 w-[calc(100vw-1rem)] max-w-[420px] sm:w-96 bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
               dir === 'rtl' ? "left-0" : "right-0"
             )}>
               <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
@@ -1042,7 +1082,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
                   </p>
                 </div>
                 {canViewLeads ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <button
                       className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                       onClick={() => {
