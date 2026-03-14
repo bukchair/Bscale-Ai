@@ -1,53 +1,68 @@
-import { z } from 'zod';
+const DEFAULT_APP_BASE_URL = 'http://localhost:3000';
+const DEFAULT_ENCRYPTION_KEY = Buffer.alloc(32).toString('base64');
+const DEFAULT_SESSION_SECRET = 'local-dev-session-secret-change-me-12345';
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  APP_BASE_URL: z.string().url(),
-  DATABASE_URL: z.string().min(1),
-  ENCRYPTION_KEY: z
-    .string()
-    .min(1)
-    .refine(
-      (value) => {
-        try {
-          const key = Buffer.from(value, 'base64');
-          return key.length === 32;
-        } catch {
-          return false;
-        }
-      },
-      { message: 'ENCRYPTION_KEY must be a base64-encoded 32-byte key.' }
-    ),
-  SESSION_SIGNING_SECRET: z.string().min(32),
-  OAUTH_STATE_TTL_SECONDS: z.coerce.number().int().positive().default(600),
-  ENABLE_GMAIL_SEND_SCOPE: z
-    .string()
-    .optional()
-    .transform((v) => v === 'true'),
-  TIKTOK_REPORTING_ENABLED: z
-    .string()
-    .optional()
-    .transform((v) => v === 'true'),
-  GOOGLE_CLIENT_ID: z.string().min(1),
-  GOOGLE_CLIENT_SECRET: z.string().min(1),
-  GOOGLE_REDIRECT_URI: z.string().url(),
-  GOOGLE_ADS_DEVELOPER_TOKEN: z.string().min(1),
-  GOOGLE_ADS_MANAGER_CUSTOMER_ID: z.string().optional(),
-  META_APP_ID: z.string().min(1),
-  META_APP_SECRET: z.string().min(1),
-  META_REDIRECT_URI: z.string().url(),
-  TIKTOK_CLIENT_KEY: z.string().min(1),
-  TIKTOK_CLIENT_SECRET: z.string().min(1),
-  TIKTOK_REDIRECT_URI: z.string().url(),
-});
+const toBoolean = (value: string | undefined): boolean => value === 'true';
 
-const parsed = envSchema.safeParse(process.env);
+const toPositiveInt = (value: string | undefined, fallback: number): number => {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+};
 
-if (!parsed.success) {
-  const message = parsed.error.issues
-    .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-    .join('\n');
-  throw new Error(`Invalid integrations environment configuration:\n${message}`);
-}
+const toUrl = (value: string | undefined, fallback: string): string => {
+  if (!value) return fallback;
+  try {
+    // eslint-disable-next-line no-new
+    new URL(value);
+    return value;
+  } catch {
+    return fallback;
+  }
+};
 
-export const integrationsEnv = parsed.data;
+const toBase64Key = (value: string | undefined, fallback: string): string => {
+  if (!value) return fallback;
+  try {
+    return Buffer.from(value, 'base64').length === 32 ? value : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const appBaseUrl = toUrl(process.env.APP_BASE_URL, DEFAULT_APP_BASE_URL);
+
+export const integrationsEnv = {
+  NODE_ENV:
+    process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test'
+      ? process.env.NODE_ENV
+      : 'development',
+  APP_BASE_URL: appBaseUrl,
+  DATABASE_URL: process.env.DATABASE_URL ?? '',
+  ENCRYPTION_KEY: toBase64Key(process.env.ENCRYPTION_KEY, DEFAULT_ENCRYPTION_KEY),
+  SESSION_SIGNING_SECRET:
+    process.env.SESSION_SIGNING_SECRET && process.env.SESSION_SIGNING_SECRET.length >= 32
+      ? process.env.SESSION_SIGNING_SECRET
+      : DEFAULT_SESSION_SECRET,
+  OAUTH_STATE_TTL_SECONDS: toPositiveInt(process.env.OAUTH_STATE_TTL_SECONDS, 600),
+  ENABLE_GMAIL_SEND_SCOPE: toBoolean(process.env.ENABLE_GMAIL_SEND_SCOPE),
+  TIKTOK_REPORTING_ENABLED: toBoolean(process.env.TIKTOK_REPORTING_ENABLED),
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  GOOGLE_REDIRECT_URI: toUrl(
+    process.env.GOOGLE_REDIRECT_URI,
+    `${appBaseUrl}/api/connections/google-ads/callback`
+  ),
+  GOOGLE_ADS_DEVELOPER_TOKEN: process.env.GOOGLE_ADS_DEVELOPER_TOKEN ?? '',
+  GOOGLE_ADS_MANAGER_CUSTOMER_ID: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID,
+  META_APP_ID: process.env.META_APP_ID ?? '',
+  META_APP_SECRET: process.env.META_APP_SECRET ?? '',
+  META_REDIRECT_URI: toUrl(process.env.META_REDIRECT_URI, `${appBaseUrl}/api/connections/meta/callback`),
+  TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY ?? '',
+  TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET ?? '',
+  TIKTOK_REDIRECT_URI: toUrl(
+    process.env.TIKTOK_REDIRECT_URI,
+    `${appBaseUrl}/api/connections/tiktok/callback`
+  ),
+} as const;

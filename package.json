@@ -8,7 +8,7 @@
     "start": "node server.ts",
     "build": "vite build",
     "next:dev": "next dev",
-    "next:build": "next build",
+    "next:build": "node scripts/next-build.mjs",
     "next:start": "next start",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
