@@ -1,8 +1,9 @@
-const API_BASE =
-  (typeof import.meta !== 'undefined' &&
-    typeof import.meta.env.VITE_APP_URL === 'string' &&
-    import.meta.env.VITE_APP_URL) ||
-  '';
+const viteEnv =
+  typeof import.meta !== 'undefined'
+    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
+    : undefined;
+
+const API_BASE = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL) || '';
 
 export async function fetchGoogleAdAccounts(accessToken: string) {
   const response = await fetch(`${API_BASE}/api/google/ads/accounts`, {

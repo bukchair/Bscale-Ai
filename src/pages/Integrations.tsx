@@ -5,6 +5,12 @@ import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
+const viteEnv =
+  typeof import.meta !== 'undefined'
+    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
+    : undefined;
+const API_BASE = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL) || '';
+
 const iconMap: Record<string, React.ElementType> = {
   'gemini': Sparkles,
   'openai': Zap,
@@ -380,7 +386,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const handleTikTokConnect = async () => {
     if (blockIfReadOnly()) return;
     try {
-      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/tiktok/url`);
+      const response = await fetch(`${API_BASE}/api/auth/tiktok/url`);
       if (!response.ok) throw new Error('Failed to get auth URL');
       const { url } = await response.json();
       
@@ -404,7 +410,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const handleMetaConnect = async () => {
     if (blockIfReadOnly()) return;
     try {
-      const response = await fetch(`${import.meta.env.VITE_APP_URL}/api/auth/meta/url`);
+      const response = await fetch(`${API_BASE}/api/auth/meta/url`);
       if (!response.ok) throw new Error('Failed to get auth URL');
       const { url } = await response.json();
       
@@ -428,8 +434,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const handleGoogleConnect = async () => {
     if (blockIfReadOnly()) return;
     try {
-      const base = (typeof import.meta.env.VITE_APP_URL === 'string' && import.meta.env.VITE_APP_URL) || '';
-      const response = await fetch(`${base}/api/auth/google/url`);
+      const response = await fetch(`${API_BASE}/api/auth/google/url`);
       
       // Log the full response for debugging
       const responseText = await response.text();

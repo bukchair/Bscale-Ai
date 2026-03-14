@@ -1,11 +1,12 @@
 import { constants } from 'node:fs';
-import { access, rename } from 'node:fs/promises';
+import { access, readFile, rename, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 const projectRoot = process.cwd();
 const pagesDir = path.join(projectRoot, 'src', 'pages');
 const backupPagesDir = path.join(projectRoot, 'src', '__vite_pages_for_next_build__');
+const appEntryPath = path.join(projectRoot, 'src', 'App.tsx');
 
 async function exists(targetPath) {
   try {
@@ -45,6 +46,8 @@ function runCommand(command, args) {
 }
 
 let movedPages = false;
+let rewroteAppImports = false;
+let originalAppSource = '';
 
 try {
   console.log('Generating Prisma Client for Next.js runtime...');
@@ -57,10 +60,27 @@ try {
     await rename(pagesDir, backupPagesDir);
     movedPages = true;
     console.log('Temporarily moved src/pages for Next.js build isolation.');
+
+    originalAppSource = await readFile(appEntryPath, 'utf8');
+    const rewrittenAppSource = originalAppSource.replaceAll(
+      "./pages/",
+      "./__vite_pages_for_next_build__/"
+    );
+
+    if (rewrittenAppSource !== originalAppSource) {
+      await writeFile(appEntryPath, rewrittenAppSource, 'utf8');
+      rewroteAppImports = true;
+      console.log('Temporarily rewired App.tsx imports for Next.js build.');
+    }
   }
 
   await runNextBuild();
 } finally {
+  if (rewroteAppImports) {
+    await writeFile(appEntryPath, originalAppSource, 'utf8');
+    console.log('Restored App.tsx imports after Next.js build.');
+  }
+
   if (movedPages && (await exists(backupPagesDir))) {
     if (await exists(pagesDir)) {
       throw new Error(`Cannot restore src/pages because destination already exists: ${pagesDir}`);
