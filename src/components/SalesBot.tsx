@@ -3,6 +3,7 @@ import { Bot, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import { useLanguage, type Language } from '../contexts/LanguageContext';
 import { cn } from '../lib/utils';
 import { ADMIN_SALES_EMAIL, createPublicSalesLead } from '../lib/firebase';
+import { trackEvent } from '../lib/tracking';
 
 type ChatMessage = {
   id: string;
@@ -376,6 +377,11 @@ export function SalesBot() {
   const handleQuickAction = (action: QuickAction, label: string) => {
     appendMessage('user', label);
     setSubmitError(null);
+    trackEvent('bscale_chat_quick_action', {
+      action,
+      language,
+      page_path: window.location.pathname,
+    });
 
     if (action === 'analysis' || action === 'leadForm') {
       appendBotMessageWithTyping(action === 'leadForm' ? copy.leadPrompt : copy.analysisPrompt, 700);
@@ -398,6 +404,11 @@ export function SalesBot() {
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
+    trackEvent('bscale_chat_message_sent', {
+      message_length: text.length,
+      language,
+      page_path: window.location.pathname,
+    });
     appendMessage('user', text);
     setInput('');
     setSubmitError(null);
@@ -433,6 +444,13 @@ export function SalesBot() {
         sourcePath: window.location.pathname,
         message: analysisMessage,
         assignedAdminEmail: ADMIN_SALES_EMAIL,
+      });
+      trackEvent('bscale_lead_submit', {
+        source: 'sales_bot',
+        form_type: 'needs_analysis',
+        has_email: Boolean(form.email.trim()),
+        has_phone: Boolean(form.phone.trim()),
+        language,
       });
 
       appendBotMessageWithTyping(copy.success, 500);
@@ -611,7 +629,25 @@ export function SalesBot() {
       )}
 
       <button
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          setIsOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              trackEvent('bscale_chat_open', {
+                source: 'floating_button',
+                language,
+                page_path: window.location.pathname,
+              });
+            } else {
+              trackEvent('bscale_chat_close', {
+                source: 'floating_button',
+                language,
+                page_path: window.location.pathname,
+              });
+            }
+            return next;
+          });
+        }}
         className="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 transition-colors flex items-center justify-center"
         aria-label={copy.openAria}
       >

@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc, addDoc, query, where, limit } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { trackEvent } from './tracking';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -379,6 +380,11 @@ export async function createPublicSalesLead(input: SalesLeadInput): Promise<stri
 
   try {
     const ref = await addDoc(collection(db, 'salesLeads'), payload);
+    trackEvent('bscale_lead_submit', {
+      source: safeSourcePath || 'unknown',
+      has_email: Boolean(safeEmail),
+      has_phone: Boolean(safePhone),
+    });
     return ref.id;
   } catch (error) {
     // Fallback for stricter legacy rules that may reject extra fields.
@@ -393,6 +399,12 @@ export async function createPublicSalesLead(input: SalesLeadInput): Promise<stri
     };
     try {
       const ref = await addDoc(collection(db, 'salesLeads'), minimalPayload);
+      trackEvent('bscale_lead_submit', {
+        source: safeSourcePath || 'unknown',
+        has_email: Boolean(safeEmail),
+        has_phone: Boolean(safePhone),
+        mode: 'fallback_minimal_payload',
+      });
       return ref.id;
     } catch (fallbackError) {
       console.error('createPublicSalesLead failed (full + minimal payload):', error, fallbackError);

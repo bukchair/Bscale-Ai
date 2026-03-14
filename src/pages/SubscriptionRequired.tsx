@@ -7,6 +7,7 @@ import { SiteLegalNotice } from '../components/SiteLegalNotice';
 import { auth, signOut, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
+import { trackEvent } from '../lib/tracking';
 
 interface SubscriptionRequiredProps {
   onGoToPricing: () => void;
@@ -88,7 +89,13 @@ export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProp
 
         <div className="space-y-3">
           <button
-            onClick={onGoToPricing}
+            onClick={() => {
+              trackEvent('bscale_pricing_view_click', {
+                source: 'subscription_required',
+                page_path: window.location.pathname,
+              });
+              onGoToPricing();
+            }}
             className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg hover:shadow-xl"
           >
             {t('subscription.ctaPlans')}
@@ -98,6 +105,14 @@ export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProp
             href={payPalUrl}
             target="_blank"
             rel="noreferrer"
+            onClick={() => {
+              trackEvent('bscale_payment_click', {
+                provider: 'paypal',
+                source: 'subscription_required',
+                plan: 'subscription_required_entry',
+                page_path: window.location.pathname,
+              });
+            }}
             className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-bold border-2 border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
           >
             {payPalButtonText}

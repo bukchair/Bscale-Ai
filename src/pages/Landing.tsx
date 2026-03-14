@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 import { SiteLegalNotice } from '../components/SiteLegalNotice';
+import { trackEvent } from '../lib/tracking';
 
 interface LandingProps {
   onEnter: () => void;
@@ -147,7 +148,13 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
               <button
-                onClick={onEnter}
+                  onClick={() => {
+                    trackEvent('bscale_enter_app_click', {
+                      source: 'landing_hero',
+                      page_path: window.location.pathname,
+                    });
+                    onEnter();
+                  }}
                 className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-indigo-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:bg-indigo-700 hover:scale-105 w-full sm:w-auto"
               >
                 {t('landing.cta')}
@@ -292,7 +299,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   <span className="text-gray-500 dark:text-gray-400 text-sm">/חודש</span>
                 </div>
                 <button
-                  onClick={onEnter}
+                  onClick={() => {
+                    trackEvent('bscale_enter_app_click', {
+                      source: 'landing_plan_1',
+                      plan: 'independent',
+                      page_path: window.location.pathname,
+                    });
+                    onEnter();
+                  }}
                   className="w-full py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                 >
                   {t('landing.planCtaStart')}
@@ -301,6 +315,15 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   href={plan1PayPalUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                    trackEvent('bscale_payment_click', {
+                      provider: 'paypal',
+                      source: 'landing_pricing',
+                      plan: 'independent',
+                      amount_ils: 499,
+                      page_path: window.location.pathname,
+                    });
+                  }}
                   className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
                 >
                   {paypalButtonText}
@@ -327,7 +350,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   <span className="text-gray-500 dark:text-gray-400 text-sm">/חודש</span>
                 </div>
                 <button
-                  onClick={onEnter}
+                  onClick={() => {
+                    trackEvent('bscale_enter_app_click', {
+                      source: 'landing_plan_2',
+                      plan: 'managed_support',
+                      page_path: window.location.pathname,
+                    });
+                    onEnter();
+                  }}
                   className="w-full py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                 >
                   {t('landing.planCtaStart')}
@@ -336,6 +366,15 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   href={plan2PayPalUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                    trackEvent('bscale_payment_click', {
+                      provider: 'paypal',
+                      source: 'landing_pricing',
+                      plan: 'managed_support',
+                      amount_ils: 999,
+                      page_path: window.location.pathname,
+                    });
+                  }}
                   className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
                 >
                   {paypalButtonText}
@@ -361,6 +400,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                 </div>
                 <a
                   href="mailto:contact@bscale.ai?subject=סוכנות - BScale AI"
+                  onClick={() => {
+                    trackEvent('bscale_contact_click', {
+                      source: 'landing_pricing',
+                      plan: 'agency',
+                      channel: 'email',
+                      page_path: window.location.pathname,
+                    });
+                  }}
                   className="block w-full py-3 rounded-xl font-bold text-center border-2 border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-colors"
                 >
                   {t('landing.planCtaContact')}
@@ -369,6 +416,14 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
                   href={plan3PayPalUrl}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => {
+                    trackEvent('bscale_payment_click', {
+                      provider: 'paypal',
+                      source: 'landing_pricing',
+                      plan: 'agency',
+                      page_path: window.location.pathname,
+                    });
+                  }}
                   className="mt-2 block w-full py-3 rounded-xl font-bold text-center border border-[#0070ba] text-[#0070ba] hover:bg-[#0070ba]/10 transition-colors"
                 >
                   {paypalButtonText}
@@ -441,7 +496,13 @@ export function Landing({ onEnter, scrollToPricing }: LandingProps) {
             <div>
               <h2 className="ui-section-title text-4xl mb-8 text-gray-900 dark:text-white">{t('landing.ready')}</h2>
               <button
-                onClick={onEnter}
+                onClick={() => {
+                  trackEvent('bscale_enter_app_click', {
+                    source: 'landing_footer',
+                    page_path: window.location.pathname,
+                  });
+                  onEnter();
+                }}
                 className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-gradient-to-r from-indigo-600 to-purple-600 font-pj rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 hover:scale-105 shadow-[0_0_40px_rgba(79,70,229,0.3)] dark:shadow-[0_0_40px_rgba(79,70,229,0.4)]"
               >
                 {t('landing.cta')}

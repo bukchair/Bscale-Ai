@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+
+# Private app areas
+Disallow: /app
+Disallow: /dashboard
+Disallow: /profitability
+Disallow: /budget
+Disallow: /campaigns
+Disallow: /ai-recommendations
+Disallow: /search-analysis
+Disallow: /seo
+Disallow: /products
+Disallow: /orders
+Disallow: /audiences
+Disallow: /creative-lab
+Disallow: /automations
+Disallow: /connections
+Disallow: /leads
+Disallow: /users
+Disallow: /settings
+Disallow: /support
+
+Sitemap: https://www.bscale.co.il/sitemap.xml

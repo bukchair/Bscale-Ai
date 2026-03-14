@@ -3,6 +3,7 @@ import { BrainCircuit, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { auth, googleProvider, signInWithPopup } from '../lib/firebase';
 import { SiteLegalNotice } from '../components/SiteLegalNotice';
+import { trackEvent } from '../lib/tracking';
 
 interface AuthProps {
   onLogin: () => void;
@@ -22,11 +23,17 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
   const handleGoogleLogin = async () => {
     setError(null);
     setIsLoading(true);
+    trackEvent('bscale_login_google_start', { page_path: window.location.pathname });
     try {
       await signInWithPopup(auth, googleProvider);
+      trackEvent('bscale_login_google_success', { page_path: window.location.pathname });
       // App.tsx will handle the redirect/state change via onAuthStateChanged
     } catch (err: any) {
       console.error("Google Login Error:", err);
+      trackEvent('bscale_login_google_error', {
+        page_path: window.location.pathname,
+        error_message: err?.message || 'unknown_error',
+      });
       setError(err.message || (language === 'he' ? 'אירעה שגיאה בהתחברות עם גוגל.' : 'Google sign-in failed. Please try again.'));
     } finally {
       setIsLoading(false);
@@ -35,6 +42,10 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    trackEvent(isLogin ? 'bscale_login_form_submit' : 'bscale_register_form_submit', {
+      method: 'email_form_mock',
+      page_path: window.location.pathname,
+    });
     // For now, we still allow mock login via form for testing
     onLogin();
   };
