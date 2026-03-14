@@ -53,6 +53,7 @@ export default async function handler(
               campaign.status, 
               metrics.cost_micros, 
               metrics.conversions, 
+              metrics.conversions_value,
               metrics.absolute_top_impression_percentage
             FROM campaign 
             WHERE campaign.status != 'REMOVED'

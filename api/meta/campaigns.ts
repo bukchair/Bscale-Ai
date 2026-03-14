@@ -24,7 +24,7 @@ export default async function handler(
   const formattedAdAccountId = adAccountIdStr.startsWith('act_') ? adAccountIdStr : `act_${adAccountIdStr}`;
 
   try {
-    const url = `https://graph.facebook.com/v19.0/${formattedAdAccountId}/campaigns?fields=id,name,status,objective,start_time,stop_time,spend,insights{spend,inline_link_click_ctr,roas}&access_token=${encodeURIComponent(token)}`;
+    const url = `https://graph.facebook.com/v19.0/${formattedAdAccountId}/campaigns?fields=id,name,status,objective,start_time,stop_time,insights{spend,inline_link_click_ctr,purchase_roas,roas,actions,action_values}&access_token=${encodeURIComponent(token)}`;
     const response = await fetch(url);
 
     const data = await response.json();

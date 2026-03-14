@@ -305,25 +305,17 @@ export function Campaigns() {
 
   const syncTikTokData = async () => {
     const tiktokConn = connections.find(c => c.id === 'tiktok');
-    if (tiktokConn?.status === 'connected' && tiktokConn.settings?.tiktokToken && tiktokConn.settings?.tiktokAdvertiserId) {
+    const token = tiktokConn?.settings?.tiktokToken || tiktokConn?.settings?.tiktokAccessToken;
+    const advertiserId = tiktokConn?.settings?.tiktokAdvertiserId || tiktokConn?.settings?.advertiserId;
+    if (tiktokConn?.status === 'connected' && token && advertiserId) {
       setIsSyncing(true);
       try {
         const campaigns = await fetchTikTokCampaigns(
-          tiktokConn.settings.tiktokToken,
-          tiktokConn.settings.tiktokAdvertiserId
+          token,
+          advertiserId
         );
-        
-        const formattedCampaigns = campaigns.map((c: any) => ({
-          id: c.campaign_id,
-          name: c.campaign_name,
-          platform: 'TikTok',
-          status: c.operation_status === 'ENABLE' ? 'Active' : 'Paused',
-          spend: Number((Math.random() * 1000).toFixed(0)), // TikTok API might need more calls for spend, simulating for now
-          roas: Number((Math.random() * 5 + 1).toFixed(1)),
-          cpa: Number((Math.random() * 100 + 10).toFixed(0))
-        }));
-        
-        setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'TikTok'), ...formattedCampaigns]);
+
+        setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'TikTok'), ...campaigns]);
       } catch (err) {
         console.error("Failed to sync TikTok data:", err);
       } finally {
@@ -334,12 +326,17 @@ export function Campaigns() {
 
   const syncMetaData = async () => {
     const metaConn = connections.find(c => c.id === 'meta');
-    if (metaConn?.status === 'connected' && metaConn.settings?.metaToken && metaConn.settings?.metaAdsId) {
+    const token = metaConn?.settings?.metaToken;
+    const adAccountId =
+      metaConn?.settings?.metaAdsId ||
+      metaConn?.settings?.adAccountId ||
+      metaConn?.settings?.metaAdAccountId;
+    if (metaConn?.status === 'connected' && token && adAccountId) {
       setIsSyncing(true);
       try {
         const campaigns = await fetchMetaCampaigns(
-          metaConn.settings.metaToken,
-          metaConn.settings.metaAdsId
+          token,
+          adAccountId
         );
         
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Meta'), ...campaigns]);
@@ -353,12 +350,19 @@ export function Campaigns() {
 
   const syncGoogleData = async () => {
     const googleConn = connections.find(c => c.id === 'google');
-    if (googleConn?.status === 'connected' && googleConn.settings?.googleAccessToken && googleConn.settings?.googleAdsId) {
+    const token = googleConn?.settings?.googleAccessToken;
+    const customerId =
+      googleConn?.settings?.googleAdsId ||
+      googleConn?.settings?.customerId ||
+      googleConn?.settings?.googleCustomerId;
+    const loginCustomerId = googleConn?.settings?.loginCustomerId;
+    if (googleConn?.status === 'connected' && token && customerId) {
       setIsSyncing(true);
       try {
         const campaigns = await fetchGoogleCampaigns(
-          googleConn.settings.googleAccessToken,
-          googleConn.settings.googleAdsId
+          token,
+          customerId,
+          loginCustomerId
         );
         
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Google'), ...campaigns]);
@@ -556,11 +560,21 @@ export function Campaigns() {
     });
   };
 
+  const hasConnectedAdPlatform = Boolean(
+    connections.find(
+      (c) =>
+        (c.id === 'google' || c.id === 'meta' || c.id === 'tiktok') &&
+        c.status === 'connected'
+    )
+  );
+
   const allCampaigns = [
     ...createdCampaigns,
     ...(realCampaigns.length > 0
-    ? realCampaigns
-    : mockCampaignData),
+      ? realCampaigns
+      : hasConnectedAdPlatform
+      ? []
+      : mockCampaignData),
   ];
 
   const filteredAndSortedCampaigns = allCampaigns
@@ -1123,7 +1137,9 @@ export function Campaigns() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
-                      {realCampaigns.length === 0 ? t('campaigns.connectPlatforms') : t('campaigns.noCampaigns')}
+                      {!hasConnectedAdPlatform
+                        ? t('campaigns.connectPlatforms')
+                        : t('campaigns.noCampaigns')}
                     </td>
                   </tr>
                 )}

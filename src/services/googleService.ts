@@ -41,7 +41,9 @@ export async function fetchGoogleCampaigns(accessToken: string, customerId: stri
     const m = r.metrics;
     const spend = parseFloat(m.costMicros || 0) / 1000000;
     const conversions = parseFloat(m.conversions || 0);
+    const conversionValue = parseFloat(m.conversionsValue || 0);
     const cpa = conversions > 0 ? spend / conversions : 0;
+    const roas = spend > 0 ? conversionValue / spend : 0;
 
     return {
       id: c.id,
@@ -49,10 +51,10 @@ export async function fetchGoogleCampaigns(accessToken: string, customerId: stri
       platform: 'Google',
       status: c.status === 'ENABLED' ? 'Active' : 'Paused',
       spend,
-      // This is more of a CPA-like metric when we don't have conversion value;
-      // formatting to currency / symbol is handled in the UI.
-      roas: conversions > 0 ? (spend / conversions).toFixed(1) : '0.0',
+      roas: Number.isFinite(roas) ? roas.toFixed(2) : '0.00',
       cpa,
+      conversions,
+      conversionValue,
     };
   });
 }

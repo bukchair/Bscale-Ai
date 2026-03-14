@@ -34,8 +34,40 @@ export async function fetchMetaCampaigns(accessToken: string, adAccountId: strin
   return data.data.map((c: any) => {
     const insights = c.insights?.data?.[0] || {};
     const spend = parseFloat(insights.spend || 0) || 0;
-    const conversions = parseFloat(c.conversions || 0) || 0;
+    const actions = Array.isArray(insights.actions) ? insights.actions : [];
+    const actionValues = Array.isArray(insights.action_values) ? insights.action_values : [];
+    const conversionActionTypes = new Set([
+      'purchase',
+      'offsite_conversion.purchase',
+      'omni_purchase',
+      'onsite_conversion.purchase',
+      'lead',
+      'offsite_conversion.fb_pixel_lead',
+    ]);
+    const conversionValueTypes = new Set([
+      'purchase',
+      'offsite_conversion.purchase',
+      'omni_purchase',
+      'onsite_conversion.purchase',
+    ]);
+    const conversions = actions.reduce((sum: number, action: any) => {
+      if (!action || !conversionActionTypes.has(String(action.action_type || ''))) return sum;
+      const v = parseFloat(action.value || 0);
+      return sum + (Number.isFinite(v) ? v : 0);
+    }, 0);
+    const conversionValue = actionValues.reduce((sum: number, action: any) => {
+      if (!action || !conversionValueTypes.has(String(action.action_type || ''))) return sum;
+      const v = parseFloat(action.value || 0);
+      return sum + (Number.isFinite(v) ? v : 0);
+    }, 0);
     const cpa = conversions > 0 ? spend / conversions : 0;
+    const roasFromInsight =
+      Array.isArray(insights.purchase_roas) && insights.purchase_roas[0]?.value != null
+        ? parseFloat(insights.purchase_roas[0].value || 0)
+        : Array.isArray(insights.roas) && insights.roas[0]?.value != null
+        ? parseFloat(insights.roas[0].value || 0)
+        : 0;
+    const roas = roasFromInsight > 0 ? roasFromInsight : spend > 0 ? conversionValue / spend : 0;
 
     return {
       id: c.id,
@@ -43,8 +75,10 @@ export async function fetchMetaCampaigns(accessToken: string, adAccountId: strin
       platform: 'Meta',
       status: c.status === 'ACTIVE' ? 'Active' : 'Paused',
       spend,
-      roas: parseFloat(insights.roas?.[0]?.value || 0).toFixed(1),
+      roas: Number.isFinite(roas) ? roas.toFixed(2) : '0.00',
       cpa,
+      conversions,
+      conversionValue,
     };
   });
 }
