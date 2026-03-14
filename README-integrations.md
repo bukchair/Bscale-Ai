@@ -148,9 +148,9 @@ Orchestration layer:
 
 - `src/lib/integrations/services/integration-orchestrator.ts`
 
-UI module:
+UI module (single-site mode):
 
-- `src/app/dashboard/connections/page.tsx`
+- `src/app/dashboard/connections/page.tsx` (redirects to `/connections`)
 - `src/components/connections/ConnectionsPage.tsx`
 - `src/components/connections/ConnectionCard.tsx`
 - `src/components/connections/AccountPickerDialog.tsx`
@@ -190,7 +190,7 @@ Implemented:
 4. Start Next module:
    - `npm run next:dev`
 5. Open:
-   - `/dashboard/connections`
+   - `/connections`
 
 ---
 

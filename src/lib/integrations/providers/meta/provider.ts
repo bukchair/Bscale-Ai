@@ -61,7 +61,7 @@ export class MetaProvider implements IntegrationProvider {
       throw new ProviderConfigError('Meta app credentials are missing.');
     }
 
-    const issued = await issueOAuthState(context.userId, this.platform, '/dashboard/connections');
+    const issued = await issueOAuthState(context.userId, this.platform, '/connections');
     const url = new URL(META_AUTH_BASE);
     url.searchParams.set('client_id', integrationsEnv.META_APP_ID);
     url.searchParams.set('redirect_uri', this.callbackUrl);

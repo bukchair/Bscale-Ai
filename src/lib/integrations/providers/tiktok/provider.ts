@@ -69,7 +69,7 @@ export class TikTokProvider implements IntegrationProvider {
       throw new ProviderConfigError('TikTok client credentials are missing.');
     }
 
-    const issued = await issueOAuthState(context.userId, this.platform, '/dashboard/connections');
+    const issued = await issueOAuthState(context.userId, this.platform, '/connections');
     const url = new URL(TIKTOK_AUTH_URL);
     url.searchParams.set('app_id', integrationsEnv.TIKTOK_CLIENT_KEY);
     url.searchParams.set('state', issued.state);

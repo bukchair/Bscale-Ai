@@ -1,7 +1,7 @@
-import { ConnectionsPage } from '@/src/components/connections/ConnectionsPage';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default function ConnectionsDashboardPage() {
-  return <ConnectionsPage />;
+  redirect('/connections');
 }

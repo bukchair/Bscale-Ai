@@ -23,14 +23,14 @@ export async function GET(request: Request, context: RouteContext) {
       error_description: url.searchParams.get('error_description'),
     });
 
-    const redirect = new URL('/dashboard/connections', integrationsEnv.APP_BASE_URL);
+    const redirect = new URL('/connections', integrationsEnv.APP_BASE_URL);
     redirect.searchParams.set('platform', toRoutePlatform(platform));
     redirect.searchParams.set('status', result.status.toLowerCase());
     redirect.searchParams.set('connected', '1');
     return NextResponse.redirect(redirect);
   } catch (error) {
     if (error instanceof Error) {
-      const redirect = new URL('/dashboard/connections', integrationsEnv.APP_BASE_URL);
+      const redirect = new URL('/connections', integrationsEnv.APP_BASE_URL);
       redirect.searchParams.set('connected', '0');
       redirect.searchParams.set('error', error.message);
       return NextResponse.redirect(redirect);
