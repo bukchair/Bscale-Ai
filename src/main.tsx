@@ -8,6 +8,7 @@ import { ConnectionsProvider } from './contexts/ConnectionsContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TimeProvider } from './contexts/TimeContext';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { GoogleTagManager } from './components/GoogleTagManager';
 
 
 createRoot(document.getElementById('root')!).render(
@@ -17,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
         <CurrencyProvider>
           <DateRangeProvider>
             <ConnectionsProvider>
+              <GoogleTagManager />
               <App />
             </ConnectionsProvider>
           </DateRangeProvider>
