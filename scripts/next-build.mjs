@@ -54,15 +54,16 @@ let rewroteAppImports = false;
 let originalAppSource = '';
 
 try {
-  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required for production build/deploy.');
-  }
-
   if (process.env.DATABASE_URL) {
     console.log('Applying Prisma migrations (deploy)...');
     await runPrismaMigrateDeploy();
   } else {
-    console.log('DATABASE_URL not set; skipping prisma migrate deploy.');
+    console.warn('DATABASE_URL not set; skipping prisma migrate deploy.');
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(
+        'Production build is continuing without DATABASE_URL. Integrations API will fail at runtime until DATABASE_URL is configured.'
+      );
+    }
   }
 
   console.log('Generating Prisma Client for Next.js runtime...');
