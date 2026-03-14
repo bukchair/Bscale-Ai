@@ -6,7 +6,7 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
-import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
 interface HeaderProps {
@@ -44,6 +44,7 @@ type SupportThreadNotification = {
   docId: string;
   kind?: 'support_thread';
   subject: string;
+  createdByUid?: string;
   createdByName?: string;
   createdByEmail?: string;
   status?: string;
@@ -52,6 +53,18 @@ type SupportThreadNotification = {
   lastMessageFrom?: 'user' | 'admin';
   lastMessageText?: string;
   adminSeenAt?: string;
+  userSeenAt?: string;
+  messages?: SupportMessageRow[];
+};
+
+type SupportMessageRow = {
+  id: string;
+  threadId: string;
+  text: string;
+  senderUid: string;
+  senderRole: 'user' | 'admin';
+  senderName?: string;
+  createdAt: string;
 };
 
 export function Header({ onMenuClick, userProfile }: HeaderProps) {
@@ -61,6 +74,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const [isConnectionsOpen, setIsConnectionsOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [liveLeadToast, setLiveLeadToast] = useState<{ id: string; name: string; contact: string } | null>(null);
   const [livePendingUserToast, setLivePendingUserToast] = useState<{ uid: string; name: string; email: string } | null>(null);
   const [leadNotifications, setLeadNotifications] = useState<Array<{
@@ -74,11 +88,20 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   }>>([]);
   const [pendingUserApprovals, setPendingUserApprovals] = useState<PendingUserApproval[]>([]);
   const [supportNotifications, setSupportNotifications] = useState<SupportThreadNotification[]>([]);
+  const [supportThreads, setSupportThreads] = useState<SupportThreadNotification[]>([]);
+  const [supportSelectedThreadId, setSupportSelectedThreadId] = useState<string | null>(null);
+  const [supportDraftSubject, setSupportDraftSubject] = useState('');
+  const [supportDraftMessage, setSupportDraftMessage] = useState('');
+  const [supportReply, setSupportReply] = useState('');
+  const [supportError, setSupportError] = useState<string | null>(null);
+  const [supportSuccess, setSupportSuccess] = useState<string | null>(null);
+  const [isSupportSending, setIsSupportSending] = useState(false);
   const isDemo = userProfile?.subscriptionStatus === 'demo';
   const canViewLeads = userProfile?.role === 'admin';
   const canApproveUsers = userProfile?.role === 'admin';
   const canViewSupport = userProfile?.role === 'admin';
   const currentUid = auth.currentUser?.uid;
+  const supportCurrentUid = auth.currentUser?.uid || userProfile?.uid || '';
   const previousNewestLeadRef = useRef<string | null>(null);
   const previousNewestPendingUserRef = useRef<string | null>(null);
   const previousNewestSupportRef = useRef<string | null>(null);
@@ -200,6 +223,71 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     return () => unsubscribe();
   }, [canViewSupport]);
 
+  useEffect(() => {
+    if (!supportCurrentUid) {
+      setSupportThreads([]);
+      setSupportSelectedThreadId(null);
+      return;
+    }
+
+    const unsubscribe = canViewSupport
+      ? onSnapshot(
+          query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50)),
+          (snapshot) => {
+            const rows = snapshot.docs
+              .map((threadDoc) => {
+                const ownerUid = threadDoc.ref.parent.parent?.id || '';
+                return {
+                  id: threadDoc.id,
+                  docId: threadDoc.id,
+                  ownerUid,
+                  ...(threadDoc.data() as any),
+                } as SupportThreadNotification;
+              })
+              .filter((row) => Boolean(row.ownerUid))
+              .sort((a, b) => {
+                const aTime = new Date(a.updatedAt || a.lastMessageAt || 0).getTime();
+                const bTime = new Date(b.updatedAt || b.lastMessageAt || 0).getTime();
+                return bTime - aTime;
+              });
+            setSupportThreads(rows);
+            setSupportSelectedThreadId((prev) =>
+              prev && rows.some((thread) => thread.id === prev) ? prev : rows[0]?.id || null
+            );
+          },
+          (error) => {
+            console.error('Failed to subscribe support widget threads:', error);
+          }
+        )
+      : onSnapshot(
+          collection(db, 'users', supportCurrentUid, 'settings'),
+          (snapshot) => {
+            const rows = snapshot.docs
+              .map((threadDoc) => ({
+                id: threadDoc.id,
+                docId: threadDoc.id,
+                ownerUid: supportCurrentUid,
+                ...(threadDoc.data() as any),
+              }))
+              .filter((row) => row.kind === 'support_thread')
+              .sort((a, b) => {
+                const aTime = new Date((a as any).updatedAt || (a as any).lastMessageAt || 0).getTime();
+                const bTime = new Date((b as any).updatedAt || (b as any).lastMessageAt || 0).getTime();
+                return bTime - aTime;
+              }) as SupportThreadNotification[];
+            setSupportThreads(rows);
+            setSupportSelectedThreadId((prev) =>
+              prev && rows.some((thread) => thread.id === prev) ? prev : rows[0]?.id || null
+            );
+          },
+          (error) => {
+            console.error('Failed to subscribe user support widget threads:', error);
+          }
+        );
+
+    return () => unsubscribe();
+  }, [canViewSupport, supportCurrentUid]);
+
   const playLeadAlertSound = () => {
     try {
       const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -316,6 +404,29 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     return pendingUserApprovals.filter((user) => !user.approvalReadBy?.[currentUid]).length;
   }, [currentUid, pendingUserApprovals]);
 
+  const selectedSupportThread = useMemo(
+    () => supportThreads.find((thread) => thread.id === supportSelectedThreadId) || null,
+    [supportSelectedThreadId, supportThreads]
+  );
+
+  const selectedSupportMessages = useMemo(() => {
+    if (!selectedSupportThread?.messages) return [];
+    return selectedSupportThread.messages.slice().sort((a, b) => {
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+    });
+  }, [selectedSupportThread]);
+
+  const unreadSupportWidgetCount = useMemo(() => {
+    return supportThreads.filter((thread) => {
+      const lastAt = thread.lastMessageAt ? new Date(thread.lastMessageAt).getTime() : 0;
+      const seenAt = canViewSupport
+        ? (thread.adminSeenAt ? new Date(thread.adminSeenAt).getTime() : 0)
+        : (thread.userSeenAt ? new Date(thread.userSeenAt).getTime() : 0);
+      const expectedSender: 'user' | 'admin' = canViewSupport ? 'user' : 'admin';
+      return thread.lastMessageFrom === expectedSender && lastAt > seenAt;
+    }).length;
+  }, [canViewSupport, supportThreads]);
+
   const unreadSupportCount = useMemo(() => {
     if (!canViewSupport) return 0;
     return supportNotifications.filter((thread) => {
@@ -396,6 +507,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const handleToggleNotifications = async () => {
     const nextState = !isNotificationsOpen;
     setIsNotificationsOpen(nextState);
+    if (nextState) setIsSupportOpen(false);
     if (nextState && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => undefined);
     }
@@ -441,6 +553,136 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
         })
       )
     );
+  };
+
+  const getSupportThreadDocRef = (thread: SupportThreadNotification) => {
+    return doc(db, 'users', thread.ownerUid || thread.createdByUid || '', 'settings', thread.docId || thread.id);
+  };
+
+  const handleToggleSupport = () => {
+    setIsSupportOpen((prev) => !prev);
+    setSupportError(null);
+    setSupportSuccess(null);
+    setIsNotificationsOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isSupportOpen || !selectedSupportThread) return;
+    const markSeen = async () => {
+      try {
+        const lastAt = selectedSupportThread.lastMessageAt
+          ? new Date(selectedSupportThread.lastMessageAt).getTime()
+          : 0;
+        if (!lastAt) return;
+        const field = canViewSupport ? 'adminSeenAt' : 'userSeenAt';
+        const seenAtRaw = canViewSupport ? selectedSupportThread.adminSeenAt : selectedSupportThread.userSeenAt;
+        const seenAt = seenAtRaw ? new Date(seenAtRaw).getTime() : 0;
+        if (seenAt >= lastAt) return;
+        await updateDoc(getSupportThreadDocRef(selectedSupportThread), { [field]: new Date().toISOString() });
+      } catch (error) {
+        console.warn('Failed to mark support widget thread as seen:', error);
+      }
+    };
+    markSeen();
+  }, [canViewSupport, isSupportOpen, selectedSupportThread]);
+
+  const handleSupportSend = async () => {
+    if (!supportCurrentUid) {
+      setSupportError(tr('support.authRequired', 'You must be logged in to use support.'));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setSupportError(null);
+    setSupportSuccess(null);
+    setIsSupportSending(true);
+
+    try {
+      if (selectedSupportThread) {
+        const clean = supportReply.trim();
+        if (!clean) {
+          setSupportError(tr('support.messageRequired', 'Message is required.'));
+          setIsSupportSending(false);
+          return;
+        }
+        const senderRole: 'user' | 'admin' = canViewSupport ? 'admin' : 'user';
+        const nextMessage: SupportMessageRow = {
+          id: `msg_${Date.now()}`,
+          threadId: selectedSupportThread.id,
+          text: clean.slice(0, 4000),
+          senderUid: supportCurrentUid,
+          senderRole,
+          senderName: auth.currentUser?.displayName || userProfile?.name || (canViewSupport ? 'Admin' : 'User'),
+          createdAt: now,
+        };
+        await updateDoc(getSupportThreadDocRef(selectedSupportThread), {
+          messages: [...(selectedSupportThread.messages || []), nextMessage],
+          updatedAt: now,
+          lastMessageAt: now,
+          lastMessageFrom: senderRole,
+          lastMessageText: clean.slice(0, 300),
+          status: senderRole === 'admin' ? 'waiting-user' : 'waiting-admin',
+          ...(senderRole === 'admin' ? { adminSeenAt: now } : { userSeenAt: now }),
+        });
+        setSupportReply('');
+        setSupportSuccess(tr('support.messageSent', 'Message sent.'));
+      } else {
+        if (canViewSupport) {
+          setSupportError(tr('support.selectThread', 'Select a support request first.'));
+          setIsSupportSending(false);
+          return;
+        }
+        const cleanSubject = supportDraftSubject.trim();
+        const cleanMessage = supportDraftMessage.trim();
+        if (!cleanSubject) {
+          setSupportError(tr('support.subjectRequired', 'Subject is required.'));
+          setIsSupportSending(false);
+          return;
+        }
+        if (!cleanMessage) {
+          setSupportError(tr('support.messageRequired', 'Message is required.'));
+          setIsSupportSending(false);
+          return;
+        }
+
+        const threadRef = doc(collection(db, 'users', supportCurrentUid, 'settings'));
+        const firstMessage: SupportMessageRow = {
+          id: `msg_${Date.now()}`,
+          threadId: threadRef.id,
+          text: cleanMessage.slice(0, 4000),
+          senderUid: supportCurrentUid,
+          senderRole: 'user',
+          senderName: auth.currentUser?.displayName || userProfile?.name || 'User',
+          createdAt: now,
+        };
+
+        await setDoc(threadRef, {
+          kind: 'support_thread',
+          subject: cleanSubject.slice(0, 180),
+          createdByUid: supportCurrentUid,
+          createdByName: auth.currentUser?.displayName || userProfile?.name || 'User',
+          createdByEmail: auth.currentUser?.email || userProfile?.email || '',
+          createdAt: now,
+          updatedAt: now,
+          status: 'waiting-admin',
+          lastMessageAt: now,
+          lastMessageFrom: 'user',
+          lastMessageText: cleanMessage.slice(0, 300),
+          adminSeenAt: '',
+          userSeenAt: now,
+          messages: [firstMessage],
+        });
+        setSupportDraftSubject('');
+        setSupportDraftMessage('');
+        setSupportSelectedThreadId(threadRef.id);
+        setSupportSuccess(tr('support.requestSent', 'Support request sent.'));
+      }
+    } catch (error) {
+      console.error('Support widget send failed:', error);
+      setSupportError(tr('support.sendFailed', 'Failed to send support message.'));
+    } finally {
+      setIsSupportSending(false);
+    }
   };
 
   const handleDateClick = (range: DateRangeType) => {
@@ -607,6 +849,169 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
       <div className="flex items-center gap-4">
         <ThemeSwitcher />
         <LanguageSwitcher />
+
+        <div className="relative">
+          <button
+            onClick={handleToggleSupport}
+            className={cn(
+              "p-2 rounded-lg transition-colors relative",
+              isSupportOpen ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+            )}
+            title={tr('notifications.openSupportInbox', 'תמיכה טכנית')}
+          >
+            <LifeBuoy className="w-6 h-6" />
+            {unreadSupportWidgetCount > 0 && (
+              <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
+            )}
+          </button>
+
+          {isSupportOpen && (
+            <div
+              className={cn(
+                "absolute top-full mt-2 w-80 sm:w-[360px] bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 overflow-hidden",
+                dir === 'rtl' ? "left-0" : "right-0"
+              )}
+            >
+              <div className="p-3 border-b border-gray-200 dark:border-white/10 bg-gray-50/50 dark:bg-white/5 flex items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">
+                    {tr('notifications.openSupportInbox', 'תמיכה טכנית')}
+                  </h4>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                    {canViewSupport
+                      ? tr('support.adminMini', 'חלון מענה מהיר לפניות משתמשים')
+                      : tr('support.userMini', 'שליחת פנייה מהירה לצוות התמיכה')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    window.history.pushState({}, '', '/support');
+                    window.dispatchEvent(new PopStateEvent('popstate'));
+                    setIsSupportOpen(false);
+                  }}
+                  className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  {tr('support.openFull', 'פתח מלא')}
+                </button>
+              </div>
+
+              <div className="p-3 space-y-3">
+                {supportThreads.length > 0 && (
+                  <div className="max-h-24 overflow-y-auto space-y-1">
+                    {supportThreads.map((thread) => {
+                      const lastAt = thread.lastMessageAt ? new Date(thread.lastMessageAt).getTime() : 0;
+                      const seenAt = canViewSupport
+                        ? (thread.adminSeenAt ? new Date(thread.adminSeenAt).getTime() : 0)
+                        : (thread.userSeenAt ? new Date(thread.userSeenAt).getTime() : 0);
+                      const expectedSender: 'user' | 'admin' = canViewSupport ? 'user' : 'admin';
+                      const unread = thread.lastMessageFrom === expectedSender && lastAt > seenAt;
+                      return (
+                        <button
+                          key={`support-mini-${thread.id}`}
+                          onClick={() => setSupportSelectedThreadId(thread.id)}
+                          className={cn(
+                            'w-full rounded-lg border px-2.5 py-2 text-xs text-start transition-colors',
+                            supportSelectedThreadId === thread.id
+                              ? 'border-indigo-300 bg-indigo-50/70 dark:bg-indigo-500/10 dark:border-indigo-400/50'
+                              : 'border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-gray-800 dark:text-gray-100 truncate">
+                              {thread.subject || tr('support.noSubject', 'ללא נושא')}
+                            </span>
+                            {unread && <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-gray-500 dark:text-gray-400 truncate">
+                            {thread.lastMessageText || tr('support.noMessages', 'אין הודעות עדיין')}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {selectedSupportThread ? (
+                  <>
+                    <div className="max-h-40 overflow-y-auto space-y-2 rounded-lg border border-gray-200 dark:border-white/10 p-2">
+                      {selectedSupportMessages.length > 0 ? (
+                        selectedSupportMessages.map((message) => {
+                          const mine = message.senderUid === supportCurrentUid;
+                          return (
+                            <div
+                              key={`mini-msg-${selectedSupportThread.id}-${message.id}`}
+                              className={cn('flex', mine ? 'justify-end' : 'justify-start')}
+                            >
+                              <div
+                                className={cn(
+                                  'max-w-[85%] rounded-xl px-2.5 py-1.5 text-[11px]',
+                                  mine
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-100'
+                                )}
+                              >
+                                {message.text}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                          {tr('support.noMessages', 'אין הודעות עדיין')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={supportReply}
+                        onChange={(event) => setSupportReply(event.target.value)}
+                        placeholder={tr('support.replyPlaceholder', 'כתוב תגובה מהירה...')}
+                        className="flex-1 h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1a1a] px-3 text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      />
+                      <button
+                        onClick={handleSupportSend}
+                        disabled={isSupportSending}
+                        className="h-9 px-3 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-60"
+                      >
+                        {tr('support.send', 'שלח')}
+                      </button>
+                    </div>
+                  </>
+                ) : canViewSupport ? (
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                    {tr('support.selectThread', 'בחר פנייה כדי להגיב')}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      value={supportDraftSubject}
+                      onChange={(event) => setSupportDraftSubject(event.target.value)}
+                      placeholder={tr('support.subject', 'נושא הפנייה')}
+                      className="w-full h-9 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1a1a] px-3 text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                    />
+                    <textarea
+                      value={supportDraftMessage}
+                      onChange={(event) => setSupportDraftMessage(event.target.value)}
+                      placeholder={tr('support.message', 'תאר בקצרה את הבעיה')}
+                      rows={3}
+                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#1a1a1a] px-3 py-2 text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 resize-none"
+                    />
+                    <button
+                      onClick={handleSupportSend}
+                      disabled={isSupportSending}
+                      className="w-full h-9 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 disabled:opacity-60"
+                    >
+                      {tr('support.sendRequest', 'שלח פנייה')}
+                    </button>
+                  </div>
+                )}
+
+                {supportError && <p className="text-[11px] text-red-500">{supportError}</p>}
+                {supportSuccess && <p className="text-[11px] text-emerald-600 dark:text-emerald-400">{supportSuccess}</p>}
+              </div>
+            </div>
+          )}
+        </div>
         
         <div className="relative">
           <button 
