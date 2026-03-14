@@ -39,6 +39,16 @@ type WizardField = {
   type?: 'text' | 'password' | 'url';
 };
 
+type WizardDraft = {
+  platform: WizardPlatform;
+  step: WizardStep;
+  values: Record<string, string>;
+  completedPlatforms: WizardPlatform[];
+  updatedAt: number;
+};
+
+const WIZARD_STORAGE_PREFIX = 'bscale.integrations.wizardDraft';
+
 const WIZARD_PLATFORM_OPTIONS: Array<{ id: WizardPlatform; label: string }> = [
   { id: 'google', label: 'Google' },
   { id: 'meta', label: 'Meta' },
@@ -83,6 +93,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const { t, dir, language } = useLanguage();
   const {
     connections,
+    dataOwnerUid,
     toggleConnection,
     updateConnectionSettings,
     clearConnectionSettings,
@@ -108,6 +119,9 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     wizardMainGoal: '',
     wizardNotes: '',
   });
+  const [wizardResumeAvailable, setWizardResumeAvailable] = useState(false);
+  const [wizardLastSavedAt, setWizardLastSavedAt] = useState<number | null>(null);
+  const [wizardLoadedStorageKey, setWizardLoadedStorageKey] = useState<string | null>(null);
   const blockIfReadOnly = (): boolean => {
     if (!isWorkspaceReadOnly) return false;
     setToast({
@@ -120,10 +134,73 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   };
   const languageSafeText = (value: string, fallback: string) => (value && value !== 'integrations.readOnlyWorkspace' ? value : fallback);
   const isHebrew = language === 'he';
+  const wizardStorageKey = `${WIZARD_STORAGE_PREFIX}:${dataOwnerUid || 'default'}`;
 
   const getConnectionSettingsById = (id: string): Record<string, string> => {
     return connections.find((c) => c.id === id)?.settings || {};
   };
+
+  const isWizardPlatformDone = (platform: WizardPlatform, sourceSettings?: Record<string, string>) => {
+    const connection = connections.find((c) => c.id === platform);
+    const settings = sourceSettings || connection?.settings || {};
+    const required = WIZARD_FIELDS[platform].filter((field) => field.required);
+    const requiredComplete = required.every((field) => String(settings[field.key] || '').trim());
+    const anyFieldFilled = Object.keys(settings).some((key) => String(settings[key] || '').trim());
+    return Boolean(connection?.status === 'connected' || requiredComplete || anyFieldFilled);
+  };
+
+  const isWizardValuesMeaningful = (values: Record<string, string>) => {
+    const nonEmptyKeys = Object.keys(values).filter((key) => String(values[key] || '').trim());
+    return nonEmptyKeys.length > 0;
+  };
+
+  const clearWizardDraft = () => {
+    try {
+      localStorage.removeItem(wizardStorageKey);
+    } catch (err) {
+      console.error('Failed to clear wizard draft:', err);
+    }
+    setWizardResumeAvailable(false);
+    setWizardLastSavedAt(null);
+    setWizardStep(1);
+    setWizardPlatform('google');
+    setWizardValues({
+      wizardBusinessName: '',
+      wizardMainGoal: '',
+      wizardNotes: '',
+    });
+  };
+
+  const pauseWizardForLater = () => {
+    setIsWizardOpen(false);
+    setWizardResumeAvailable(true);
+    setToast({
+      message: isHebrew ? 'ההתקדמות נשמרה. אפשר להמשיך מהנקודה הזו בהמשך.' : 'Progress saved. You can continue from this point later.',
+      type: 'success',
+    });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const resumeWizard = () => {
+    if (blockIfReadOnly()) return;
+    setIsWizardOpen(true);
+  };
+
+  const wizardPlatforms = React.useMemo(
+    () => WIZARD_PLATFORM_OPTIONS.map((platform) => platform.id),
+    []
+  );
+  const completedWizardPlatforms = React.useMemo(
+    () => wizardPlatforms.filter((platform) => isWizardPlatformDone(platform)),
+    [wizardPlatforms, connections]
+  );
+  const wizardCompletedCount = completedWizardPlatforms.length;
+  const wizardTotalCount = wizardPlatforms.length;
+  const wizardHasPendingPlatforms = wizardCompletedCount < wizardTotalCount;
+  const wizardProgressPercent = Math.round((wizardCompletedCount / Math.max(wizardTotalCount, 1)) * 100);
+  const wizardLastSavedLabel = wizardLastSavedAt
+    ? new Date(wizardLastSavedAt).toLocaleString(isHebrew ? 'he-IL' : 'en-US')
+    : null;
 
   const openConnectionWizard = (platform: WizardPlatform) => {
     if (blockIfReadOnly()) return;
@@ -207,6 +284,8 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
       await handleSave(wizardPlatform, payload);
       setIsWizardOpen(false);
       setWizardStep(1);
+      setWizardResumeAvailable(true);
+      setWizardLastSavedAt(Date.now());
       setToast({
         message: isHebrew
           ? 'שאלון ההתחברות הושלם והנכסים נשמרו לחיבור.'
@@ -226,6 +305,65 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
       setWizardSaving(false);
     }
   };
+
+  React.useEffect(() => {
+    if (wizardLoadedStorageKey === wizardStorageKey) return;
+    setWizardLoadedStorageKey(wizardStorageKey);
+    setWizardStep(1);
+    setWizardPlatform('google');
+    setWizardValues({
+      wizardBusinessName: '',
+      wizardMainGoal: '',
+      wizardNotes: '',
+    });
+    setWizardLastSavedAt(null);
+    try {
+      const raw = localStorage.getItem(wizardStorageKey);
+      if (!raw) {
+        setWizardResumeAvailable(false);
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<WizardDraft>;
+      const parsedPlatform = parsed.platform;
+      const parsedStep = parsed.step;
+      const parsedValues = parsed.values;
+      const platformIsValid = parsedPlatform && WIZARD_PLATFORM_OPTIONS.some((item) => item.id === parsedPlatform);
+      const stepIsValid = parsedStep === 1 || parsedStep === 2 || parsedStep === 3;
+      if (platformIsValid) {
+        setWizardPlatform(parsedPlatform);
+      }
+      if (stepIsValid) {
+        setWizardStep(parsedStep);
+      }
+      if (parsedValues && typeof parsedValues === 'object') {
+        setWizardValues((prev) => ({ ...prev, ...parsedValues }));
+        setWizardResumeAvailable(isWizardValuesMeaningful(parsedValues));
+      }
+      if (typeof parsed.updatedAt === 'number') {
+        setWizardLastSavedAt(parsed.updatedAt);
+      }
+    } catch (err) {
+      console.error('Failed to hydrate wizard draft:', err);
+      setWizardResumeAvailable(false);
+    }
+  }, [wizardStorageKey, wizardLoadedStorageKey]);
+
+  React.useEffect(() => {
+    const draft: WizardDraft = {
+      platform: wizardPlatform,
+      step: wizardStep,
+      values: wizardValues,
+      completedPlatforms: completedWizardPlatforms,
+      updatedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(wizardStorageKey, JSON.stringify(draft));
+      setWizardLastSavedAt(draft.updatedAt);
+      setWizardResumeAvailable(isWizardValuesMeaningful(wizardValues) || completedWizardPlatforms.length > 0);
+    } catch (err) {
+      console.error('Failed to persist wizard draft:', err);
+    }
+  }, [wizardPlatform, wizardStep, wizardValues, completedWizardPlatforms, wizardStorageKey]);
 
   const handleMigrateAi = async () => {
     if (blockIfReadOnly()) return;
@@ -1083,11 +1221,19 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                 </span>
               </div>
               <button
-                onClick={() => openConnectionWizard('google')}
+                onClick={() => {
+                  if (wizardResumeAvailable) {
+                    resumeWizard();
+                    return;
+                  }
+                  openConnectionWizard('google');
+                }}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/20 border border-white/30 text-white font-bold text-sm hover:bg-white/30 transition-all"
               >
                 <Settings2 className="w-4 h-4" />
-                {isHebrew ? 'שאלון התחברות לנכסים' : 'Assets connection wizard'}
+                {wizardResumeAvailable
+                  ? (isHebrew ? 'חזרה מהירה לאשף' : 'Quick return to wizard')
+                  : (isHebrew ? 'שאלון התחברות לנכסים' : 'Assets connection wizard')}
               </button>
               <button
                 onClick={() => {
@@ -1136,6 +1282,48 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
           </motion.div>
         )}
       </AnimatePresence>
+
+      {(wizardResumeAvailable || (wizardCompletedCount > 0 && wizardHasPendingPlatforms)) && !isWizardOpen && (
+        <div className="max-w-7xl mx-auto mb-6">
+          <div className="rounded-2xl border-2 border-indigo-100 bg-indigo-50/70 p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-indigo-900">
+                {isHebrew ? 'אשף החיבורים מוכן להמשך' : 'Connections wizard ready to continue'}
+              </p>
+              <p className="text-xs text-indigo-700 mt-1">
+                {isHebrew
+                  ? `הושלמו ${wizardCompletedCount} מתוך ${wizardTotalCount} חיבורים. אפשר לחזור בכל רגע ולהמשיך מאותה נקודה.`
+                  : `${wizardCompletedCount} of ${wizardTotalCount} connections completed. Return anytime and continue from the same point.`}
+              </p>
+              {wizardLastSavedLabel && (
+                <p className="text-[11px] text-indigo-600 mt-1">
+                  {isHebrew ? `עודכן לאחרונה: ${wizardLastSavedLabel}` : `Last updated: ${wizardLastSavedLabel}`}
+                </p>
+              )}
+              <div className="mt-3 h-2 w-full max-w-md rounded-full bg-indigo-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-indigo-600 transition-all"
+                  style={{ width: `${Math.min(100, Math.max(0, wizardProgressPercent))}%` }}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={resumeWizard}
+                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-colors"
+              >
+                {isHebrew ? 'המשך הגדרות אשף' : 'Continue wizard setup'}
+              </button>
+              <button
+                onClick={clearWizardDraft}
+                className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-white text-xs sm:text-sm font-semibold hover:bg-indigo-50 transition-colors"
+              >
+                {isHebrew ? 'איפוס זיכרון אשף' : 'Reset wizard memory'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence>
         {isWizardOpen && (
@@ -1205,22 +1393,48 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {WIZARD_PLATFORM_OPTIONS.map((platform) => (
-                          <button
-                            key={`wizard-platform-${platform.id}`}
-                            onClick={() => {
-                              const nextSettings = getConnectionSettingsById(platform.id);
-                              setWizardPlatform(platform.id);
-                              setWizardValues((prev) => ({ ...prev, ...nextSettings }));
-                            }}
-                            className={cn(
-                              'px-3 py-2 rounded-lg border text-sm font-semibold text-left transition-colors',
-                              wizardPlatform === platform.id
-                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                            )}
-                          >
-                            {platform.label}
-                          </button>
+                          (() => {
+                            const connection = connections.find((c) => c.id === platform.id);
+                            const connectionSettings = connection?.settings || {};
+                            const hasAnySavedValue = Object.keys(connectionSettings).some((key) => String(connectionSettings[key] || '').trim());
+                            const isDone = isWizardPlatformDone(platform.id, connectionSettings);
+                            return (
+                              <button
+                                key={`wizard-platform-${platform.id}`}
+                                onClick={() => {
+                                  const nextSettings = getConnectionSettingsById(platform.id);
+                                  setWizardPlatform(platform.id);
+                                  setWizardValues((prev) => ({ ...prev, ...nextSettings }));
+                                }}
+                                className={cn(
+                                  'px-3 py-2 rounded-lg border text-sm font-semibold text-left transition-colors',
+                                  wizardPlatform === platform.id
+                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span>{platform.label}</span>
+                                  <span
+                                    className={cn(
+                                      'text-[10px] px-2 py-0.5 rounded-full font-bold',
+                                      isDone
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : hasAnySavedValue
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-gray-100 text-gray-500'
+                                    )}
+                                  >
+                                    {isDone
+                                      ? (isHebrew ? 'הושלם' : 'Completed')
+                                      : hasAnySavedValue
+                                      ? (isHebrew ? 'בטיוטה' : 'Draft')
+                                      : (isHebrew ? 'לא הוגדר' : 'Not set')}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })()
                         ))}
                       </div>
                     </div>
@@ -1363,13 +1577,22 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
               </div>
 
               <div className="px-5 py-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
-                <button
-                  onClick={handleWizardBack}
-                  disabled={wizardStep === 1 || wizardSaving}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold disabled:opacity-50"
-                >
-                  {isHebrew ? 'חזרה' : 'Back'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleWizardBack}
+                    disabled={wizardStep === 1 || wizardSaving}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {isHebrew ? 'חזרה' : 'Back'}
+                  </button>
+                  <button
+                    onClick={pauseWizardForLater}
+                    disabled={wizardSaving}
+                    className="px-4 py-2 rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {isHebrew ? 'המשך אחר כך' : 'Continue later'}
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-2">
                   {wizardStep < 3 ? (
