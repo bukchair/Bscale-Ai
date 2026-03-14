@@ -7,8 +7,19 @@ declare global {
 }
 
 function createPrismaClient() {
-  const connectionString =
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/bscale_integrations';
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_URL is required in production runtime for Prisma.');
+    }
+    // Local fallback for development environments without a configured DB.
+    return new PrismaClient({
+      adapter: new PrismaPg({
+        connectionString: 'postgresql://postgres:postgres@localhost:5432/bscale_integrations',
+      }),
+      log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    });
+  }
 
   return new PrismaClient({
     adapter: new PrismaPg({ connectionString }),
