@@ -7,6 +7,10 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+googleProvider.addScope('openid');
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
 
 export { signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut };
 

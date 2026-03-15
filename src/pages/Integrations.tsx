@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { fetchGA4Report, fetchGoogleDiscovery } from '../services/googleService';
+import { fetchGA4Report } from '../services/googleService';
+import { auth } from '../lib/firebase';
 
 type ConnectionFlowState = {
   integrated: boolean;
@@ -23,6 +24,21 @@ type MetaAssetsData = {
   defaultMessageAccountId?: string;
   defaultPixelId?: string;
 };
+
+type GoogleServiceSlug = 'google-ads' | 'ga4' | 'search-console' | 'gmail';
+type GoogleSubConnectionId = 'google_ads' | 'ga4' | 'gsc' | 'gmail';
+
+const GOOGLE_SERVICE_ROWS: Array<{
+  slug: GoogleServiceSlug;
+  subId: GoogleSubConnectionId;
+  labelEn: string;
+  labelHe: string;
+}> = [
+  { slug: 'google-ads', subId: 'google_ads', labelEn: 'Google Ads', labelHe: 'Google Ads' },
+  { slug: 'ga4', subId: 'ga4', labelEn: 'Google Analytics 4', labelHe: 'Google Analytics 4' },
+  { slug: 'search-console', subId: 'gsc', labelEn: 'Google Search Console', labelHe: 'Google Search Console' },
+  { slug: 'gmail', subId: 'gmail', labelEn: 'Gmail', labelHe: 'Gmail' },
+];
 
 const iconMap: Record<string, React.ElementType> = {
   'gemini': Sparkles,
@@ -45,7 +61,7 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
 export function Integrations() {
   const { t, dir } = useLanguage();
   const isHebrew = dir === 'rtl';
-  const { connections, toggleConnection, updateConnectionSettings, testConnection } = useConnections();
+  const { connections, toggleConnection, updateConnectionSettings, testConnection, syncGoogleServices } = useConnections();
   const [error, setError] = useState<{ id: string; message: string } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
@@ -56,6 +72,12 @@ export function Integrations() {
   const [metaAssetsLoading, setMetaAssetsLoading] = useState(false);
   const [metaAssets, setMetaAssets] = useState<MetaAssetsData | null>(null);
   const [connectionFlowState, setConnectionFlowState] = useState<Record<string, ConnectionFlowState>>({});
+  const [googleServiceBusy, setGoogleServiceBusy] = useState<Record<GoogleServiceSlug, boolean>>({
+    'google-ads': false,
+    ga4: false,
+    'search-console': false,
+    gmail: false,
+  });
 
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -134,6 +156,83 @@ export function Integrations() {
     }));
   };
 
+  const getActiveUid = () => auth.currentUser?.uid || '';
+
+  const setGoogleServiceLoading = (slug: GoogleServiceSlug, loading: boolean) => {
+    setGoogleServiceBusy((prev) => ({ ...prev, [slug]: loading }));
+  };
+
+  const handleGoogleServiceConnect = async (serviceSlug: GoogleServiceSlug, selectDifferentAccount = false) => {
+    const uid = getActiveUid();
+    if (!uid) {
+      setToast({
+        message: isHebrew ? 'נדרש משתמש מחובר לפני חיבור Google.' : 'You must be logged in before connecting Google.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setGoogleServiceLoading(serviceSlug, true);
+    try {
+      const query = new URLSearchParams({
+        user_id: uid,
+        select_account: selectDifferentAccount ? '1' : '0',
+      });
+      const response = await fetch(`/api/integrations/${serviceSlug}/start?${query.toString()}`);
+      const payload = (await response.json().catch(() => null)) as { url?: string; message?: string } | null;
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.message || t('integrations.oauth.googleStartFailed'));
+      }
+
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      window.open(payload.url, `google_service_${serviceSlug}`, `width=${width},height=${height},left=${left},top=${top}`);
+      patchFlowState('google', { integrated: false, tested: false });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : t('integrations.oauth.googleStartFailed'),
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 4000);
+    } finally {
+      setGoogleServiceLoading(serviceSlug, false);
+    }
+  };
+
+  const handleGoogleServiceDisconnect = async (serviceSlug: GoogleServiceSlug) => {
+    const uid = getActiveUid();
+    if (!uid) return;
+    setGoogleServiceLoading(serviceSlug, true);
+    try {
+      const response = await fetch(`/api/integrations/${serviceSlug}/disconnect`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ user_id: uid }),
+      });
+      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+      if (!response.ok) {
+        throw new Error(payload?.message || (isHebrew ? 'ניתוק השירות נכשל.' : 'Failed to disconnect service.'));
+      }
+
+      await syncGoogleServices();
+      setToast({
+        message: isHebrew ? 'שירות Google נותק בהצלחה.' : 'Google service disconnected successfully.',
+        type: 'success',
+      });
+      patchFlowState('google', { tested: false });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : (isHebrew ? 'ניתוק השירות נכשל.' : 'Failed to disconnect service.'),
+        type: 'error',
+      });
+    } finally {
+      setGoogleServiceLoading(serviceSlug, false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  };
+
   const handleTikTokConnect = async () => {
     try {
       const response = await fetch(`/api/auth/tiktok/url`);
@@ -176,42 +275,6 @@ export function Integrations() {
       console.error("Failed to get Meta auth URL:", err);
       setToast({ message: t('integrations.oauth.metaStartFailed'), type: 'error' });
     }
-  };
-
-  const handleGoogleConnect = async (selectDifferentAccount = false) => {
-    try {
-      const response = await fetch(`/api/auth/google/url?select_account=${selectDifferentAccount ? '1' : '0'}`);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`${t('integrations.oauth.getAuthUrlFailed')}: ${response.status} ${text}`);
-      }
-      const { url } = await response.json();
-      
-      const width = 600;
-      const height = 700;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      
-      window.open(
-        url,
-        'google_auth',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-    } catch (err) {
-      console.error("Failed to get Google auth URL:", err);
-      setToast({ message: `${t('integrations.oauth.googleStartFailed')}: ${err instanceof Error ? err.message : t('common.error')}`, type: 'error' });
-    }
-  };
-
-  const getDiscoveredGoogleSettings = async (accessToken: string) => {
-    const discovery = await fetchGoogleDiscovery(accessToken);
-    const discovered = discovery.discovered || {};
-    return {
-      googleAdsId: discovered.googleAdsId || '',
-      ga4PropertyId: discovered.ga4PropertyId || '',
-      gscSiteUrl: discovered.gscSiteUrl || '',
-      ga4PropertyName: discovered.ga4PropertyName || '',
-    };
   };
 
   const handleMetaAssetsLoad = async () => {
@@ -346,16 +409,30 @@ export function Integrations() {
   };
 
   const handleGoogleDiscovery = async () => {
-    const googleConn = connections.find(c => c.id === 'google');
-    const accessToken = formValues.googleAccessToken || googleConn?.settings?.googleAccessToken;
-    if (!accessToken) {
-      setToast({ message: t('integrations.oauth.googleTokenMissing'), type: 'error' });
+    const uid = getActiveUid();
+    if (!uid) {
+      setToast({
+        message: isHebrew ? 'יש להתחבר למערכת לפני סריקת Google.' : 'Please log in before scanning Google resources.',
+        type: 'error',
+      });
       return;
     }
 
     setDiscoveringGoogle(true);
     try {
-      const discoveredSettings = await getDiscoveredGoogleSettings(accessToken);
+      const response = await fetch(`/api/integrations/google/discover?user_id=${encodeURIComponent(uid)}`);
+      const payload = (await response.json().catch(() => null)) as
+        | { discovered?: Record<string, string>; message?: string }
+        | null;
+      if (!response.ok) {
+        throw new Error(payload?.message || (isHebrew ? 'סריקת Google נכשלה.' : 'Google discovery failed.'));
+      }
+      const discoveredSettings = {
+        googleAdsId: payload?.discovered?.googleAdsId || '',
+        ga4PropertyId: payload?.discovered?.ga4PropertyId || '',
+        gscSiteUrl: payload?.discovered?.gscSiteUrl || '',
+        ga4PropertyName: payload?.discovered?.ga4PropertyName || '',
+      };
       const mergedSettings = { ...formValues, ...discoveredSettings };
       setFormValues(mergedSettings);
       patchFlowState('google', { assetsLoaded: true, tested: false });
@@ -372,7 +449,6 @@ export function Integrations() {
 
   const handleValidateGa4Property = async () => {
     const googleConn = connections.find((c) => c.id === 'google');
-    const accessToken = formValues.googleAccessToken || googleConn?.settings?.googleAccessToken || '';
     const rawPropertyId =
       formValues.ga4PropertyId ||
       formValues.ga4Id ||
@@ -399,20 +475,10 @@ export function Integrations() {
       return;
     }
 
-    if (!accessToken) {
-      setGa4ValidationResult({
-        type: 'error',
-        message: isHebrew
-          ? 'חסר Google Access Token. יש לבצע חיבור Google לפני בדיקת GA4.'
-          : 'Missing Google access token. Please connect Google before testing GA4.',
-      });
-      return;
-    }
-
     setGa4ValidationLoading(true);
     setGa4ValidationResult(null);
     try {
-      const result = await fetchGA4Report(accessToken, propertyId);
+      const result = await fetchGA4Report('', propertyId);
       const rowsCount = Array.isArray((result as any)?.rows) ? (result as any).rows.length : 0;
       setFormValues((prev) => ({ ...prev, ga4PropertyId: propertyId, ga4Id: propertyId }));
       setGa4ValidationResult({
@@ -468,27 +534,17 @@ export function Integrations() {
         setToast({ message: t('integrations.oauth.metaConnected'), type: 'success' });
       }
 
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'google') {
-        const { tokens } = event.data;
-        // Update connection settings with tokens and discovered resource IDs
-        const tokenSettings = {
-          googleAccessToken: tokens.access_token,
-          googleRefreshToken: tokens.refresh_token || '',
-          googleExpiry: (Date.now() + tokens.expires_in * 1000).toString(),
-        };
-
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'google-service') {
+        const connectedService = String(event.data?.service || '').trim();
         setExpandedId('google');
-        try {
-          const discoveredSettings = await getDiscoveredGoogleSettings(tokens.access_token);
-          setFormValues((prev) => ({ ...prev, ...tokenSettings, ...discoveredSettings }));
-          patchFlowState('google', { integrated: true, assetsLoaded: true, tested: false });
-          setToast({ message: t('integrations.oauth.googleConnectedAndSynced'), type: 'success' });
-        } catch (err) {
-          console.error("Google discovery during OAuth failed:", err);
-          setFormValues((prev) => ({ ...prev, ...tokenSettings }));
-          patchFlowState('google', { integrated: true, tested: false });
-          setToast({ message: t('integrations.oauth.googleConnectedScanFailed'), type: 'error' });
-        }
+        await syncGoogleServices();
+        patchFlowState('google', { integrated: true, tested: false });
+        setToast({
+          message: isHebrew
+            ? `שירות Google חובר בהצלחה: ${connectedService || 'service'}.`
+            : `Google service connected successfully: ${connectedService || 'service'}.`,
+          type: 'success',
+        });
       }
 
       if (event.data?.type === 'OAUTH_AUTH_ERROR') {
@@ -498,7 +554,11 @@ export function Integrations() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [formValues]);
+  }, [formValues, isHebrew, syncGoogleServices, t]);
+
+  React.useEffect(() => {
+    void syncGoogleServices();
+  }, [syncGoogleServices]);
 
   const handleExpand = (integration: Connection) => {
     if (expandedId === integration.id) {
@@ -581,6 +641,20 @@ export function Integrations() {
   const handleToggle = async (id: string, subId?: string) => {
     setError(null);
     try {
+      if (id === 'google' && !subId) {
+        await Promise.allSettled(
+          GOOGLE_SERVICE_ROWS.map((row) =>
+            fetch(`/api/integrations/${row.slug}/disconnect`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ user_id: getActiveUid() }),
+            })
+          )
+        );
+        await syncGoogleServices();
+        patchFlowState('google', { integrated: false, assetsLoaded: false, tested: false });
+        return;
+      }
       await toggleConnection(id, subId);
       if (supportsStructuredFlow(id)) {
         patchFlowState(id, { integrated: false, assetsLoaded: false, tested: false });
@@ -845,28 +919,83 @@ export function Integrations() {
               {integration.id === 'google' && (
                 <>
                   <div className="sm:col-span-2">
-                    <button
-                      onClick={() => {
-                        patchFlowState('google', { integrated: false, tested: false });
-                        void handleGoogleConnect(false);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
-                    >
-                      <Megaphone className="w-4 h-4" />
-                      {isConnected ? t('integrations.reconnectGoogle') : t('integrations.connectGoogle')}
-                    </button>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <button
-                      onClick={() => {
-                        patchFlowState('google', { integrated: false, tested: false });
-                        void handleGoogleConnect(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 bg-white border border-blue-200 text-blue-700 py-2 rounded-lg font-bold hover:bg-blue-50 transition-all"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {t('integrations.connectGoogleDifferent')}
-                    </button>
+                    <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3 space-y-2.5">
+                      <p className="text-[11px] font-black text-blue-900">
+                        {isHebrew
+                          ? 'Google כולל 4 שירותים עצמאיים עם OAuth וטוקנים נפרדים'
+                          : 'Google includes 4 independent services with separate OAuth and tokens'}
+                      </p>
+                      <div className="space-y-2">
+                        {GOOGLE_SERVICE_ROWS.map((row) => {
+                          const subStatus =
+                            integration.subConnections?.find((sub) => sub.id === row.subId)?.status || 'disconnected';
+                          const isBusy = googleServiceBusy[row.slug];
+                          const isRowConnected = subStatus === 'connected';
+                          return (
+                            <div
+                              key={`google-service-${row.slug}`}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-white px-2.5 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-gray-900">
+                                  {isHebrew ? row.labelHe : row.labelEn}
+                                </p>
+                                <p
+                                  className={cn(
+                                    'text-[10px] font-bold uppercase',
+                                    subStatus === 'connected'
+                                      ? 'text-emerald-600'
+                                      : subStatus === 'connecting'
+                                      ? 'text-blue-600'
+                                      : subStatus === 'error'
+                                      ? 'text-red-600'
+                                      : 'text-gray-500'
+                                  )}
+                                >
+                                  {subStatus}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => void handleGoogleServiceConnect(row.slug)}
+                                  className="px-2.5 py-1.5 text-[10px] font-bold rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1"
+                                >
+                                  {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Megaphone className="w-3 h-3" />}
+                                  {isRowConnected
+                                    ? isHebrew
+                                      ? 'Reconnect'
+                                      : 'Reconnect'
+                                    : isHebrew
+                                    ? 'Connect'
+                                    : 'Connect'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => void handleGoogleServiceConnect(row.slug, true)}
+                                  className="px-2.5 py-1.5 text-[10px] font-bold rounded-md border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-60 flex items-center gap-1"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  {isHebrew ? 'חשבון אחר' : 'Switch account'}
+                                </button>
+                                {isRowConnected && (
+                                  <button
+                                    type="button"
+                                    disabled={isBusy}
+                                    onClick={() => void handleGoogleServiceDisconnect(row.slug)}
+                                    className="px-2.5 py-1.5 text-[10px] font-bold rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60"
+                                  >
+                                    {isHebrew ? 'נתק' : 'Disconnect'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                   {(isFlowStructured ? flowState.integrated : isConnected) && (
                     <div className="sm:col-span-2">
@@ -880,7 +1009,7 @@ export function Integrations() {
                       </button>
                     </div>
                   )}
-                  {(isFlowStructured ? flowState.integrated : isConnected) && (
+                  {true && (
                     <>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adsAccountId')}</label>
@@ -912,10 +1041,6 @@ export function Integrations() {
                       <div className="sm:col-span-2">
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.searchConsoleSiteUrl')}</label>
                         <input type="text" placeholder="sc-domain:example.com or https://example.com/" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.gscSiteUrl || ""} onChange={(e) => handleInputChange('gscSiteUrl', e.target.value)} />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.googleAccessToken')}</label>
-                        <input type="password" placeholder="ya29..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.googleAccessToken || ""} readOnly />
                       </div>
                     </>
                   )}

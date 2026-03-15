@@ -4,6 +4,18 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import axios from "axios";
 import dotenv from "dotenv";
+import {
+  buildGoogleOAuthUrl,
+  consumeOAuthState,
+  disconnectServiceConnection,
+  exchangeCodeForServiceToken,
+  getValidServiceAccessToken,
+  googleServiceCatalog,
+  listGoogleServiceConnections,
+  resolveUserIdFromRequest,
+  saveServiceConnection,
+  toPublicGoogleServicePayload,
+} from "./api/integrations/_lib/google-store";
 
 dotenv.config();
 
@@ -479,14 +491,220 @@ async function startServer() {
     }
   });
 
+  const postGooglePopupMessage = (options: {
+    type: "OAUTH_AUTH_SUCCESS" | "OAUTH_AUTH_ERROR";
+    service: string;
+    error?: string;
+  }) => `
+    <html>
+      <body>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage({
+              type: '${options.type}',
+              platform: 'google-service',
+              service: '${options.service}',
+              ${options.error ? `error: ${JSON.stringify(options.error)}` : "status: 'connected'"}
+            }, '*');
+          }
+          window.close();
+        </script>
+      </body>
+    </html>
+  `;
+
+  const googleServiceSlugs = googleServiceCatalog.allSlugs();
+  for (const serviceSlug of googleServiceSlugs) {
+    const serviceKey = googleServiceCatalog.slugToService(serviceSlug);
+    const callbackPath = `/api/integrations/${serviceSlug}/callback`;
+    const redirectEnvBySlug: Record<typeof serviceSlug, string | undefined> = {
+      "google-ads": process.env.GOOGLE_ADS_REDIRECT_URI,
+      ga4: process.env.GA4_REDIRECT_URI,
+      "search-console": process.env.SEARCH_CONSOLE_REDIRECT_URI,
+      gmail: process.env.GMAIL_REDIRECT_URI,
+    };
+
+    app.get(`/api/integrations/${serviceSlug}/start`, (req, res) => {
+      const userId = resolveUserIdFromRequest(req);
+      if (!userId) {
+        return res.status(400).json({ message: "Missing user_id" });
+      }
+      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+        return res.status(500).json({ message: "Google OAuth client is not configured" });
+      }
+
+      const host = req.get("x-forwarded-host") || req.get("host");
+      const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+      const redirectUri =
+        redirectEnvBySlug[serviceSlug] || `${proto}://${host}${callbackPath}`;
+      const selectAccount = String(req.query.select_account || "") === "1";
+      const { url } = buildGoogleOAuthUrl({
+        serviceSlug,
+        redirectUri,
+        userId,
+        selectAccount,
+      });
+      return res.json({ url });
+    });
+
+    app.get(callbackPath, async (req, res) => {
+      const code = String(req.query.code || "").trim();
+      const state = String(req.query.state || "").trim();
+      if (!code || !state) {
+        return res.send(
+          postGooglePopupMessage({
+            type: "OAUTH_AUTH_ERROR",
+            service: serviceKey,
+            error: "Missing OAuth callback code or state.",
+          })
+        );
+      }
+
+      const consumed = consumeOAuthState(state, serviceSlug);
+      if (!consumed?.user_id) {
+        return res.send(
+          postGooglePopupMessage({
+            type: "OAUTH_AUTH_ERROR",
+            service: serviceKey,
+            error: "Invalid or expired OAuth state.",
+          })
+        );
+      }
+
+      try {
+        const host = req.get("x-forwarded-host") || req.get("host");
+        const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+        const redirectUri =
+          redirectEnvBySlug[serviceSlug] || `${proto}://${host}${callbackPath}`;
+        const token = await exchangeCodeForServiceToken({ code, redirectUri });
+        saveServiceConnection({
+          userId: consumed.user_id,
+          serviceSlug,
+          token,
+        });
+        return res.send(
+          postGooglePopupMessage({
+            type: "OAUTH_AUTH_SUCCESS",
+            service: serviceKey,
+          })
+        );
+      } catch (error) {
+        return res.send(
+          postGooglePopupMessage({
+            type: "OAUTH_AUTH_ERROR",
+            service: serviceKey,
+            error: getAxiosErrorMessage(error, `Failed to authenticate ${serviceSlug}`),
+          })
+        );
+      }
+    });
+
+    app.post(`/api/integrations/${serviceSlug}/disconnect`, express.json(), (req, res) => {
+      const userId = resolveUserIdFromRequest(req);
+      if (!userId) {
+        return res.status(400).json({ message: "Missing user_id" });
+      }
+      disconnectServiceConnection({ userId, serviceSlug });
+      return res.json({ disconnected: true, service: serviceKey });
+    });
+
+    app.get(`/api/integrations/${serviceSlug}/access-token`, async (req, res) => {
+      const userId = resolveUserIdFromRequest(req);
+      if (!userId) {
+        return res.status(400).json({ message: "Missing user_id" });
+      }
+      try {
+        const accessToken = await getValidServiceAccessToken({ userId, service: serviceKey });
+        return res.json({ accessToken });
+      } catch (error) {
+        return res.status(400).json({
+          message: getAxiosErrorMessage(error, `Google service ${serviceSlug} is not connected.`),
+        });
+      }
+    });
+  }
+
+  app.get("/api/integrations/google/services", (req, res) => {
+    const userId = resolveUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(400).json({ message: "Missing user_id" });
+    }
+    const items = listGoogleServiceConnections(userId).map(toPublicGoogleServicePayload);
+    return res.json({ items });
+  });
+
+  app.get("/api/integrations/google/discover", async (req, res) => {
+    const userId = resolveUserIdFromRequest(req);
+    if (!userId) {
+      return res.status(400).json({ message: "Missing user_id" });
+    }
+
+    const discovered: Record<string, string> = {};
+    const warnings: string[] = [];
+
+    try {
+      const ga4Token = await getValidServiceAccessToken({ userId, service: "ga4" });
+      const ga4Response = await axios.get("https://analyticsadmin.googleapis.com/v1alpha/accountSummaries", {
+        params: { pageSize: 200 },
+        headers: { Authorization: `Bearer ${ga4Token}` },
+      });
+      const firstProperty = (ga4Response.data.accountSummaries || [])
+        .flatMap((summary: any) => summary.propertySummaries || [])
+        .find((property: any) => property?.property);
+
+      if (firstProperty?.property) {
+        discovered.ga4PropertyId = String(firstProperty.property).replace("properties/", "");
+        if (firstProperty.displayName) {
+          discovered.ga4PropertyName = firstProperty.displayName;
+        }
+      }
+    } catch (error) {
+      warnings.push(`GA4 discovery failed: ${getAxiosErrorMessage(error, "Unknown GA4 error")}`);
+    }
+
+    try {
+      const gscToken = await getValidServiceAccessToken({ userId, service: "search_console" });
+      const gscResponse = await axios.get("https://www.googleapis.com/webmasters/v3/sites", {
+        headers: { Authorization: `Bearer ${gscToken}` },
+      });
+      const site = (gscResponse.data.siteEntry || []).find((entry: any) =>
+        entry.permissionLevel && entry.permissionLevel !== "siteUnverified"
+      );
+      if (site?.siteUrl) {
+        discovered.gscSiteUrl = site.siteUrl;
+      }
+    } catch (error) {
+      warnings.push(`Search Console discovery failed: ${getAxiosErrorMessage(error, "Unknown GSC error")}`);
+    }
+
+    if (process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
+      try {
+        const adsToken = await getValidServiceAccessToken({ userId, service: "google_ads" });
+        const adsResponse = await axios.get("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
+          headers: {
+            Authorization: `Bearer ${adsToken}`,
+            "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+          }
+        });
+        const firstCustomerResource = adsResponse.data.resourceNames?.[0];
+        if (firstCustomerResource) {
+          discovered.googleAdsId = String(firstCustomerResource).replace("customers/", "");
+        }
+      } catch (error) {
+        warnings.push(`Google Ads discovery failed: ${getAxiosErrorMessage(error, "Unknown Google Ads error")}`);
+      }
+    } else {
+      warnings.push("Google Ads discovery skipped: GOOGLE_ADS_DEVELOPER_TOKEN is not configured.");
+    }
+
+    return res.json({ discovered, warnings });
+  });
+
   app.get(["/api/auth/google/url", "/api/auth/google/url/"], (req, res) => {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
     const forceAccountSelection = String(req.query.select_account || "") === "1";
     const scopes = [
-      "https://www.googleapis.com/auth/adwords",
-      "https://www.googleapis.com/auth/analytics.readonly",
-      "https://www.googleapis.com/auth/webmasters.readonly",
-      "https://www.googleapis.com/auth/gmail.send",
+      "openid",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email"
     ];

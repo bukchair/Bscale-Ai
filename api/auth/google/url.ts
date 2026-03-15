@@ -24,10 +24,7 @@ export default function handler(req: IncomingMessage & { query?: any; headers: a
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || fallbackRedirect;
 
   const scopes = [
-    'https://www.googleapis.com/auth/adwords',
-    'https://www.googleapis.com/auth/analytics.readonly',
-    'https://www.googleapis.com/auth/webmasters.readonly',
-    'https://www.googleapis.com/auth/gmail.send',
+    'openid',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email',
   ];

@@ -1,9 +1,60 @@
-export async function fetchGoogleAdAccounts(accessToken: string) {
-  const response = await fetch(`/api/google/discover`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+import { auth, onAuthStateChanged } from '../lib/firebase';
+
+type GoogleServiceSlug = 'google-ads' | 'ga4' | 'search-console' | 'gmail';
+
+const getActiveUid = async (): Promise<string> => {
+  const existing = auth.currentUser?.uid;
+  if (existing) return existing;
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        resolve('');
+      }
+    }, 3000);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      unsubscribe();
+      resolve(user?.uid || '');
+    });
   });
+};
+
+const getManagedGoogleAccessToken = async (
+  serviceSlug: GoogleServiceSlug,
+  providedToken?: string
+): Promise<{ accessToken: string; uid: string }> => {
+  const normalized = String(providedToken || '').trim();
+  const uid = await getActiveUid();
+
+  if (normalized && normalized !== 'server-managed') {
+    return { accessToken: normalized, uid };
+  }
+
+  if (!uid) {
+    throw new Error('Missing authenticated user context for managed Google service token.');
+  }
+
+  const response = await fetch(
+    `/api/integrations/${serviceSlug}/access-token?user_id=${encodeURIComponent(uid)}`
+  );
+  const payload = (await response.json().catch(() => null)) as
+    | { accessToken?: string; message?: string }
+    | null;
+  if (!response.ok || !payload?.accessToken) {
+    throw new Error(payload?.message || `Failed to resolve ${serviceSlug} access token.`);
+  }
+  return { accessToken: payload.accessToken, uid };
+};
+
+export async function fetchGoogleAdAccounts(accessToken: string) {
+  const uid = await getActiveUid();
+  const query = uid ? `?user_id=${encodeURIComponent(uid)}` : '';
+  const response = await fetch(`/api/integrations/google/discover${query}`);
   
   if (!response.ok) {
     const error = await response.json();
@@ -32,9 +83,11 @@ export async function refreshGoogleAccessToken(refreshToken: string): Promise<{ 
 }
 
 export async function validateGoogleAccessToken(accessToken: string): Promise<{ valid: boolean; account?: { email?: string; name?: string } }> {
+  const { accessToken: resolvedAccessToken, uid } = await getManagedGoogleAccessToken('google-ads', accessToken);
   const response = await fetch('/api/google/validate', {
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      'Authorization': `Bearer ${resolvedAccessToken}`,
+      ...(uid ? { 'x-user-id': uid } : {}),
     },
   });
 
@@ -52,6 +105,7 @@ export async function fetchGoogleCampaigns(
   loginCustomerId?: string,
   dateRange?: DateRangeParams
 ) {
+  const resolved = await getManagedGoogleAccessToken('google-ads', accessToken);
   const search = new URLSearchParams({ customer_id: customerId });
   if (loginCustomerId) {
     search.set('login_customer_id', loginCustomerId);
@@ -63,7 +117,8 @@ export async function fetchGoogleCampaigns(
 
   const response = await fetch(`/api/google/ads/campaigns?${search.toString()}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
     }
   });
   
@@ -96,6 +151,7 @@ export async function fetchGoogleSearchTerms(
   loginCustomerId?: string,
   dateRange?: DateRangeParams
 ) {
+  const resolved = await getManagedGoogleAccessToken('google-ads', accessToken);
   const search = new URLSearchParams({ customer_id: customerId });
   if (loginCustomerId) {
     search.set('login_customer_id', loginCustomerId);
@@ -107,7 +163,8 @@ export async function fetchGoogleSearchTerms(
 
   const response = await fetch(`/api/google/ads/search-terms?${search.toString()}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
     }
   });
 
@@ -141,10 +198,12 @@ export async function fetchGoogleSearchTerms(
 }
 
 export async function sendGmailNotification(accessToken: string, to: string, subject: string, body: string) {
+  const resolved = await getManagedGoogleAccessToken('gmail', accessToken);
   const response = await fetch('/api/google/gmail/send', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ to, subject, body })
@@ -159,6 +218,7 @@ export async function sendGmailNotification(accessToken: string, to: string, sub
 }
 
 export async function fetchGA4Report(accessToken: string, propertyId: string, dateRange?: DateRangeParams) {
+  const resolved = await getManagedGoogleAccessToken('ga4', accessToken);
   const search = new URLSearchParams({ property_id: propertyId });
   if (dateRange) {
     search.set('start_date', dateRange.startDate);
@@ -167,7 +227,8 @@ export async function fetchGA4Report(accessToken: string, propertyId: string, da
 
   const response = await fetch(`/api/google/analytics/report?${search.toString()}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
     }
   });
 
@@ -190,10 +251,17 @@ export interface GoogleDiscoveryResult {
 }
 
 export async function fetchGoogleDiscovery(accessToken: string): Promise<GoogleDiscoveryResult> {
-  const response = await fetch(`/api/google/discover`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+  const uid = await getActiveUid();
+  const query = uid ? `?user_id=${encodeURIComponent(uid)}` : '';
+  const headers: Record<string, string> = {};
+  if (accessToken && accessToken !== 'server-managed') {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  if (uid) {
+    headers['x-user-id'] = uid;
+  }
+  const response = await fetch(`/api/integrations/google/discover${query}`, {
+    headers,
   });
 
   if (!response.ok) {
@@ -222,6 +290,7 @@ export async function fetchGA4LiveData(
   propertyId?: string,
   dateRange?: DateRangeParams
 ): Promise<GA4LiveData> {
+  const resolved = await getManagedGoogleAccessToken('ga4', accessToken);
   const search = new URLSearchParams();
   if (propertyId && String(propertyId).trim()) {
     search.set('property_id', String(propertyId).trim());
@@ -233,7 +302,8 @@ export async function fetchGA4LiveData(
 
   const response = await fetch(`/api/google/analytics/live?${search.toString()}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
     }
   });
 
@@ -251,6 +321,7 @@ export async function fetchGA4LiveData(
 }
 
 export async function fetchGSCData(accessToken: string, siteUrl: string, dateRange?: DateRangeParams) {
+  const resolved = await getManagedGoogleAccessToken('search-console', accessToken);
   const search = new URLSearchParams({
     site_url: siteUrl,
   });
@@ -261,7 +332,8 @@ export async function fetchGSCData(accessToken: string, siteUrl: string, dateRan
 
   const response = await fetch(`/api/google/search-console/query?${search.toString()}`, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
+      'Authorization': `Bearer ${resolved.accessToken}`,
+      ...(resolved.uid ? { 'x-user-id': resolved.uid } : {}),
     }
   });
 

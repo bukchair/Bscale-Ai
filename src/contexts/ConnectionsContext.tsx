@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
-import { fetchGoogleDiscovery, refreshGoogleAccessToken, validateGoogleAccessToken } from '../services/googleService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
@@ -39,10 +38,20 @@ interface ConnectionsContextType {
     options?: { silent?: boolean }
   ) => Promise<void>;
   testConnection: (id: string) => Promise<{ success: boolean; message: string }>;
+  syncGoogleServices: () => Promise<void>;
   overallQualityScore: number;
   connectedCount: number;
   totalCount: number;
 }
+
+type GoogleServiceApiItem = {
+  provider: 'google';
+  service: 'google_ads' | 'ga4' | 'search_console' | 'gmail';
+  status: ConnectionStatus;
+  tokenExpiry?: number | null;
+  scope?: string | null;
+  updatedAt?: number;
+};
 
 const initialConnections: Connection[] = [
   { 
@@ -97,9 +106,79 @@ const initialConnections: Connection[] = [
 
 const ConnectionsContext = createContext<ConnectionsContextType | undefined>(undefined);
 
+const GOOGLE_SERVICE_TO_SUB_ID: Record<GoogleServiceApiItem['service'], string> = {
+  google_ads: 'google_ads',
+  ga4: 'ga4',
+  search_console: 'gsc',
+  gmail: 'gmail',
+};
+
+const applyGoogleServiceSnapshot = (
+  source: Connection[],
+  items: GoogleServiceApiItem[]
+): Connection[] => {
+  const statusByService = new Map(items.map((item) => [item.service, item.status]));
+  const connectedCount = items.filter((item) => item.status === 'connected').length;
+
+  return source.map((connection) => {
+    if (connection.id !== 'google') return connection;
+
+    const nextSubConnections = (connection.subConnections || []).map((subConnection) => {
+      const matchingService = (Object.keys(GOOGLE_SERVICE_TO_SUB_ID) as GoogleServiceApiItem['service'][]).find(
+        (service) => GOOGLE_SERVICE_TO_SUB_ID[service] === subConnection.id
+      );
+      if (!matchingService) return subConnection;
+      const nextStatus = statusByService.get(matchingService) || 'disconnected';
+      return {
+        ...subConnection,
+        status: nextStatus,
+        score: nextStatus === 'connected' ? 100 : undefined,
+      };
+    });
+
+    const googleStatus: ConnectionStatus = connectedCount > 0 ? 'connected' : 'disconnected';
+    const googleSettings = {
+      ...(connection.settings || {}),
+      googleAccessToken: connectedCount > 0 ? 'server-managed' : '',
+      googleAuthMode: 'service-split',
+      googleServicesStatus: JSON.stringify(
+        items.reduce<Record<string, ConnectionStatus>>((acc, item) => {
+          acc[item.service] = item.status;
+          return acc;
+        }, {})
+      ),
+    };
+
+    return {
+      ...connection,
+      status: googleStatus,
+      score: connectedCount > 0 ? Math.max(70, Math.min(100, 70 + connectedCount * 7)) : undefined,
+      subConnections: nextSubConnections,
+      settings: googleSettings,
+    };
+  });
+};
+
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
   const [isLoading, setIsLoading] = useState(true);
+
+  const syncGoogleServices = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const response = await fetch(
+        `/api/integrations/google/services?user_id=${encodeURIComponent(user.uid)}`
+      );
+      if (!response.ok) return;
+      const payload = (await response.json().catch(() => null)) as { items?: GoogleServiceApiItem[] } | null;
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      setConnections((prev) => applyGoogleServiceSnapshot(prev, items));
+    } catch (error) {
+      console.warn('Failed to sync Google services snapshot:', error);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
@@ -107,11 +186,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
         const unsubscribeSnapshot = onSnapshot(connectionsRef, (docSnap) => {
           if (docSnap.exists()) {
-            setConnections(docSnap.data().items || initialConnections);
+            const source = docSnap.data().items || initialConnections;
+            setConnections(source);
+            void syncGoogleServices();
           } else {
             // Initialize with clean state if not exists
             setDoc(connectionsRef, { items: initialConnections });
             setConnections(initialConnections);
+            void syncGoogleServices();
           }
           setIsLoading(false);
         });
@@ -123,7 +205,25 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribeAuth();
-  }, []);
+  }, [syncGoogleServices]);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+    void syncGoogleServices();
+
+    const intervalId = window.setInterval(() => {
+      void syncGoogleServices();
+    }, 30_000);
+    const handleFocus = () => {
+      void syncGoogleServices();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [syncGoogleServices]);
 
   const persistConnections = async (newConnections: Connection[]) => {
     const user = auth.currentUser;
@@ -261,17 +361,26 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
     let normalizedSettings: ConnectionSettings = { ...settings };
     if (id === 'google') {
-      const token = normalizedSettings.googleAccessToken || '';
-      if (token) {
-        try {
-          const discovery = await fetchGoogleDiscovery(token);
-          normalizedSettings = mergeGoogleDiscoveredSettings(normalizedSettings, discovery.discovered);
-        } catch (discoveryErr) {
+      try {
+        const userId = auth.currentUser?.uid || '';
+        if (userId) {
+          const response = await fetch(
+            `/api/integrations/google/discover?user_id=${encodeURIComponent(userId)}`
+          );
+          if (response.ok) {
+            const payload = (await response.json().catch(() => null)) as
+              | { discovered?: { ga4PropertyId?: string; gscSiteUrl?: string; googleAdsId?: string } }
+              | null;
+            normalizedSettings = mergeGoogleDiscoveredSettings(normalizedSettings, payload?.discovered);
+          } else {
+            normalizedSettings = mergeGoogleDiscoveredSettings(normalizedSettings);
+          }
+        } else {
           normalizedSettings = mergeGoogleDiscoveredSettings(normalizedSettings);
-          console.warn('Google discovery warning during save:', discoveryErr);
         }
-      } else {
+      } catch (discoveryErr) {
         normalizedSettings = mergeGoogleDiscoveredSettings(normalizedSettings);
+        console.warn('Google discovery warning during save:', discoveryErr);
       }
     }
 
@@ -355,144 +464,43 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Special logic for Google real verification
+    // Special logic for Google split services verification
     if (id === 'google') {
-      let accessToken = connection.settings?.googleAccessToken || '';
-      const refreshToken = connection.settings?.googleRefreshToken;
-      const expiry = Number(connection.settings?.googleExpiry || 0);
-      const hasManualGoogleSettings = Boolean(
-        connection.settings?.googleAdsId ||
-        connection.settings?.ga4PropertyId ||
-        connection.settings?.ga4Id ||
-        connection.settings?.gscSiteUrl
-      );
-
-      if (!accessToken && !refreshToken) {
-        if (hasManualGoogleSettings) {
-          const updatedConnections = connections.map(c =>
-            c.id === 'google' ? { ...c, status: 'connected' as ConnectionStatus, score: 85 } : c
-          );
-          setConnections(updatedConnections);
-          await persistConnections(updatedConnections);
-          return {
-            success: true,
-            message: 'החיבור נשמר במצב ידני. לנתונים חיים מומלץ לבצע Reconnect ל-Google.'
-          };
-        }
-        return { success: false, message: 'חסר Google access token. יש לבצע חיבור מחדש ל-Google.' };
+      const userId = auth.currentUser?.uid || '';
+      if (!userId) {
+        return { success: false, message: 'User is not authenticated.' };
       }
 
-      const persistGoogleTokens = async (token: string, expiresInSec: number) => {
-        const updatedConnections = connections.map(c =>
-          c.id === 'google'
-            ? {
-                ...c,
-                settings: {
-                  ...(c.settings || {}),
-                  googleAccessToken: token,
-                  googleExpiry: String(Date.now() + expiresInSec * 1000),
-                },
-              }
-            : c
-        );
-        setConnections(updatedConnections);
-        await persistConnections(updatedConnections);
-      };
-
-      const markGoogleConnected = async (
-        discovered?: {
-          ga4PropertyId?: string;
-          gscSiteUrl?: string;
-          googleAdsId?: string;
-        }
-      ) => {
-        const updatedConnections = connections.map(c =>
-          c.id === 'google'
-            ? {
-                ...c,
-                status: 'connected' as ConnectionStatus,
-                score: 100,
-                settings: mergeGoogleDiscoveredSettings({ ...(c.settings || {}) }, discovered),
-              }
-            : c
-        );
-        setConnections(updatedConnections);
-        await persistConnections(updatedConnections);
-      };
-
       try {
-        const shouldRefresh = !!refreshToken && (!!expiry && Date.now() > expiry - 60_000);
-        if (shouldRefresh) {
-          const refreshed = await refreshGoogleAccessToken(refreshToken);
-          accessToken = refreshed.access_token;
-          await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
+        const response = await fetch(`/api/integrations/google/services?user_id=${encodeURIComponent(userId)}`);
+        if (!response.ok) {
+          throw new Error('Failed to load Google service statuses');
         }
+        const payload = (await response.json().catch(() => null)) as { items?: GoogleServiceApiItem[] } | null;
+        const items = Array.isArray(payload?.items) ? payload.items : [];
 
-        if (!accessToken && refreshToken) {
-          const refreshed = await refreshGoogleAccessToken(refreshToken);
-          accessToken = refreshed.access_token;
-          await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
-        }
+        const updatedConnections = applyGoogleServiceSnapshot(connections, items);
+        setConnections(updatedConnections);
+        await persistConnections(updatedConnections);
 
-        await validateGoogleAccessToken(accessToken);
-        // Discovery failures should not block auth validation.
-        try {
-          const discovery = await fetchGoogleDiscovery(accessToken);
-          await markGoogleConnected(discovery.discovered);
-        } catch (discoveryErr) {
-          console.warn('Google discovery warning during test:', discoveryErr);
-          await markGoogleConnected();
-        }
-        return { success: true, message: 'החיבור ל-Google אומת בהצלחה.' };
-      } catch (err) {
-        try {
-          if (refreshToken) {
-            const refreshed = await refreshGoogleAccessToken(refreshToken);
-            accessToken = refreshed.access_token;
-            await persistGoogleTokens(accessToken, refreshed.expires_in || 3600);
-            await validateGoogleAccessToken(accessToken);
-            try {
-              const discovery = await fetchGoogleDiscovery(accessToken);
-              await markGoogleConnected(discovery.discovered);
-            } catch (discoveryErr) {
-              console.warn('Google discovery warning after refresh:', discoveryErr);
-              await markGoogleConnected();
-            }
-            return { success: true, message: 'החיבור ל-Google אומת בהצלחה לאחר רענון טוקן.' };
-          }
-        } catch (refreshErr) {
-          if (hasManualGoogleSettings) {
-            const updatedConnections = connections.map(c =>
-              c.id === 'google' ? { ...c, status: 'connected' as ConnectionStatus, score: 85 } : c
-            );
-            setConnections(updatedConnections);
-            await persistConnections(updatedConnections);
-            return {
-              success: true,
-              message: 'החיבור נשמר במצב ידני. אימות OAuth נכשל, אך ההגדרות נשמרו.'
-            };
-          }
+        const connectedServices = items.filter((item) => item.status === 'connected');
+        if (connectedServices.length === 0) {
           return {
             success: false,
-            message: `נכשל אימות החיבור ל-Google: ${refreshErr instanceof Error ? refreshErr.message : 'שגיאה לא ידועה'}`,
-          };
-        }
-
-        if (hasManualGoogleSettings) {
-          const updatedConnections = connections.map(c =>
-            c.id === 'google' ? { ...c, status: 'connected' as ConnectionStatus, score: 85 } : c
-          );
-          setConnections(updatedConnections);
-          await persistConnections(updatedConnections);
-          return {
-            success: true,
-            message: 'החיבור נשמר במצב ידני. אימות OAuth נכשל, אך ניתן להמשיך בהגדרות החיבור.'
+            message: 'No Google services are connected yet. Please connect at least one Google service.',
           };
         }
 
         return {
+          success: true,
+          message: `Google services verified (${connectedServices
+            .map((service) => service.service)
+            .join(', ')}).`,
+        };
+      } catch (error) {
+        return {
           success: false,
-          message: `נכשל אימות החיבור ל-Google: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`,
+          message: error instanceof Error ? error.message : 'Failed to verify Google service connections.',
         };
       }
     }
@@ -533,6 +541,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       toggleConnection, 
       updateConnectionSettings,
       testConnection,
+      syncGoogleServices,
       overallQualityScore, 
       connectedCount, 
       totalCount 
