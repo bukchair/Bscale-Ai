@@ -244,6 +244,8 @@ export function Campaigns() {
     wooRequireTarget: isHebrew
       ? 'בחר קטגוריה או מוצר לפרסום מתוך WooCommerce.'
       : 'Select a WooCommerce category or product to promote.',
+    markFullDay: isHebrew ? 'סמן יום מלא' : 'Mark full day',
+    unmarkFullDay: isHebrew ? 'בטל יום מלא' : 'Unmark full day',
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
@@ -1025,6 +1027,25 @@ export function Campaigns() {
         [day]: hasHour
           ? currentHours.filter((value) => value !== normalizedHour)
           : sanitizeHours([...currentHours, normalizedHour]),
+      };
+      return next;
+    });
+  };
+
+  const isFullDaySelected = (platform: string, day: DayKey) => {
+    const hours = weeklySchedule[platform]?.[day] || [];
+    return Array.isArray(hours) && hours.length === 24;
+  };
+
+  const toggleFullDay = (platform: string, day: DayKey) => {
+    setWeeklySchedule((prev) => {
+      const next: WeeklySchedule = { ...prev };
+      if (!next[platform]) next[platform] = createEmptyDaySchedule();
+      const currentHours = Array.isArray(next[platform][day]) ? next[platform][day] : [];
+      const fullDay = Array.from({ length: 24 }, (_, hour) => hour);
+      next[platform] = {
+        ...next[platform],
+        [day]: currentHours.length === 24 ? [] : fullDay,
       };
       return next;
     });
@@ -2251,6 +2272,22 @@ export function Campaigns() {
                         {dayLabels[day]}
                       </button>
                     ))}
+                  </div>
+                  <div className="mb-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleFullDay(selectedSchedulePlatform, selectedScheduleDay)}
+                      className={cn(
+                        'inline-flex items-center rounded-md border px-2.5 py-1 text-[11px] font-bold',
+                        isFullDaySelected(selectedSchedulePlatform, selectedScheduleDay)
+                          ? 'border-emerald-300 text-emerald-800 bg-emerald-100/70 hover:bg-emerald-100'
+                          : 'border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50'
+                      )}
+                    >
+                      {isFullDaySelected(selectedSchedulePlatform, selectedScheduleDay)
+                        ? text.unmarkFullDay
+                        : text.markFullDay}
+                    </button>
                   </div>
                   <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-12 gap-1.5">
                     {hourOptions.map((hour) => {
