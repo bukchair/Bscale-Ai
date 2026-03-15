@@ -15,7 +15,7 @@ import {
   resolveUserIdFromRequest,
   saveServiceConnection,
   toPublicGoogleServicePayload,
-} from "./api/integrations/_lib/google-store";
+} from "./src/server/google-store";
 
 dotenv.config();
 

@@ -143,7 +143,6 @@ const upsertConnection = (input: Omit<GoogleConnectionRow, 'provider'> & { provi
 
   if (idx >= 0) {
     const previous = store.connections[idx];
-    // Keep existing refresh token if new payload does not include one.
     row.refresh_token =
       row.refresh_token && row.refresh_token.trim()
         ? row.refresh_token
@@ -169,11 +168,6 @@ export const googleServiceCatalog = {
   scopeForSlug(slug: GoogleServiceSlug): string {
     return SERVICE_SCOPE_BY_SLUG[slug];
   },
-};
-
-export const resolveGoogleServiceSlug = (value: string): GoogleServiceSlug | null => {
-  if (value in SERVICE_SCOPE_BY_SLUG) return value as GoogleServiceSlug;
-  return null;
 };
 
 export const resolveUserIdFromRequest = (req: { query?: any; headers?: any; body?: any }): string => {
@@ -373,12 +367,3 @@ export const toPublicGoogleServicePayload = (row: GoogleConnectionRow) => ({
   scope: row.scope,
   updatedAt: row.updated_at,
 });
-
-// Prevent Vercel API route build errors if this helper file is scanned as a function.
-export default function _libGoogleStoreHandler(
-  _req: unknown,
-  res: { statusCode?: number; end: (body?: string) => void }
-) {
-  res.statusCode = 404;
-  res.end('Not Found');
-}
