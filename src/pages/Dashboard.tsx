@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -7,8 +7,9 @@ import { useDateRange } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
 import { auth } from '../lib/firebase';
-import { fetchGA4LiveData, fetchGSCData, GA4LiveData } from '../services/googleService';
+import { fetchGA4LiveData, fetchGSCData, fetchGoogleCampaigns, GA4LiveData } from '../services/googleService';
 import { fetchMetaAdAccounts, fetchMetaCampaigns } from '../services/metaService';
+import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { fetchWooCommerceProducts } from '../services/woocommerceService';
 import { useAppNavigation } from '../contexts/AppNavigationContext';
 
@@ -22,8 +23,9 @@ export function Dashboard() {
   const [ga4LiveData, setGa4LiveData] = useState<GA4LiveData | null>(null);
   const [ga4Error, setGa4Error] = useState<string | null>(null);
   const [gscTotals, setGscTotals] = useState<{ clicks: number; impressions: number; position: number; ctr: number } | null>(null);
-  const [overviewSyncStage, setOverviewSyncStage] = useState<'idle' | 'google-meta' | 'woocommerce'>('idle');
+  const [overviewSyncStage, setOverviewSyncStage] = useState<'idle' | 'platforms' | 'woocommerce'>('idle');
   const [wooLiveLoadingPercent, setWooLiveLoadingPercent] = useState(0);
+  const syncInFlightRef = useRef(false);
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -76,96 +78,164 @@ export function Dashboard() {
 
     let isCancelled = false;
 
+    const parseCurrencyNumber = (value: unknown): number => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value !== 'string') return 0;
+      const normalized = value.replace(/[^\d.-]/g, '');
+      const parsed = Number.parseFloat(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
     const loadOverviewData = async () => {
       if (isCancelled) return;
-      setOverviewSyncStage('google-meta');
+      if (syncInFlightRef.current) return;
+      syncInFlightRef.current = true;
+      setOverviewSyncStage('platforms');
+
+      let syncedAdSpendTotal = 0;
 
       try {
-        const ga4Data = await fetchGA4LiveData(accessToken, propertyId || undefined, resolvedRange);
-        if (!isCancelled) {
-          setGa4LiveData(ga4Data);
-          setGa4Error(null);
-        }
-      } catch (err) {
-        console.error("Failed to load GA4 live data:", err);
-        if (!isCancelled) {
-          setGa4LiveData(null);
-          setGa4Error(err instanceof Error ? err.message : t('common.error'));
-        }
-      }
-
-      try {
-        if (siteUrl) {
-          const gscData = await fetchGSCData(accessToken, siteUrl, resolvedRange);
-          const rows = gscData.rows || [];
-          const clicks = rows.reduce((sum: number, row: any) => sum + Number(row.clicks || 0), 0);
-          const impressions = rows.reduce((sum: number, row: any) => sum + Number(row.impressions || 0), 0);
-          const weightedPosition = rows.reduce((sum: number, row: any) => sum + (Number(row.position || 0) * Number(row.impressions || 0)), 0);
-          const position = impressions > 0 ? weightedPosition / impressions : 0;
-          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-
+        try {
+          // 1) Google sync (GA4/GSC + Google Ads for revenue window spend).
+          const ga4Data = await fetchGA4LiveData(accessToken, propertyId || undefined, resolvedRange);
           if (!isCancelled) {
-            setGscTotals({ clicks, impressions, position, ctr });
+            setGa4LiveData(ga4Data);
+            setGa4Error(null);
+          }
+        } catch (err) {
+          console.error("Failed to load GA4 live data:", err);
+          if (!isCancelled) {
+            setGa4LiveData(null);
+            setGa4Error(err instanceof Error ? err.message : t('common.error'));
           }
         }
-      } catch (err) {
-        console.error("Failed to load Search Console data:", err);
-        if (!isCancelled) {
-          setGscTotals(null);
-        }
-      }
 
-      // Stage 1 continues: ensure Meta connection is synced before WooCommerce.
-      try {
-        const metaToken = metaConnection?.settings?.metaToken;
-        if (metaConnection?.status === 'connected' && metaToken) {
-          let metaAdsId =
-            metaConnection.settings?.metaAdsId ||
-            metaConnection.settings?.adAccountId ||
-            metaConnection.settings?.metaAdAccountId ||
-            '';
+        try {
+          if (siteUrl) {
+            const gscData = await fetchGSCData(accessToken, siteUrl, resolvedRange);
+            const rows = gscData.rows || [];
+            const clicks = rows.reduce((sum: number, row: any) => sum + Number(row.clicks || 0), 0);
+            const impressions = rows.reduce((sum: number, row: any) => sum + Number(row.impressions || 0), 0);
+            const weightedPosition = rows.reduce((sum: number, row: any) => sum + (Number(row.position || 0) * Number(row.impressions || 0)), 0);
+            const position = impressions > 0 ? weightedPosition / impressions : 0;
+            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
 
-          if (!metaAdsId) {
-            try {
-              const accounts = await fetchMetaAdAccounts(metaToken);
-              metaAdsId = String(accounts?.[0]?.account_id || accounts?.[0]?.id || '').trim();
-            } catch (metaAccountErr) {
-              console.warn('Failed to discover Meta ad accounts during overview sync:', metaAccountErr);
+            if (!isCancelled) {
+              setGscTotals({ clicks, impressions, position, ctr });
             }
           }
-
-          if (metaAdsId) {
-            await fetchMetaCampaigns(metaToken, metaAdsId);
+        } catch (err) {
+          console.error("Failed to load Search Console data:", err);
+          if (!isCancelled) {
+            setGscTotals(null);
           }
         }
-      } catch (metaErr) {
-        console.warn('Failed to sync Meta campaigns during overview sync:', metaErr);
-      }
 
-      if (isCancelled) return;
-      setOverviewSyncStage('woocommerce');
-
-      // Stage 2: WooCommerce sync runs only after Google + Meta stage.
-      try {
-        if (
-          wooConnection?.status === 'connected' &&
-          wooConnection.settings?.storeUrl &&
-          wooConnection.settings?.wooKey &&
-          wooConnection.settings?.wooSecret
-        ) {
-          await fetchWooCommerceProducts(
-            wooConnection.settings.storeUrl,
-            wooConnection.settings.wooKey,
-            wooConnection.settings.wooSecret
-          );
+        try {
+          const googleAdsId = googleConnection?.settings?.googleAdsId || '';
+          if (googleAdsId) {
+            const googleCampaigns = await fetchGoogleCampaigns(accessToken, googleAdsId, undefined, resolvedRange);
+            syncedAdSpendTotal += googleCampaigns.reduce(
+              (sum, campaign) => sum + parseCurrencyNumber(campaign?.spend),
+              0
+            );
+          }
+        } catch (googleCampaignErr) {
+          console.warn('Failed to sync Google Ads campaigns during overview sync:', googleCampaignErr);
         }
-      } catch (wooErr) {
-        console.warn('Failed to sync WooCommerce during overview sync:', wooErr);
-      }
 
-      if (!isCancelled) {
-        setDashboardData(buildDashboardData());
-        setOverviewSyncStage('idle');
+        // 2) Meta sync before WooCommerce.
+        try {
+          const metaToken = metaConnection?.settings?.metaToken;
+          if (metaConnection?.status === 'connected' && metaToken) {
+            let metaAdsId =
+              metaConnection.settings?.metaAdsId ||
+              metaConnection.settings?.adAccountId ||
+              metaConnection.settings?.metaAdAccountId ||
+              '';
+
+            if (!metaAdsId) {
+              try {
+                const accounts = await fetchMetaAdAccounts(metaToken);
+                metaAdsId = String(accounts?.[0]?.account_id || accounts?.[0]?.id || '').trim();
+              } catch (metaAccountErr) {
+                console.warn('Failed to discover Meta ad accounts during overview sync:', metaAccountErr);
+              }
+            }
+
+            if (metaAdsId) {
+              const metaCampaigns = await fetchMetaCampaigns(metaToken, metaAdsId);
+              syncedAdSpendTotal += metaCampaigns.reduce(
+                (sum, campaign) => sum + parseCurrencyNumber(campaign?.spend),
+                0
+              );
+            }
+          }
+        } catch (metaErr) {
+          console.warn('Failed to sync Meta campaigns during overview sync:', metaErr);
+        }
+
+        // 3) TikTok sync before WooCommerce.
+        try {
+          const tiktokConnection = connections.find(c => c.id === 'tiktok');
+          const tiktokToken = tiktokConnection?.settings?.tiktokToken;
+          const tiktokAdvertiserId = tiktokConnection?.settings?.tiktokAdvertiserId;
+          if (tiktokConnection?.status === 'connected' && tiktokToken && tiktokAdvertiserId) {
+            const tiktokCampaigns = await fetchTikTokCampaigns(tiktokToken, tiktokAdvertiserId);
+            syncedAdSpendTotal += tiktokCampaigns.reduce(
+              (sum, campaign) =>
+                sum + parseCurrencyNumber((campaign as { spend?: unknown })?.spend),
+              0
+            );
+          }
+        } catch (tiktokErr) {
+          console.warn('Failed to sync TikTok campaigns during overview sync:', tiktokErr);
+        }
+
+        if (isCancelled) return;
+        setOverviewSyncStage('woocommerce');
+
+        // Stage 2: WooCommerce sync runs only after Google + Meta + TikTok stage.
+        try {
+          if (
+            wooConnection?.status === 'connected' &&
+            wooConnection.settings?.storeUrl &&
+            wooConnection.settings?.wooKey &&
+            wooConnection.settings?.wooSecret
+          ) {
+            await fetchWooCommerceProducts(
+              wooConnection.settings.storeUrl,
+              wooConnection.settings.wooKey,
+              wooConnection.settings.wooSecret
+            );
+          }
+        } catch (wooErr) {
+          console.warn('Failed to sync WooCommerce during overview sync:', wooErr);
+        }
+
+        if (!isCancelled) {
+          const baseData = buildDashboardData();
+          const normalizedLiveSpend = Math.max(0, Math.round(syncedAdSpendTotal));
+          const hasLiveSpend = normalizedLiveSpend > 0;
+          const nextSpend = hasLiveSpend ? normalizedLiveSpend : baseData.totalSpend;
+          const nextRoas = nextSpend > 0 ? (baseData.totalRevenue / nextSpend).toFixed(2) : '0.00';
+          const nextNetProfit = baseData.totalRevenue - nextSpend;
+          const scaleFactor = baseData.totalSpend > 0 ? nextSpend / baseData.totalSpend : 1;
+
+          setDashboardData({
+            ...baseData,
+            totalSpend: nextSpend,
+            roas: nextRoas,
+            netProfit: nextNetProfit,
+            chartData: baseData.chartData.map((point) => ({
+              ...point,
+              spend: Math.max(0, Math.round(point.spend * scaleFactor)),
+            })),
+          });
+          setOverviewSyncStage('idle');
+        }
+      } finally {
+        syncInFlightRef.current = false;
       }
     };
 
@@ -176,7 +246,7 @@ export function Dashboard() {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [connections, resolvedRange.endDate, resolvedRange.startDate, buildDashboardData]);
+  }, [connections, resolvedRange.endDate, resolvedRange.startDate, buildDashboardData, t]);
 
   useEffect(() => {
     if (!(isWooConnected && overviewSyncStage === 'woocommerce')) {
@@ -260,10 +330,10 @@ export function Dashboard() {
         </p>
         {overviewSyncStage !== 'idle' && (
           <p className="text-xs mt-2 font-bold text-indigo-600">
-            {overviewSyncStage === 'google-meta'
+            {overviewSyncStage === 'platforms'
               ? (isHebrew
-                  ? 'מסנכרן קודם חיבורי Google + Meta...'
-                  : 'Syncing Google + Meta connections first...')
+                  ? 'מסנכרן קודם Google + Meta + TikTok...'
+                  : 'Syncing Google + Meta + TikTok connections first...')
               : (isHebrew
                   ? 'מסנכרן עכשיו נתוני WooCommerce...'
                   : 'Now syncing WooCommerce data...')}
