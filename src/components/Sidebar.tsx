@@ -34,6 +34,13 @@ interface SidebarProps {
   userProfile?: any;
 }
 
+type NavItem = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<any>;
+  children?: NavItem[];
+};
+
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfile }: SidebarProps) {
   const { t, language } = useLanguage();
   const currentUser = auth.currentUser;
@@ -66,15 +73,22 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
         { id: 'dashboard', label: t('nav.overview'), icon: LayoutDashboard },
         { id: 'profitability', label: t('nav.profitability'), icon: BarChart3 },
         { id: 'budget', label: t('nav.budget'), icon: TrendingUp },
-      ]
+      ] as NavItem[]
     },
     {
       title: t('nav.aiCampaigns'),
       items: [
-        { id: 'campaigns', label: t('nav.campaigns'), icon: Megaphone },
+        {
+          id: 'campaigns',
+          label: t('nav.campaigns'),
+          icon: Megaphone,
+          children: [
+            { id: 'creative-lab', label: t('nav.creativeLab'), icon: PenTool },
+          ],
+        },
         { id: 'ai-recommendations', label: t('nav.aiRecommendations'), icon: Activity },
         { id: 'search-analysis', label: t('nav.searchAnalysis'), icon: Search },
-      ]
+      ] as NavItem[]
     },
     {
       title: t('nav.growth'),
@@ -83,8 +97,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
         { id: 'products', label: t('nav.products'), icon: ShoppingCart },
         { id: 'orders', label: t('nav.orders') || 'Orders', icon: ListTodo },
         { id: 'audiences', label: t('nav.audiences'), icon: Users },
-        { id: 'creative-lab', label: t('nav.creativeLab'), icon: PenTool },
-      ]
+      ] as NavItem[]
     },
     {
       title: t('nav.approvalsAutomations') || 'Approvals / Automations',
@@ -100,7 +113,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
           { id: 'system-mail', label: 'דואר מערכת', icon: Mail },
         ] : []),
         { id: 'settings', label: t('nav.settings'), icon: Settings },
-      ]
+      ] as NavItem[]
     }
   ];
 
@@ -148,26 +161,63 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
               <nav className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
+                  const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+                  const isChildActive = hasChildren
+                    ? item.children!.some((child) => child.id === activeTab)
+                    : false;
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        setIsOpen(false);
-                      }}
-                      className={cn(
-                        "flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors",
-                        activeTab === item.id
-                          ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400"
-                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                    <div key={item.id}>
+                      <button
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          setIsOpen(false);
+                        }}
+                        className={cn(
+                          "flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                          activeTab === item.id || isChildActive
+                            ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                        )}
+                      >
+                        <Icon className={cn(
+                          "w-5 h-5 me-3",
+                          activeTab === item.id || isChildActive
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : "text-gray-400 dark:text-gray-500"
+                        )} />
+                        {item.label}
+                      </button>
+                      {hasChildren && (
+                        <div className="mt-1 space-y-1 ps-8">
+                          {item.children!.map((child) => {
+                            const ChildIcon = child.icon;
+                            return (
+                              <button
+                                key={child.id}
+                                onClick={() => {
+                                  setActiveTab(child.id);
+                                  setIsOpen(false);
+                                }}
+                                className={cn(
+                                  "flex items-center w-full px-2.5 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                                  activeTab === child.id
+                                    ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300"
+                                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white"
+                                )}
+                              >
+                                <ChildIcon className={cn(
+                                  "w-3.5 h-3.5 me-2",
+                                  activeTab === child.id
+                                    ? "text-indigo-600 dark:text-indigo-300"
+                                    : "text-gray-400 dark:text-gray-500"
+                                )} />
+                                {child.label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
-                    >
-                      <Icon className={cn(
-                        "w-5 h-5 me-3",
-                        activeTab === item.id ? "text-indigo-600 dark:text-indigo-400" : "text-gray-400 dark:text-gray-500"
-                      )} />
-                      {item.label}
-                    </button>
+                    </div>
                   );
                 })}
               </nav>
