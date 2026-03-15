@@ -143,19 +143,25 @@ export function Audiences() {
   const fetchPlatformData = async (): Promise<string> => {
     const result: Record<string, unknown> = {};
     const meta = connections.find((c) => c.id === 'meta');
-    if (meta?.status === 'connected' && meta.settings?.metaToken) {
+    const metaToken = meta?.status === 'connected' ? meta.settings?.metaToken || 'server-managed' : '';
+    if (meta?.status === 'connected' && metaToken) {
       try {
         const acc = meta.settings.metaAdsId || meta.settings.adAccountId || meta.settings.metaAdAccountId;
-        result.meta = await fetchMetaCampaigns(meta.settings.metaToken, acc || undefined);
+        result.meta = await fetchMetaCampaigns(metaToken, acc || undefined);
       } catch (e) {
         result.meta = [{ error: String(e) }];
       }
     }
     const google = connections.find((c) => c.id === 'google');
-    if (google?.status === 'connected' && google.settings?.googleAccessToken) {
+    const googleToken = google?.status === 'connected' ? google.settings?.googleAccessToken || 'server-managed' : '';
+    if (google?.status === 'connected' && googleToken) {
       try {
         const cid = google.settings.googleAdsId || google.settings.customerId || google.settings.googleCustomerId;
-        if (cid) result.google = await fetchGoogleCampaigns(google.settings.googleAccessToken, cid, google.settings.loginCustomerId);
+        result.google = await fetchGoogleCampaigns(
+          googleToken,
+          cid || undefined,
+          google.settings.loginCustomerId
+        );
       } catch (e) {
         result.google = [{ error: String(e) }];
       }

@@ -328,7 +328,7 @@ export function Campaigns() {
 
   const syncMetaData = async () => {
     const metaConn = connections.find(c => c.id === 'meta');
-    const token = metaConn?.settings?.metaToken;
+    const token = metaConn?.status === 'connected' ? metaConn?.settings?.metaToken || 'server-managed' : '';
     const adAccountId =
       metaConn?.settings?.metaAdsId ||
       metaConn?.settings?.adAccountId ||
@@ -351,17 +351,17 @@ export function Campaigns() {
 
   const syncGoogleData = async () => {
     const googleConn = connections.find(c => c.id === 'google');
-    const token = googleConn?.settings?.googleAccessToken;
+    const token = googleConn?.status === 'connected' ? googleConn?.settings?.googleAccessToken || 'server-managed' : '';
     const customerId =
       googleConn?.settings?.googleAdsId ||
       googleConn?.settings?.customerId ||
       googleConn?.settings?.googleCustomerId;
     const loginCustomerId = googleConn?.settings?.loginCustomerId;
-    if (googleConn?.status === 'connected' && token && customerId) {
+    if (googleConn?.status === 'connected' && token) {
       try {
         const campaigns = await fetchGoogleCampaigns(
           token,
-          customerId,
+          customerId || undefined,
           loginCustomerId,
           startDateIso,
           endDateIso

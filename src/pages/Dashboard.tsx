@@ -645,8 +645,8 @@ export function Dashboard() {
         }
       }
 
-      if (google?.settings?.googleAccessToken) {
-        const token = google.settings.googleAccessToken;
+      if (google?.status === 'connected') {
+        const token = google.settings?.googleAccessToken || 'server-managed';
         try {
           const report = await fetchGA4Report(
             token,
@@ -707,39 +707,35 @@ export function Dashboard() {
           google.settings.googleAdsId ||
           google.settings.customerId ||
           google.settings.googleCustomerId;
-        if (googleCustomerId) {
-          try {
-            const googleCampaigns = await fetchGoogleCampaigns(
-              token,
-              googleCustomerId,
-              google.settings.loginCustomerId
-            );
-            googleCampaigns.forEach((campaign: any) => {
-              const spend = moneyFromUnknown(campaign.spend);
-              const roasValue = moneyFromUnknown(campaign.roas);
-              campaignRows.push({
-                id: campaign.id,
-                name: campaign.name || 'Google Campaign',
-                platform: 'Google',
-                status: campaign.status === 'Active' ? 'Active' : 'Paused',
-                spend,
-                roas: roasValue,
-              });
-              liveSpend += spend;
+        try {
+          const googleCampaigns = await fetchGoogleCampaigns(
+            token,
+            googleCustomerId || undefined,
+            google.settings.loginCustomerId
+          );
+          googleCampaigns.forEach((campaign: any) => {
+            const spend = moneyFromUnknown(campaign.spend);
+            const roasValue = moneyFromUnknown(campaign.roas);
+            campaignRows.push({
+              id: campaign.id,
+              name: campaign.name || 'Google Campaign',
+              platform: 'Google',
+              status: campaign.status === 'Active' ? 'Active' : 'Paused',
+              spend,
+              roas: roasValue,
             });
-            if (googleCampaigns.length > 0) {
-              hasSpendLive = true;
-            }
-            if (googleCampaigns.length > 0) {
-              hasCampaignsLive = true;
-            }
-          } catch (error) {
-            console.warn('Failed to load Google campaigns', error);
+            liveSpend += spend;
+          });
+          if (googleCampaigns.length > 0) {
+            hasSpendLive = true;
+            hasCampaignsLive = true;
           }
+        } catch (error) {
+          console.warn('Failed to load Google campaigns', error);
         }
       }
 
-      const metaToken = meta?.settings?.metaToken;
+      const metaToken = meta?.status === 'connected' ? meta.settings?.metaToken || 'server-managed' : undefined;
       const metaAdsId =
         meta?.settings?.metaAdsId ||
         meta?.settings?.adAccountId ||

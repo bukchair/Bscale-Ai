@@ -1,3 +1,5 @@
+import { auth } from '../lib/firebase';
+
 const viteEnv =
   typeof import.meta !== 'undefined'
     ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
@@ -13,7 +15,20 @@ const API_BASE = (() => {
   }
 })();
 
+const ensureManagedApiSession = async (accessToken: string) => {
+  if (accessToken !== 'server-managed') return;
+  const user = auth.currentUser;
+  if (!user) return;
+  const idToken = await user.getIdToken();
+  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+};
+
 export async function fetchGoogleAdAccounts(accessToken: string) {
+  await ensureManagedApiSession(accessToken);
   const response = await fetch(`${API_BASE}/api/google/ads/accounts`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -32,13 +47,14 @@ export async function fetchGoogleAdAccounts(accessToken: string) {
 
 export async function fetchGoogleCampaigns(
   accessToken: string,
-  customerId: string,
+  customerId?: string,
   loginCustomerId?: string,
   startDate?: string,
   endDate?: string
 ) {
+  await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
-  query.set('customer_id', customerId);
+  if (customerId) query.set('customer_id', customerId);
   if (loginCustomerId) query.set('login_customer_id', loginCustomerId);
   if (startDate) query.set('start_date', startDate);
   if (endDate) query.set('end_date', endDate);
@@ -87,6 +103,7 @@ export async function fetchGoogleSearchTerms(
   startDate?: string,
   endDate?: string
 ) {
+  await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
   if (customerId) query.set('customer_id', customerId);
   if (loginCustomerId) query.set('login_customer_id', loginCustomerId);
@@ -144,6 +161,7 @@ export async function fetchGoogleSearchTerms(
 }
 
 export async function sendGmailNotification(accessToken: string, to: string, subject: string, body: string) {
+  await ensureManagedApiSession(accessToken);
   const response = await fetch(`${API_BASE}/api/google/gmail/send`, {
     method: 'POST',
     headers: {
@@ -167,6 +185,7 @@ export async function fetchGA4Report(
   startDate?: string,
   endDate?: string
 ) {
+  await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
   if (propertyId) query.set('property_id', propertyId);
   if (startDate) query.set('start_date', startDate);
@@ -186,6 +205,7 @@ export async function fetchGA4Report(
 }
 
 export async function fetchGSCData(accessToken: string, siteUrl?: string, startDate?: string, endDate?: string) {
+  await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
   if (siteUrl) query.set('site_url', siteUrl);
   if (startDate) query.set('start_date', startDate);
