@@ -23,7 +23,6 @@ type CreateScheduledCampaignBody = {
   contentType?: string;
   productType?: string;
   serviceType?: string;
-  mediaMeta?: Array<{ name?: string; type?: string; size?: number }>;
 };
 
 type PlatformCreateResult = {

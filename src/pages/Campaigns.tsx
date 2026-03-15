@@ -199,8 +199,8 @@ export function Campaigns() {
       : 'Images are auto-resized smartly to fit platform requirements with no visible quality loss.',
     uploadButton: isHebrew ? 'בחר תמונה / וידאו' : 'Choose image / video',
     noDataPersistenceNote: isHebrew
-      ? 'הערה: נתוני המדיה אינם נשמרים לאחר פרסום המודעה.'
-      : 'Note: media data is not stored after ad publication.',
+      ? 'הערה: המדיה נמחקת אוטומטית אחרי שליחת הפרסום ואינה נשמרת במערכת.'
+      : 'Note: media is automatically deleted right after publish submission and is never stored.',
     timingRulesTitle: isHebrew ? 'חוקי טירגוט לפי שעות ביצועים (AI)' : 'AI hourly performance targeting rules',
     weeklyTitle: isHebrew ? 'לוח זמנים שבועי לפי שעות (גובר על כל החוקים)' : 'Weekly hourly schedule (overrides all other rules)',
     createDraft: isHebrew ? 'צור קמפיין מתוזמן בפלטפורמה' : 'Create scheduled campaign in platform',
@@ -1043,6 +1043,13 @@ export function Campaigns() {
     });
   };
 
+  const clearUploadedMedia = () => {
+    setUploadedAssets((prev) => {
+      prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
+      return [];
+    });
+  };
+
   const toggleScheduleHour = (platform: string, day: DayKey, hour: number) => {
     setWeeklySchedule((prev) => {
       const next: WeeklySchedule = { ...prev };
@@ -1434,6 +1441,7 @@ export function Campaigns() {
     }
 
     setIsCreatingCampaign(true);
+    const mediaCount = uploadedAssets.length;
     try {
       const response = await fetch('/api/campaigns/scheduled', {
         method: 'POST',
@@ -1458,13 +1466,6 @@ export function Campaigns() {
           wooProductName:
             wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
           platformCopyDrafts,
-          mediaMeta: uploadedAssets.map((asset) => ({
-            name: asset.name,
-            type: asset.type,
-            size: asset.size,
-            width: asset.width,
-            height: asset.height,
-          })),
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -1490,7 +1491,7 @@ export function Campaigns() {
           objective,
           brief: campaignBrief.trim(),
           audiences: selectedAudiences,
-          mediaCount: uploadedAssets.length,
+          mediaCount,
           wooPublishMode: isWooConnected ? wooPublishScope : null,
           wooCategory: wooPublishScope === 'category' ? selectedWooCategory || null : null,
           wooProductName:
@@ -1515,13 +1516,11 @@ export function Campaigns() {
       setAiGeneratedAudienceNames([]);
       setPlatformCopyDrafts({});
       setTimeRules([]);
-      setUploadedAssets((prev) => {
-        prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
-        return [];
-      });
     } catch (error) {
       setBuilderMessage(error instanceof Error ? error.message : 'Failed to create scheduled campaign.');
     } finally {
+      // Privacy-safe behavior: remove uploaded media after publish submission attempt.
+      clearUploadedMedia();
       setIsCreatingCampaign(false);
     }
   };
