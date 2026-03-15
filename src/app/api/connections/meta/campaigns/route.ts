@@ -267,7 +267,8 @@ export async function GET(request: Request) {
       const includeEffectiveStatus = options?.includeEffectiveStatus !== false;
       const resource = toAccountResource(accountId);
       const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/campaigns`);
-      const baseFields = 'id,name,status,objective,start_time,stop_time';
+      const baseFields =
+        'id,name,status,effective_status,configured_status,objective,buying_type,account_id,start_time,stop_time,created_time,updated_time,daily_budget,lifetime_budget,promoted_object,destination_type';
       const insightsFields =
         'insights{spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_click_ctr,purchase_roas,roas,actions,action_values}';
       graphUrl.searchParams.set('fields', includeInsights ? `${baseFields},${insightsFields}` : baseFields);
@@ -335,6 +336,61 @@ export async function GET(request: Request) {
           parsed = raw ? JSON.parse(raw) : {};
         } catch {
           parsed = { message: raw || 'Meta insights returned non-JSON response.' };
+        }
+
+        lastResponse = response;
+        lastParsed = parsed;
+        if (response.ok) {
+          return { response, parsed };
+        }
+
+        const message = extractErrorMessage(response.status, parsed).toLowerCase();
+        if (!message.includes('invalid parameter')) {
+          break;
+        }
+      }
+
+      return {
+        response: lastResponse as Response,
+        parsed: lastParsed,
+      };
+    };
+
+    const loadPublisherPlatformBreakdown = async (accountId: string) => {
+      const resource = toAccountResource(accountId);
+      const fieldsVariants = [
+        'campaign_id,publisher_platform,spend,impressions,reach,clicks,ctr,cpc,cpm,actions,action_values',
+        'campaign_id,publisher_platform,spend,impressions,reach,clicks,ctr,cpc,cpm',
+        'campaign_id,publisher_platform,spend,impressions,clicks',
+      ];
+
+      let lastResponse: Response | null = null;
+      let lastParsed: unknown = {};
+
+      for (const fields of fieldsVariants) {
+        const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/insights`);
+        graphUrl.searchParams.set('level', 'campaign');
+        graphUrl.searchParams.set('limit', '1000');
+        graphUrl.searchParams.set('fields', fields);
+        graphUrl.searchParams.set('breakdowns', 'publisher_platform');
+        if (startDate && endDate) {
+          graphUrl.searchParams.set(
+            'time_range',
+            JSON.stringify({
+              since: startDate,
+              until: endDate,
+            })
+          );
+        }
+        graphUrl.searchParams.set('access_token', accessToken);
+
+        const response = await fetch(graphUrl.toString());
+        const raw = await response.text();
+        let parsed: unknown = {};
+        try {
+          parsed = raw ? JSON.parse(raw) : {};
+        } catch {
+          parsed = { message: raw || 'Meta publisher breakdown returned non-JSON response.' };
         }
 
         lastResponse = response;
@@ -501,6 +557,35 @@ export async function GET(request: Request) {
         }
       } catch {
         // Keep base campaigns list if enrichment fails.
+      }
+    }
+
+    if (enrichedCampaigns.length > 0) {
+      try {
+        const breakdownResult = await loadPublisherPlatformBreakdown(resolvedAccountId);
+        if (breakdownResult.response.ok) {
+          const rows = getInsightRows(breakdownResult.parsed);
+          const byCampaignId = new Map<string, Array<Record<string, unknown>>>();
+          for (const row of rows) {
+            const campaignId = String(row.campaign_id || '').trim();
+            if (!campaignId) continue;
+            const current = byCampaignId.get(campaignId) || [];
+            current.push(row);
+            byCampaignId.set(campaignId, current);
+          }
+
+          enrichedCampaigns = enrichedCampaigns.map((campaign) => {
+            const campaignId = String(campaign.id || '').trim();
+            const channelBreakdown = byCampaignId.get(campaignId) || [];
+            if (channelBreakdown.length === 0) return campaign;
+            return {
+              ...campaign,
+              channelBreakdown,
+            };
+          });
+        }
+      } catch {
+        // Keep base campaign list when publisher-platform breakdown fails.
       }
     }
 

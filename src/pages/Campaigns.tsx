@@ -925,6 +925,15 @@ export function Campaigns() {
                     {filteredAndSortedCampaigns.map((campaign) => {
                       const unifiedStatus = normalizeCampaignStatus(campaign.status);
                       const platform = String(campaign.platform || '');
+                      const metaFacebookSpend = toAmount(campaign?.metaChannels?.facebook?.spend);
+                      const metaInstagramSpend = toAmount(campaign?.metaChannels?.instagram?.spend);
+                      const metaWhatsappSpend = toAmount(campaign?.metaChannels?.whatsapp?.spend);
+                      const metaWhatsappConversations = toAmount(campaign?.metaChannels?.whatsapp?.conversations);
+                      const hasMetaChannels =
+                        platform === 'Meta' &&
+                        (metaFacebookSpend > 0 ||
+                          metaInstagramSpend > 0 ||
+                          Boolean(campaign?.metaChannels?.whatsapp?.enabled));
                       const typeOrObjective =
                         platform === 'Meta'
                           ? campaign.objective || '—'
@@ -944,6 +953,22 @@ export function Campaigns() {
                             <div className="max-w-[220px] truncate" title={String(campaign.name || '')}>
                               {campaign.name}
                             </div>
+                            {hasMetaChannels && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                  FB {metaFacebookSpend > 0 ? formatCurrency(metaFacebookSpend) : '—'}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                  IG {metaInstagramSpend > 0 ? formatCurrency(metaInstagramSpend) : '—'}
+                                </span>
+                                {campaign?.metaChannels?.whatsapp?.enabled && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                    WA {metaWhatsappSpend > 0 ? formatCurrency(metaWhatsappSpend) : ''}
+                                    {metaWhatsappConversations > 0 ? ` · ${Math.round(metaWhatsappConversations)}` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-700">{platform || '—'}</td>
                           <td className="px-4 py-2.5 text-sm">
@@ -982,9 +1007,9 @@ export function Campaigns() {
       </section>
 
       <section className="bg-white shadow rounded-lg overflow-hidden flex flex-col border border-gray-200">
-        <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50 flex items-center justify-between">
-          <h3 className="text-lg leading-6 font-medium text-indigo-900 flex items-center">
-            <Zap className="w-5 h-5 ml-2 text-indigo-600" />
+        <div className="px-3 py-3 sm:px-4 border-b border-gray-200 bg-indigo-50 flex items-center justify-between">
+          <h3 className="text-base leading-6 font-semibold text-indigo-900 flex items-center">
+            <Zap className="w-4 h-4 ml-1.5 text-indigo-600" />
             {t('campaigns.aiRecommendations')}
           </h3>
           {recommendations.length > 0 && (
@@ -998,22 +1023,22 @@ export function Campaigns() {
             </button>
           )}
         </div>
-        <div className="p-4">
+        <div className="p-3">
           {loading ? (
             <div className="flex justify-center items-center h-32">
               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
           ) : recommendations.length > 0 ? (
-            <ul className="space-y-2 max-h-[360px] overflow-y-auto pe-1">
+            <ul className="space-y-1.5 max-h-[250px] overflow-y-auto pe-1">
               {recommendations.map((rec, index) => (
                 <li key={`ai-rec-${index}`} className="bg-white border rounded-lg shadow-sm overflow-hidden">
                   <button
                     type="button"
                     onClick={() => toggleRecExpanded(index)}
-                    className="w-full px-3 py-2.5 flex items-center justify-between gap-3 hover:bg-gray-50"
+                    className="w-full px-2.5 py-2 flex items-center justify-between gap-2 hover:bg-gray-50"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         <span className={cn(
                           "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium",
                           rec.impact === 'High' ? "bg-red-100 text-red-800" :
@@ -1026,9 +1051,9 @@ export function Campaigns() {
                             t('campaigns.impactLow')
                           }
                         </span>
-                        <span className="text-[11px] text-gray-500 truncate">{rec.platform}</span>
+                        <span className="text-[10px] text-gray-500 truncate">{rec.platform}</span>
                       </div>
-                      <h4 className="text-sm font-bold text-gray-900 truncate text-start">{rec.title}</h4>
+                      <h4 className="text-xs font-bold text-gray-900 truncate text-start">{rec.title}</h4>
                     </div>
                     {expandedRecs.includes(index) ? (
                       <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
@@ -1037,16 +1062,16 @@ export function Campaigns() {
                     )}
                   </button>
                   <div className={cn(
-                    "px-3 overflow-hidden transition-all duration-200",
-                    expandedRecs.includes(index) ? "max-h-60 pb-3" : "max-h-0"
+                    "px-2.5 overflow-hidden transition-all duration-200",
+                    expandedRecs.includes(index) ? "max-h-44 pb-2.5" : "max-h-0"
                   )}>
-                    <p className="text-xs text-gray-600 leading-relaxed">{rec.description}</p>
-                    <div className="mt-2">
+                    <p className="text-[11px] text-gray-600 leading-relaxed line-clamp-4">{rec.description}</p>
+                    <div className="mt-1.5">
                       <button
                         onClick={() => handleApply(index)}
                         disabled={appliedRecs.includes(index)}
                         className={cn(
-                          "inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                          "inline-flex items-center px-2.5 py-1 border border-transparent text-[11px] font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
                           appliedRecs.includes(index)
                             ? "bg-green-50 text-green-700 border-green-200 cursor-not-allowed"
                             : "text-white bg-indigo-600 hover:bg-indigo-700"

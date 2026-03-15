@@ -300,6 +300,68 @@ export async function fetchMetaCampaigns(
         ? parseFloat(insights.roas[0].value || 0)
         : 0;
     const roas = roasFromInsight > 0 ? roasFromInsight : spend > 0 ? conversionValue / spend : 0;
+    const channelBreakdownRows = Array.isArray(c.channelBreakdown) ? c.channelBreakdown : [];
+    const channelAgg = channelBreakdownRows.reduce(
+      (acc: any, row: any) => {
+        const rawPlatform = String(row?.publisher_platform || '').toLowerCase();
+        const platform =
+          rawPlatform === 'facebook'
+            ? 'facebook'
+            : rawPlatform === 'instagram'
+              ? 'instagram'
+              : rawPlatform === 'messenger'
+                ? 'messenger'
+                : rawPlatform;
+        if (!platform) return acc;
+        const next = acc[platform] || {
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          reach: 0,
+          conversions: 0,
+        };
+        const rowSpend = parseFloat(row?.spend || 0) || 0;
+        const rowImpressions = parseFloat(row?.impressions || 0) || 0;
+        const rowClicks = parseFloat(row?.clicks || 0) || 0;
+        const rowReach = parseFloat(row?.reach || 0) || 0;
+        const rowActions = Array.isArray(row?.actions) ? row.actions : [];
+        const rowConversions = rowActions.reduce((sum: number, action: any) => {
+          const actionType = String(action?.action_type || '').toLowerCase();
+          if (
+            actionType === 'purchase' ||
+            actionType.includes('purchase') ||
+            actionType.includes('lead') ||
+            actionType.includes('messaging')
+          ) {
+            const v = parseFloat(action?.value || 0);
+            return sum + (Number.isFinite(v) ? v : 0);
+          }
+          return sum;
+        }, 0);
+        acc[platform] = {
+          spend: next.spend + rowSpend,
+          impressions: next.impressions + rowImpressions,
+          clicks: next.clicks + rowClicks,
+          reach: next.reach + rowReach,
+          conversions: next.conversions + rowConversions,
+        };
+        return acc;
+      },
+      {} as Record<string, { spend: number; impressions: number; clicks: number; reach: number; conversions: number }>
+    );
+
+    const promotedObject = c.promoted_object || {};
+    const hasWhatsappDestination =
+      Boolean(promotedObject?.whatsapp_phone_number) ||
+      String(c?.destination_type || '').toLowerCase().includes('whatsapp');
+    const whatsappConversations =
+      (channelAgg.messenger?.conversions || 0) +
+      actions.reduce((sum: number, action: any) => {
+        const actionType = String(action?.action_type || '').toLowerCase();
+        if (!actionType.includes('messaging') && !actionType.includes('whatsapp')) return sum;
+        const v = parseFloat(action?.value || 0);
+        return sum + (Number.isFinite(v) ? v : 0);
+      }, 0);
 
     return {
       id: c.id,
@@ -332,6 +394,18 @@ export async function fetchMetaCampaigns(
       cpa,
       conversions,
       conversionValue,
+      metaChannels: {
+        facebook: channelAgg.facebook || null,
+        instagram: channelAgg.instagram || null,
+        whatsapp: hasWhatsappDestination
+          ? {
+              enabled: true,
+              spend: channelAgg.messenger?.spend || 0,
+              conversations: whatsappConversations,
+            }
+          : null,
+      },
+      channelBreakdown: channelAgg,
     };
     });
 

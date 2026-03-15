@@ -1,24 +1,36 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
-import { DollarSign, TrendingUp, TrendingDown, Activity, Download, Filter, Zap, BarChart3, PieChart, CheckCircle2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Activity, Download, Filter, Zap, BarChart3, PieChart, CheckCircle2, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, Legend } from 'recharts';
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { fetchWooCommerceSalesByRange, WooCommerceSalesPoint } from '../services/woocommerceService';
+import { fetchGoogleCampaigns } from '../services/googleService';
+import { fetchMetaCampaigns } from '../services/metaService';
+import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { useCurrency } from '../contexts/CurrencyContext';
 
-const platformDataBase = [
-  { name: 'Google Ads', spend: 4500, roas: 3.2 },
-  { name: 'Meta Ads', spend: 3200, roas: 2.8 },
-  { name: 'TikTok Ads', spend: 2300, roas: 2.1 },
-];
+type CampaignSpendRow = {
+  id: string;
+  name: string;
+  platform: 'Google' | 'Meta' | 'TikTok';
+  status: string;
+  spend: number;
+  conversions: number;
+  conversionValue: number;
+  roas: number;
+  metaChannels?: {
+    facebook?: { spend?: number } | null;
+    instagram?: { spend?: number } | null;
+    whatsapp?: { enabled?: boolean; spend?: number; conversations?: number } | null;
+  } | null;
+};
 
-function getPeriodMultiplier(dateRange: string): number {
-  if (dateRange === 'today') return 1 / 30;
-  if (dateRange === '7days') return 7 / 30;
-  return 1;
-}
+const toAmount = (value: unknown): number => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
 
 export function Profitability() {
   const { t, dir } = useLanguage();
@@ -29,76 +41,178 @@ export function Profitability() {
   const [reportType, setReportType] = useState<'period' | 'campaigns' | 'platforms'>('period');
 
   const wooConnection = connections.find((c) => c.id === 'woocommerce' && c.status === 'connected');
-  const [wooSales, setWooSales] = useState<WooCommerceSalesPoint[] | null>(null);
-  const [isLoadingWoo, setIsLoadingWoo] = useState(false);
+  const [wooSales, setWooSales] = useState<WooCommerceSalesPoint[]>([]);
+  const [campaignRows, setCampaignRows] = useState<CampaignSpendRow[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
   const periodSubtitle =
     dateRange === 'custom'
       ? `${bounds.startDate.toLocaleDateString('he-IL')} - ${bounds.endDate.toLocaleDateString('he-IL')}`
       : periodLabel;
-  const mult = getPeriodMultiplier(dateRange);
 
   useEffect(() => {
-    if (!wooConnection?.settings) {
-      setWooSales(null);
-      return;
-    }
-    const { storeUrl, wooKey, wooSecret } = wooConnection.settings as any;
-    if (!storeUrl || !wooKey || !wooSecret) {
-      setWooSales(null);
-      return;
-    }
-
+    const googleConnection = connections.find((c) => c.id === 'google' && c.status === 'connected');
+    const metaConnection = connections.find((c) => c.id === 'meta' && c.status === 'connected');
+    const tiktokConnection = connections.find((c) => c.id === 'tiktok' && c.status === 'connected');
     const startIso = bounds.startDate.toISOString().slice(0, 10);
     const endIso = bounds.endDate.toISOString().slice(0, 10);
+    let cancelled = false;
 
-    setIsLoadingWoo(true);
-    fetchWooCommerceSalesByRange(storeUrl, wooKey, wooSecret, startIso, endIso)
-      .then((rows) => setWooSales(rows.length ? rows : null))
-      .finally(() => setIsLoadingWoo(false));
-  }, [wooConnection?.settings, bounds.startDate, bounds.endDate]);
+    const load = async () => {
+      setIsLoadingData(true);
+      try {
+        const tasks: Array<Promise<CampaignSpendRow[]>> = [];
+
+        const googleToken = String(googleConnection?.settings?.accessToken || '').trim();
+        const googleCustomerId = String(googleConnection?.settings?.adsAccountId || '').trim();
+        const googleLoginId = String(googleConnection?.settings?.loginCustomerId || '').trim();
+        if (googleToken) {
+          tasks.push(
+            fetchGoogleCampaigns(googleToken, googleCustomerId || undefined, googleLoginId || undefined, startIso, endIso)
+              .then((rows) =>
+                rows.map((row: any) => ({
+                  id: String(row.id || row.campaignId || `google-${row.name || ''}`),
+                  name: String(row.name || 'Google Campaign'),
+                  platform: 'Google' as const,
+                  status: String(row.status || 'Unknown'),
+                  spend: toAmount(row.spend),
+                  conversions: toAmount(row.conversions),
+                  conversionValue: toAmount(row.conversionValue),
+                  roas: toAmount(row.roas),
+                }))
+              )
+              .catch(() => [])
+          );
+        }
+
+        const metaToken = String(metaConnection?.settings?.accessToken || '').trim();
+        const metaAdsId = String(
+          metaConnection?.settings?.adAccountId ||
+            metaConnection?.settings?.adsAccountId ||
+            metaConnection?.settings?.selectedAdAccountId ||
+            ''
+        ).trim();
+        if (metaToken) {
+          tasks.push(
+            fetchMetaCampaigns(metaToken, metaAdsId || undefined, startIso, endIso)
+              .then((rows) =>
+                rows.map((row: any) => ({
+                  id: String(row.id || `meta-${row.name || ''}`),
+                  name: String(row.name || 'Meta Campaign'),
+                  platform: 'Meta' as const,
+                  status: String(row.status || 'Unknown'),
+                  spend: toAmount(row.spend),
+                  conversions: toAmount(row.conversions),
+                  conversionValue: toAmount(row.conversionValue),
+                  roas: toAmount(row.roas),
+                  metaChannels: row.metaChannels || null,
+                }))
+              )
+              .catch(() => [])
+          );
+        }
+
+        const tiktokToken = String(tiktokConnection?.settings?.accessToken || '').trim();
+        const advertiserId = String(tiktokConnection?.settings?.advertiserId || '').trim();
+        if (tiktokToken && advertiserId) {
+          tasks.push(
+            fetchTikTokCampaigns(tiktokToken, advertiserId, startIso, endIso)
+              .then((rows) =>
+                rows.map((row: any) => ({
+                  id: String(row.id || `tiktok-${row.name || ''}`),
+                  name: String(row.name || 'TikTok Campaign'),
+                  platform: 'TikTok' as const,
+                  status: String(row.status || 'Unknown'),
+                  spend: toAmount(row.spend),
+                  conversions: toAmount(row.conversions),
+                  conversionValue: toAmount(row.conversionValue),
+                  roas: toAmount(row.roas),
+                }))
+              )
+              .catch(() => [])
+          );
+        }
+
+        let nextWoo: WooCommerceSalesPoint[] = [];
+        if (wooConnection?.settings) {
+          const { storeUrl, wooKey, wooSecret } = wooConnection.settings as any;
+          if (storeUrl && wooKey && wooSecret) {
+            nextWoo = await fetchWooCommerceSalesByRange(storeUrl, wooKey, wooSecret, startIso, endIso).catch(() => []);
+          }
+        }
+
+        const connectedCampaigns = (await Promise.all(tasks))
+          .flat()
+          .filter((row) => row && (row.spend > 0 || row.conversions > 0 || row.conversionValue > 0 || row.name));
+
+        if (!cancelled) {
+          setWooSales(nextWoo);
+          setCampaignRows(connectedCampaigns.sort((a, b) => b.spend - a.spend));
+        }
+      } finally {
+        if (!cancelled) setIsLoadingData(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [connections, bounds.startDate, bounds.endDate, wooConnection?.settings]);
 
   const financialData = useMemo(() => {
-    if (wooSales && wooSales.length) {
-      // שימוש בנתוני אמת מ‑WooCommerce לפי טווח התאריכים
+    const totalCampaignSpend = campaignRows.reduce((sum, row) => sum + row.spend, 0);
+    if (wooSales.length > 0) {
+      const totalWooRevenue = wooSales.reduce((sum, row) => sum + toAmount(row.totalSales), 0);
       return wooSales.map((row) => {
         const dateLabel = row.date ? new Date(row.date).toLocaleDateString('he-IL') : '';
+        const revenue = toAmount(row.totalSales);
+        const allocatedSpend =
+          totalCampaignSpend > 0
+            ? totalWooRevenue > 0
+              ? (revenue / totalWooRevenue) * totalCampaignSpend
+              : totalCampaignSpend / Math.max(wooSales.length, 1)
+            : 0;
         return {
           name: dateLabel,
-          revenue: Math.round(row.totalSales),
-          // הוצאת פרסום עדיין מדומיינת כאן; ניתן בעתיד לחבר ל‑Ad Spend אמיתי
-          spend: Math.round(row.totalSales - row.netSales),
-          profit: Math.round(row.netSales),
+          revenue: Math.round(revenue),
+          spend: Math.round(allocatedSpend),
+          profit: Math.round(revenue - allocatedSpend),
         };
       });
     }
 
-    // נתוני דמו כאשר אין חיבור WooCommerce
-    const base = [
-      { name: 'Jan', revenue: 12000, spend: 4000, profit: 8000 },
-      { name: 'Feb', revenue: 19000, spend: 6000, profit: 13000 },
-      { name: 'Mar', revenue: 15000, spend: 5000, profit: 10000 },
-      { name: 'Apr', revenue: 22000, spend: 8000, profit: 14000 },
-      { name: 'May', revenue: 28000, spend: 9000, profit: 19000 },
-      { name: 'Jun', revenue: 24000, spend: 7000, profit: 17000 },
-      { name: 'Jul', revenue: 31000, spend: 10000, profit: 21000 },
-    ];
-    const points = dateRange === 'today' ? 1 : dateRange === '7days' ? 2 : 7;
-    return base.slice(-points).map(row => ({
-      ...row,
-      revenue: Math.round(row.revenue * mult),
-      spend: Math.round(row.spend * mult),
-      profit: Math.round(row.profit * mult),
-    }));
-  }, [wooSales, dateRange, mult]);
+    if (campaignRows.length > 0) {
+      const totalSpend = campaignRows.reduce((sum, row) => sum + row.spend, 0);
+      return [{ name: periodLabel, revenue: 0, spend: Math.round(totalSpend), profit: Math.round(-totalSpend) }];
+    }
 
-  const platformData = useMemo(() =>
-    platformDataBase.map(p => ({ ...p, spend: Math.round(p.spend * mult) })), [mult]);
+    return [];
+  }, [wooSales, campaignRows, periodLabel]);
+
+  const platformData = useMemo(() => {
+    const byPlatform = new Map<string, { name: string; spend: number; conversionValue: number }>();
+    campaignRows.forEach((row) => {
+      const current = byPlatform.get(row.platform) || { name: row.platform, spend: 0, conversionValue: 0 };
+      current.spend += row.spend;
+      current.conversionValue += row.conversionValue;
+      byPlatform.set(row.platform, current);
+    });
+    return Array.from(byPlatform.values())
+      .map((row) => ({
+        ...row,
+        roas: row.spend > 0 ? row.conversionValue / row.spend : 0,
+      }))
+      .sort((a, b) => {
+        const order = (name: string) => (name === 'Google' ? 0 : name === 'Meta' ? 1 : name === 'TikTok' ? 2 : 3);
+        return order(a.name) - order(b.name);
+      });
+  }, [campaignRows]);
 
   const kpiRevenue = financialData.reduce((a, r) => a + r.revenue, 0);
-  const kpiSpend = financialData.reduce((a, r) => a + r.spend, 0);
-  const kpiProfit = financialData.reduce((a, r) => a + r.profit, 0);
+  const kpiSpend = campaignRows.reduce((sum, row) => sum + row.spend, 0);
+  const kpiProfit = kpiRevenue - kpiSpend;
   const kpiRoas = kpiSpend > 0 ? (kpiRevenue / kpiSpend).toFixed(2) : '0.00';
 
   return (
@@ -109,6 +223,12 @@ export function Profitability() {
           <p className="text-sm text-gray-500 mt-1">{t('profitability.subtitle')} <span className="font-bold text-indigo-600">({periodSubtitle})</span></p>
         </div>
         <div className="flex items-center gap-2">
+          {isLoadingData && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md px-2 py-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {t('common.loading')}
+            </span>
+          )}
           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
             <Filter className="w-4 h-4" />
             {t('common.filter')}
@@ -128,7 +248,7 @@ export function Profitability() {
               <DollarSign className="w-6 h-6" />
             </div>
             <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full" dir="ltr">
-              <TrendingUp className="w-3 h-3" /> +12.5%
+              <TrendingUp className="w-3 h-3" /> Live
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.revenueWoo')}</p>
@@ -141,7 +261,7 @@ export function Profitability() {
               <Activity className="w-6 h-6" />
             </div>
             <div className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full" dir="ltr">
-              <TrendingDown className="w-3 h-3" /> -4.2%
+              <TrendingDown className="w-3 h-3" /> Live
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.adSpend')}</p>
@@ -154,7 +274,7 @@ export function Profitability() {
               <BarChart3 className="w-6 h-6" />
             </div>
             <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full" dir="ltr">
-              <TrendingUp className="w-3 h-3" /> +18.7%
+              <TrendingUp className="w-3 h-3" /> Live
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.netProfit')}</p>
@@ -167,7 +287,7 @@ export function Profitability() {
               <PieChart className="w-6 h-6" />
             </div>
             <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full" dir="ltr">
-              <TrendingUp className="w-3 h-3" /> +0.4
+              <TrendingUp className="w-3 h-3" /> Live
             </div>
           </div>
           <p className="text-sm font-medium text-gray-500 mb-1">{t('profitability.avgRoas')}</p>
@@ -175,56 +295,37 @@ export function Profitability() {
         </div>
       </div>
 
-      {/* AI Financial Analysis */}
+      {/* AI Financial Analysis (compact) */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-200 bg-indigo-50/30">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-              <Zap className="w-5 h-5" />
+        <div className="p-4 border-b border-gray-200 bg-indigo-50/40">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center">
+              <Zap className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{t('profitability.aiAnalysisTitle')}</h2>
-              <p className="text-sm text-gray-500">{t('profitability.aiAnalysisSubtitle')}</p>
+              <h2 className="text-sm font-bold text-gray-900">{t('profitability.aiAnalysisTitle')}</h2>
+              <p className="text-xs text-gray-600">{t('profitability.aiAnalysisSubtitle')}</p>
             </div>
           </div>
         </div>
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <h3 className="font-bold text-gray-900 mb-2">{t('profitability.performanceSummary')}</h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {t('profitability.performanceSummaryDesc')}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-emerald-900">{t('profitability.growthOpportunity')}</p>
-                  <p className="text-xs text-emerald-700">{t('profitability.growthOpportunityDesc')}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                <Activity className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-amber-900">{t('profitability.efficiencyAlert')}</p>
-                  <p className="text-xs text-amber-700">{t('profitability.efficiencyAlertDesc')}</p>
-                </div>
-              </div>
+        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p className="text-[11px] text-gray-500 mb-1">{t('profitability.performanceSummary')}</p>
+            <p className="text-xs text-gray-700 leading-relaxed line-clamp-3">{t('profitability.performanceSummaryDesc')}</p>
+          </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-bold text-emerald-900">{t('profitability.growthOpportunity')}</p>
+              <p className="text-[11px] text-emerald-800">{t('profitability.growthOpportunityDesc')}</p>
             </div>
           </div>
-          <div className="bg-indigo-600 rounded-xl p-6 text-white flex flex-col justify-between relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+            <Activity className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
             <div>
-              <p className="text-indigo-100 text-sm font-medium mb-1">{t('profitability.profitImprovementPotential')}</p>
-              <p className="text-4xl font-black" dir="ltr">
-                +{formatCurrency(12500)}
-              </p>
-              <p className="text-indigo-200 text-xs mt-2">{t('profitability.basedOnAi')}</p>
+              <p className="text-xs font-bold text-amber-900">{t('profitability.efficiencyAlert')}</p>
+              <p className="text-[11px] text-amber-800">{t('profitability.efficiencyAlertDesc')}</p>
             </div>
-            <button className="mt-6 w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-all shadow-lg active:scale-95">
-              {t('profitability.applyRecommendations')}
-            </button>
           </div>
         </div>
       </div>
@@ -261,6 +362,13 @@ export function Profitability() {
         <div className="p-6">
           {reportType === 'period' && (
             <div className="space-y-6">
+              {financialData.length === 0 && (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                  {t('campaigns.connectPlatforms')}
+                </div>
+              )}
+              {financialData.length > 0 && (
+                <>
               <div className="h-80" dir="ltr">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <AreaChart data={financialData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -322,17 +430,28 @@ export function Profitability() {
                         <td className="py-4 text-emerald-600 font-bold">{formatCurrency(row.revenue)}</td>
                         <td className="py-4 text-red-500">{formatCurrency(row.spend)}</td>
                         <td className="py-4 text-indigo-600 font-bold">{formatCurrency(row.profit)}</td>
-                        <td className="py-4 font-medium" dir="ltr">{(row.revenue / row.spend).toFixed(2)}x</td>
+                        <td className="py-4 font-medium" dir="ltr">
+                          {row.spend > 0 ? `${(row.revenue / row.spend).toFixed(2)}x` : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              </>
+              )}
             </div>
           )}
 
           {reportType === 'platforms' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {platformData.length === 0 && (
+                <div className="md:col-span-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                  {t('campaigns.connectPlatforms')}
+                </div>
+              )}
+              {platformData.length > 0 && (
+                <>
               <div className="h-80" dir="ltr">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <RechartsBarChart data={platformData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -366,31 +485,83 @@ export function Profitability() {
                       </div>
                     </div>
                     <div className={dir === 'rtl' ? "text-left" : "text-right"}>
-                      <p className="text-sm font-bold text-emerald-600" dir="ltr">{platform.roas}x ROAS</p>
+                      <p className="text-sm font-bold text-emerald-600" dir="ltr">{platform.roas.toFixed(2)}x ROAS</p>
                       <div className="w-24 h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden">
                         <div 
                           className="h-full bg-emerald-500 rounded-full" 
-                          style={{ width: `${(platform.roas / 5) * 100}%` }}
+                          style={{ width: `${Math.max(0, Math.min(100, (platform.roas / 5) * 100))}%` }}
                         />
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+              </>
+              )}
             </div>
           )}
 
           {reportType === 'campaigns' && (
-            <div className="flex flex-col items-center justify-center h-80 text-center space-y-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                <BarChart3 className="w-8 h-8" />
-              </div>
-              <div>
-                <p className="font-bold text-gray-900">{t('profitability.loadingCampaigns')}</p>
-                <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                  {t('profitability.loadingCampaignsDesc')}
-                </p>
-              </div>
+            <div>
+              {campaignRows.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                  {isLoadingData ? t('profitability.loadingCampaignsDesc') : t('campaigns.connectPlatforms')}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className={cn(dir === 'rtl' ? 'text-right' : 'text-left')}>
+                        <th className="px-3 py-2 font-bold text-gray-600">#{t('profitability.campaigns')}</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">{t('campaigns.platform')}</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">{t('campaigns.status')}</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">{t('profitability.spend')}</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">Conv.</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">Conv. Value</th>
+                        <th className="px-3 py-2 font-bold text-gray-600">{t('profitability.roas')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {campaignRows.map((row) => {
+                        const fbSpend = toAmount(row.metaChannels?.facebook?.spend);
+                        const igSpend = toAmount(row.metaChannels?.instagram?.spend);
+                        const waEnabled = Boolean(row.metaChannels?.whatsapp?.enabled);
+                        const waSpend = toAmount(row.metaChannels?.whatsapp?.spend);
+                        return (
+                          <tr key={`${row.platform}-${row.id}`} className={cn(dir === 'rtl' ? 'text-right' : 'text-left')}>
+                            <td className="px-3 py-2">
+                              <div className="max-w-[230px] truncate font-medium text-gray-900" title={row.name}>
+                                {row.name}
+                              </div>
+                              {row.platform === 'Meta' && (fbSpend > 0 || igSpend > 0 || waEnabled) && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                    FB {fbSpend > 0 ? formatCurrency(fbSpend) : '—'}
+                                  </span>
+                                  <span className="inline-flex items-center rounded-full bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                    IG {igSpend > 0 ? formatCurrency(igSpend) : '—'}
+                                  </span>
+                                  {waEnabled && (
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold">
+                                      WA {waSpend > 0 ? formatCurrency(waSpend) : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700">{row.platform}</td>
+                            <td className="px-3 py-2 text-gray-700">{row.status}</td>
+                            <td className="px-3 py-2 text-gray-800 font-medium">{formatCurrency(row.spend)}</td>
+                            <td className="px-3 py-2 text-gray-700">{Math.round(row.conversions).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-gray-700">{formatCurrency(row.conversionValue)}</td>
+                            <td className="px-3 py-2 text-gray-700" dir="ltr">{row.roas.toFixed(2)}x</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

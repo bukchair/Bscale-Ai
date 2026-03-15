@@ -7,7 +7,7 @@ export const translations = {
     nav: {
       performance: "Performance",
       overview: "Overview",
-      profitability: "Profitability / Financial Reports",
+      profitability: "Reports",
       budget: "Budget Management",
       aiCampaigns: "AI Campaigns",
       campaigns: "Campaigns",
@@ -373,7 +373,7 @@ export const translations = {
       statusUnderperforming: "Underperforming"
     },
     profitability: {
-      title: "Profitability / Financial Reports",
+      title: "Reports",
       subtitle: "Comprehensive financial analysis, financial reports and AI insights for your business.",
       revenueWoo: "Revenue (WooCommerce)",
       adSpend: "Advertising Spend (Ads)",
@@ -588,7 +588,7 @@ export const translations = {
     nav: {
       performance: "ביצועים",
       overview: "סקירה כללית",
-      profitability: "רווחיות / דוחות כספיים",
+      profitability: "דוחות",
       budget: "ניהול תקציב",
       aiCampaigns: "קמפיינים AI",
       campaigns: "קמפיינים",
@@ -957,7 +957,7 @@ export const translations = {
       statusUnderperforming: "ביצועים חלשים"
     },
     profitability: {
-      title: "רווחיות / דוחות כספיים",
+      title: "דוחות",
       subtitle: "ניתוח פיננסי מקיף, דוחות כספיים ותובנות AI לעסק שלך.",
       revenueWoo: "הכנסות (WooCommerce)",
       adSpend: "הוצאות פרסום (Ads)",
@@ -1163,7 +1163,7 @@ export const translations = {
   },
   ru: {
     app: { name: "BScale AI", slogan: "Интеллект для вашего роста" },
-    nav: { performance: "Производительность", overview: "Обзор", profitability: "Прибыльность", budget: "Бюджет", aiCampaigns: "Кампании", aiRecommendations: "Рекомендации", searchAnalysis: "Анализ поиска", growth: "Рост", seoCenter: "SEO Центр", products: "Продукты", orders: "Заказы", audiences: "Аудитории", creativeLab: "Креатив", approvalsAutomations: "Автоматизация", activityLog: "Журнал", connections: "Подключения", users: "Пользователи", billing: "Биллинг", settings: "Настройки", logout: "Выйти" },
+    nav: { performance: "Производительность", overview: "Обзор", profitability: "Отчеты", budget: "Бюджет", aiCampaigns: "Кампании", aiRecommendations: "Рекомендации", searchAnalysis: "Анализ поиска", growth: "Рост", seoCenter: "SEO Центр", products: "Продукты", orders: "Заказы", audiences: "Аудитории", creativeLab: "Креатив", approvalsAutomations: "Автоматизация", activityLog: "Журнал", connections: "Подключения", users: "Пользователи", billing: "Биллинг", settings: "Настройки", logout: "Выйти" },
     dashboard: { spend: "Расход", revenue: "Доход", roas: "ROAS", netProfit: "Прибыль", poas: "POAS", conversions: "Конверсии", clicks: "Клики", ga4Title: "Трафик GA4", totalUsers: "Пользователи", activeUsers: "Активные", topPages: "Топ страницы", trafficSources: "Источники", organicSearch: "Органика", paidSearch: "Платный", direct: "Прямой", social: "Соцсети", other: "Другое", gscTitle: "SEO GSC", impressions: "Показы", avgPosition: "Позиция", ctr: "CTR", businessGrowth: "Рост", revenueVsSpend: "Доход vs Расход", connectionQuality: "Связь", manageConnections: "Управление", today: "Сегодня", last7Days: "7 дней", last30Days: "30 дней", customRange: "Период", financialAnalysis: "Финансы", wooCommerceRevenueVsCampaignSpend: "Доход Woo vs Расход", wooCommerceRevenue: "Доход WooCommerce", vsPreviousPeriod: "vs прошлый период", campaignSpend: "Расход", realtimeTrafficGa4: "Трафик Real-time", activeUsersAndSources: "Активные пользователи", activeNow: "Сейчас", homePage: "Главная", products: "Продукты", promotions: "Акции", about: "О нас", contact: "Контакт", businessGrowthDesc: "Рост -", seoOverview: "SEO Обзор", performanceDataFromGsc: "Данные GSC", goToSeoCenter: "В SEO Центр", quickSmartActions: "Действия", viewAiRecs: "Рекомендации", viewAiRecsDesc: "3 новых", createAdAi: "Создать с AI", createAdAiDesc: "Генерация", fixSeoIssues: "Исправить SEO", fixSeoIssuesDesc: "2 проблемы", welcome: "С возвращением", welcomeSubtitle: "Статус вашего бизнеса." },
     landing: { login: "Войти", heroTitle1: "Управляйте рекламой", heroTitle2: "с AI", heroSubtitle: "Интеллект для роста. Кампании, SEO, отчеты.", cta: "Войти", readMore: "Подробнее", featuresTitle: "Возможности", featuresSubtitle: "Инструменты роста", howItWorks: "Как это работает?", howItWorksSub: "3 шага", ready: "Готовы?", f1_title: "Кампании", f1_desc: "Оптимизация", f2_title: "Креатив", f2_desc: "Генерация", f3_title: "SEO", f3_desc: "Ранжирование", f4_title: "Аудитории", f4_desc: "Таргетинг", f5_title: "Отчеты", f5_desc: "Аналитика", f6_title: "Автоматизация", f6_desc: "Правила", f7_title: "Интеграция", f7_desc: "Подключение", f8_title: "Gmail", f8_desc: "Отчеты", s1_title: "Подключите", s1_desc: "Каналы", s2_title: "Анализ", s2_desc: "Обучение", s3_title: "Рост", s3_desc: "Рекомендации", revenueGrowth: "Рост", articleTitle: "Почему мы?", articleP1: "Современные инструменты.", articleP2: "Преимущества", articleL1: "Данные", articleL2: "Инсайты", articleL3: "Автоматизация", articleL4: "Гибкость", articleP3: "Присоединяйтесь." },
     auth: { welcome: "Добро пожаловать", subtitle: "Войдите для роста", google: "Google", or: "или Email", email: "Email", password: "Пароль", name: "Имя", login: "Войти", register: "Создать", noAccount: "Нет аккаунта?", hasAccount: "Есть аккаунт?", signUp: "Регистрация", signIn: "Вход" },
@@ -1253,7 +1253,7 @@ export const translations = {
       connectPlatforms: "Подключите Google, Meta или TikTok в разделе «Подключения», чтобы видеть кампании в реальном времени.",
     },
     profitability: {
-      title: "Прибыльность / Финансовые отчеты",
+      title: "Отчеты",
       subtitle: "Комплексный финансовый анализ, отчеты и AI-инсайты для вашего бизнеса.",
       revenueWoo: "Доход (WooCommerce)",
       adSpend: "Расходы на рекламу (Ads)",
@@ -1443,7 +1443,7 @@ export const translations = {
   },
   pt: {
     app: { name: "BScale AI", slogan: "A Inteligência por trás do seu Crescimento" },
-    nav: { performance: "Desempenho", overview: "Geral", profitability: "Lucratividade", budget: "Orçamento", aiCampaigns: "Campanhas", aiRecommendations: "Recomendações", searchAnalysis: "Busca", growth: "Crescimento", seoCenter: "SEO", products: "Produtos", orders: "Pedidos", audiences: "Públicos", creativeLab: "Criativo", approvalsAutomations: "Automação", activityLog: "Log", connections: "Conexões", users: "Usuários", billing: "Faturamento", settings: "Configurações", logout: "Sair" },
+    nav: { performance: "Desempenho", overview: "Geral", profitability: "Relatórios", budget: "Orçamento", aiCampaigns: "Campanhas", aiRecommendations: "Recomendações", searchAnalysis: "Busca", growth: "Crescimento", seoCenter: "SEO", products: "Produtos", orders: "Pedidos", audiences: "Públicos", creativeLab: "Criativo", approvalsAutomations: "Automação", activityLog: "Log", connections: "Conexões", users: "Usuários", billing: "Faturamento", settings: "Configurações", logout: "Sair" },
     dashboard: { spend: "Gasto", revenue: "Receita", roas: "ROAS", netProfit: "Lucro", poas: "POAS", conversions: "Conversões", clicks: "Cliques", ga4Title: "Tráfego GA4", totalUsers: "Usuários", activeUsers: "Ativos", topPages: "Páginas", trafficSources: "Fontes", organicSearch: "Orgânico", paidSearch: "Pago", direct: "Direto", social: "Social", other: "Outro", gscTitle: "SEO GSC", impressions: "Impressões", avgPosition: "Posição", ctr: "CTR", businessGrowth: "Crescimento", revenueVsSpend: "Receita vs Gasto", connectionQuality: "Conexão", manageConnections: "Gerenciar", today: "Hoje", last7Days: "7 dias", last30Days: "30 dias", customRange: "Período", financialAnalysis: "Financeiro", wooCommerceRevenueVsCampaignSpend: "Woo vs Gasto", wooCommerceRevenue: "Receita Woo", vsPreviousPeriod: "vs anterior", campaignSpend: "Gasto", realtimeTrafficGa4: "Real-time", activeUsersAndSources: "Usuários ativos", activeNow: "Agora", homePage: "Home", products: "Produtos", promotions: "Promoções", about: "Sobre", contact: "Contato", businessGrowthDesc: "Crescimento -", seoOverview: "SEO Geral", performanceDataFromGsc: "Dados GSC", goToSeoCenter: "Ir para SEO", quickSmartActions: "Ações", viewAiRecs: "Ver Recs", viewAiRecsDesc: "3 novas", createAdAi: "Criar com AI", createAdAiDesc: "Gerar", fixSeoIssues: "Corrigir SEO", fixSeoIssuesDesc: "2 problemas", welcome: "Bem-vindo", welcomeSubtitle: "Status hoje." },
     landing: { login: "Entrar", heroTitle1: "Gerencie Anúncios", heroTitle2: "com AI", heroSubtitle: "Inteligência para crescer. Campanhas, SEO, relatórios.", cta: "Entrar", readMore: "Saber mais", featuresTitle: "Recursos", featuresSubtitle: "Ferramentas", howItWorks: "Como funciona?", howItWorksSub: "3 passos", ready: "Pronto?", f1_title: "Campanhas", f1_desc: "Otimização", f2_title: "Criativo", f2_desc: "Geração", f3_title: "SEO", f3_desc: "Rankings", f4_title: "Públicos", f4_desc: "Targeting", f5_title: "Relatórios", f5_desc: "Análise", f6_title: "Automação", f6_desc: "Regras", f7_title: "Integração", f7_desc: "Conexão", f8_title: "Gmail", f8_desc: "Relatórios", s1_title: "Conecte", s1_desc: "Canais", s2_title: "Análise", s2_desc: "Aprendizado", s3_title: "Cresça", s3_desc: "Recs", revenueGrowth: "Crescimento", articleTitle: "Por que nós?", articleP1: "Ferramentas modernas.", articleP2: "Vantagens", articleL1: "Dados", articleL2: "Insights", articleL3: "Automação", articleL4: "Flexibilidade", articleP3: "Junte-se." },
     auth: { welcome: "Bem-vindo", subtitle: "Entre para crescer", google: "Google", or: "ou Email", email: "Email", password: "Senha", name: "Nome", login: "Entrar", register: "Criar", noAccount: "Não tem conta?", hasAccount: "Já tem conta?", signUp: "Cadastrar", signIn: "Entrar" },
@@ -1506,7 +1506,7 @@ export const translations = {
     },
     campaigns: { title: "Gestão de Campanhas", refreshAi: "Atualizar AI", activeCampaigns: "Ativas", campaignName: "Nome", platform: "Plataforma", status: "Status", spend: "Gasto", roas: "ROAS", cpa: "CPA", aiRecommendations: "Recs AI", impact: "Impacto", applyAuto: "Aplicar", appliedSuccess: "Sucesso", noRecommendations: "Sem recs", impactHigh: "Alto", impactMedium: "Médio", impactLow: "Baixo" },
     profitability: {
-      title: "Lucratividade / Relatórios Financeiros",
+      title: "Relatórios",
       subtitle: "Análise financeira abrangente, relatórios financeiros e insights de IA para o seu negócio.",
       revenueWoo: "Receita (WooCommerce)",
       adSpend: "Gastos com Publicidade (Ads)",
@@ -1623,7 +1623,7 @@ export const translations = {
   },
   fr: {
     app: { name: "BScale AI", slogan: "L'intelligence derrière votre croissance" },
-    nav: { performance: "Performance", overview: "Aperçu", profitability: "Rentabilité", budget: "Budget", aiCampaigns: "Campagnes", aiRecommendations: "Recommandations", searchAnalysis: "Recherche", growth: "Croissance", seoCenter: "SEO", products: "Produits", orders: "Commandes", audiences: "Audiences", creativeLab: "Créatif", approvalsAutomations: "Automatisation", activityLog: "Log", connections: "Connexions", users: "Utilisateurs", billing: "Facturation", settings: "Paramètres", logout: "Déconnexion" },
+    nav: { performance: "Performance", overview: "Aperçu", profitability: "Rapports", budget: "Budget", aiCampaigns: "Campagnes", aiRecommendations: "Recommandations", searchAnalysis: "Recherche", growth: "Croissance", seoCenter: "SEO", products: "Produits", orders: "Commandes", audiences: "Audiences", creativeLab: "Créatif", approvalsAutomations: "Automatisation", activityLog: "Log", connections: "Connexions", users: "Utilisateurs", billing: "Facturation", settings: "Paramètres", logout: "Déconnexion" },
     dashboard: { spend: "Dépense", revenue: "Revenu", roas: "ROAS", netProfit: "Profit", poas: "POAS", conversions: "Conversions", clicks: "Clics", ga4Title: "Trafic GA4", totalUsers: "Utilisateurs", activeUsers: "Actifs", topPages: "Pages", trafficSources: "Sources", organicSearch: "Organique", paidSearch: "Payant", direct: "Direct", social: "Social", other: "Autre", gscTitle: "SEO GSC", impressions: "Impressions", avgPosition: "Position", ctr: "CTR", businessGrowth: "Croissance", revenueVsSpend: "Revenu vs Dépense", connectionQuality: "Connexion", manageConnections: "Gérer", today: "Aujourd'hui", last7Days: "7 jours", last30Days: "30 jours", customRange: "Période", financialAnalysis: "Finance", wooCommerceRevenueVsCampaignSpend: "Revenu Woo vs Dépense", wooCommerceRevenue: "Revenu Woo", vsPreviousPeriod: "vs précédent", campaignSpend: "Dépense", realtimeTrafficGa4: "Real-time", activeUsersAndSources: "Utilisateurs actifs", activeNow: "Maintenant", homePage: "Accueil", products: "Produits", promotions: "Promotions", about: "À propos", contact: "Contact", businessGrowthDesc: "Croissance -", seoOverview: "SEO Aperçu", performanceDataFromGsc: "Données GSC", goToSeoCenter: "Vers SEO", quickSmartActions: "Actions", viewAiRecs: "Voir Recs", viewAiRecsDesc: "3 nouvelles", createAdAi: "Créer avec AI", createAdAiDesc: "Générer", fixSeoIssues: "Corriger SEO", fixSeoIssuesDesc: "2 problèmes", welcome: "Bienvenue", welcomeSubtitle: "Statut aujourd'hui." },
     landing: { login: "Connexion", heroTitle1: "Gérez la Pub", heroTitle2: "avec AI", heroSubtitle: "Intelligence pour croître. Campagnes, SEO, rapports.", cta: "Entrer", readMore: "En savoir plus", featuresTitle: "Fonctions", featuresSubtitle: "Outils", howItWorks: "Comment ça marche ?", howItWorksSub: "3 étapes", ready: "Prêt ?", f1_title: "Campagnes", f1_desc: "Optimisation", f2_title: "Créatif", f2_desc: "Génération", f3_title: "SEO", f3_desc: "Classement", f4_title: "Audiences", f4_desc: "Ciblage", f5_title: "Rapports", f5_desc: "Analyse", f6_title: "Automatisation", f6_desc: "Règles", f7_title: "Intégration", f7_desc: "Connexion", f8_title: "Gmail", f8_desc: "Rapports", s1_title: "Connectez", s1_desc: "Canaux", s2_title: "Analyse", s2_desc: "Apprentissage", s3_title: "Croître", s3_desc: "Recs", revenueGrowth: "Croissance", articleTitle: "Pourquoi nous ?", articleP1: "Outils modernes.", articleP2: "Avantages", articleL1: "Données", articleL2: "Insights", articleL3: "Automatisation", articleL4: "Flexibilité", articleP3: "Rejoignez-nous." },
     auth: { welcome: "Bienvenue", subtitle: "Connectez-vous", google: "Google", or: "ou Email", email: "Email", password: "Mot de passe", name: "Nom", login: "Connexion", register: "Créer", noAccount: "Pas de compte ?", hasAccount: "Déjà un compte ?", signUp: "S'inscrire", signIn: "Connexion" },
@@ -1713,7 +1713,7 @@ export const translations = {
       connectPlatforms: "Connectez Google, Meta ou TikTok dans Connexions pour voir les campagnes en direct.",
     },
     profitability: {
-      title: "Rentabilité / Rapports Financiers",
+      title: "Rapports",
       subtitle: "Analyse financière complète, rapports financiers et informations IA pour votre entreprise.",
       revenueWoo: "Revenu (WooCommerce)",
       adSpend: "Dépenses Publicitaires (Ads)",
