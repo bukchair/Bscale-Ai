@@ -85,6 +85,39 @@ const isExpiredTrialStatus = (data: Record<string, unknown> | undefined) => {
   return Date.parse(trialEndsAt) <= Date.now();
 };
 
+const stripUndefinedDeep = <T,>(value: T): T => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined) as unknown as T;
+  }
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (nestedValue === undefined) continue;
+      const cleaned = stripUndefinedDeep(nestedValue as unknown);
+      if (cleaned !== undefined) {
+        next[key] = cleaned;
+      }
+    }
+    return next as T;
+  }
+  return value;
+};
+
+const isPermissionDeniedError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const maybeCode =
+    typeof (error as { code?: unknown }).code === 'string'
+      ? String((error as { code?: unknown }).code).toLowerCase()
+      : '';
+  const maybeMessage =
+    typeof (error as { message?: unknown }).message === 'string'
+      ? String((error as { message?: unknown }).message).toLowerCase()
+      : '';
+  return maybeCode.includes('permission-denied') || maybeMessage.includes('missing or insufficient permissions');
+};
+
 const initialConnections: Connection[] = [
   { 
     id: 'gemini', 
@@ -590,6 +623,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       let globalItems: Connection[] = [];
       let userItems: Connection[] = [];
       let restrictPlatformsToDemo = false;
+      let allowGlobalAiRead = false;
 
       const shouldRestrictPlatformsToDemo = (ownerData: Record<string, unknown> | undefined) => {
         if (!ownerData) return false;
@@ -629,7 +663,10 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       try {
         const ownerSnap = await getDoc(ownerProfileRef);
         if (ownerSnap.exists()) {
-          restrictPlatformsToDemo = shouldRestrictPlatformsToDemo(ownerSnap.data() as Record<string, unknown>);
+          const ownerData = ownerSnap.data() as Record<string, unknown>;
+          restrictPlatformsToDemo = shouldRestrictPlatformsToDemo(ownerData);
+          const ownerEmail = String(ownerData.email || '').toLowerCase();
+          allowGlobalAiRead = ownerData.role === 'admin' || ownerEmail === ADMIN_SALES_EMAIL;
         }
       } catch (err) {
         console.warn('Failed reading owner subscription mode for connection restrictions:', err);
@@ -641,6 +678,8 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         (snap) => {
           const ownerData = snap.exists() ? (snap.data() as Record<string, unknown>) : undefined;
           restrictPlatformsToDemo = shouldRestrictPlatformsToDemo(ownerData);
+          const ownerEmail = String(ownerData?.email || '').toLowerCase();
+          allowGlobalAiRead = ownerData?.role === 'admin' || ownerEmail === ADMIN_SALES_EMAIL;
           mergeAndSet();
         },
         (err) => {
@@ -649,30 +688,43 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       );
 
       const handleSnapshotError = (source: 'global' | 'user') => (err: any) => {
-        console.error(`Error in ${source} connections snapshot:`, err);
+        const permissionDenied = isPermissionDeniedError(err);
+        if (!permissionDenied) {
+          console.error(`Error in ${source} connections snapshot:`, err);
+        } else {
+          console.warn(`Permission denied reading ${source} connections; falling back to local data.`);
+        }
         // אם אין הרשאות לקרוא את המסמכים - נישאר על נתוני דמו ולא נפיל את האפליקציה
         globalItems = [];
         if (source === 'user') {
           userItems = [];
         }
+        if (source === 'global' && permissionDenied && unsubGlobal) {
+          unsubGlobal();
+          unsubGlobal = null;
+        }
         mergeAndSet();
         setIsLoading(false);
       };
 
-      unsubGlobal = onSnapshot(
-        globalAiRef,
-        (snap) => {
-          if (snap.exists()) {
-            const items = (snap.data().items || []) as Connection[];
-            globalItems = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
-          } else {
-            globalItems = [];
-          }
-          mergeAndSet();
-          setIsLoading(false);
-        },
-        handleSnapshotError('global')
-      );
+      if (allowGlobalAiRead) {
+        unsubGlobal = onSnapshot(
+          globalAiRef,
+          (snap) => {
+            if (snap.exists()) {
+              const items = (snap.data().items || []) as Connection[];
+              globalItems = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+            } else {
+              globalItems = [];
+            }
+            mergeAndSet();
+            setIsLoading(false);
+          },
+          handleSnapshotError('global')
+        );
+      } else {
+        globalItems = [];
+      }
 
       unsubUser = onSnapshot(
         userConnectionsRef,
@@ -686,7 +738,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
             // אל תנסה ליצור מסמך אם אין הרשאות - זה ייכשל ברמת השרת
             setDoc(
               userConnectionsRef,
-              { items: initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any)) }
+              {
+                items: stripUndefinedDeep(
+                  initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any))
+                ),
+              }
             ).catch((err) => {
               console.error('Error seeding user connections document:', err);
             });
@@ -712,7 +768,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const scopedOwnerUid = dataOwnerUid || user.uid;
     const ref = doc(db, 'users', scopedOwnerUid, 'settings', 'connections');
     try {
-      await setDoc(ref, { items }, { merge: true });
+      await setDoc(ref, { items: stripUndefinedDeep(items) }, { merge: true });
     } catch (err) {
       console.error('Error persisting user connections:', err);
     }
@@ -722,7 +778,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const ref = doc(db, 'appSettings', 'connections');
     const aiOnly = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
     try {
-      await setDoc(ref, { items: aiOnly }, { merge: true });
+      await setDoc(ref, { items: stripUndefinedDeep(aiOnly) }, { merge: true });
     } catch (err) {
       console.error('Error persisting global AI connections:', err);
     }
@@ -962,7 +1018,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     });
 
     const merged = Array.from(byId.values());
-    await setDoc(globalAiRef, { items: merged }, { merge: true });
+    await setDoc(globalAiRef, { items: stripUndefinedDeep(merged) }, { merge: true });
 
     return { success: true, message: 'AI connections migrated from your user settings to appSettings (shared for all users).' };
   };

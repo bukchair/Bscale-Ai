@@ -201,8 +201,14 @@ export async function resolveWorkspaceScope(user: { uid: string; email?: string 
   if (!user?.uid) return null;
   const myEmail = normalizeEmail(user.email);
   const myRef = doc(db, 'users', user.uid);
-  const mySnap = await getDoc(myRef);
-  const myData = mySnap.exists() ? mySnap.data() : {};
+  let myData: Record<string, unknown> = {};
+  try {
+    const mySnap = await getDoc(myRef);
+    myData = (mySnap.exists() ? mySnap.data() : {}) as Record<string, unknown>;
+  } catch {
+    // Security rules may temporarily block profile read during bootstrap; fallback to own scope.
+    myData = {};
+  }
 
   if (!myEmail) {
     return {
@@ -215,8 +221,17 @@ export async function resolveWorkspaceScope(user: { uid: string; email?: string 
 
   const ownersRef = collection(db, 'users');
   const q = query(ownersRef, where('sharedAccessEmails', 'array-contains', myEmail), limit(5));
-  const sharedSnap = await getDocs(q);
-  const ownerDoc = sharedSnap.docs.find((row) => row.id !== user.uid);
+  let ownerDoc:
+    | { id: string; data: () => Record<string, unknown> }
+    | undefined;
+  try {
+    const sharedSnap = await getDocs(q);
+    ownerDoc = sharedSnap.docs.find((row) => row.id !== user.uid) as
+      | { id: string; data: () => Record<string, unknown> }
+      | undefined;
+  } catch {
+    ownerDoc = undefined;
+  }
   if (!ownerDoc) {
     return {
       ownerUid: user.uid,

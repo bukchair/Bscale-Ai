@@ -11,7 +11,26 @@ const normalizeDateParam = (value: string | null) => {
   return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
 };
 
-const normalizeMetaAccountId = (value: string) => String(value || '').replace(/^act_/i, '').trim();
+const getClampedDateRange = (url: URL) => {
+  const todayIso = new Date().toISOString().split('T')[0];
+  const rawStart = normalizeDateParam(url.searchParams.get('start_date'));
+  const rawEnd = normalizeDateParam(url.searchParams.get('end_date'));
+  if (!rawStart || !rawEnd) {
+    return { startDate: '', endDate: '' };
+  }
+  const clampedStart = rawStart > todayIso ? todayIso : rawStart;
+  const clampedEnd = rawEnd > todayIso ? todayIso : rawEnd;
+  if (clampedStart <= clampedEnd) {
+    return { startDate: clampedStart, endDate: clampedEnd };
+  }
+  return { startDate: clampedEnd, endDate: clampedStart };
+};
+
+const normalizeMetaAccountId = (value: string) => {
+  const trimmed = String(value || '').replace(/^act_/i, '').trim();
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  return digitsOnly || trimmed;
+};
 
 const toAccountResource = (value: string) => {
   const normalized = normalizeMetaAccountId(value);
@@ -50,7 +69,8 @@ const isRecoverableAccountError = (status: number, message: string) => {
     normalized.includes('unknown path components') ||
     normalized.includes('cannot access ad account') ||
     normalized.includes('permission') ||
-    normalized.includes('no permission')
+    normalized.includes('no permission') ||
+    normalized.includes('invalid parameter')
   );
 };
 
@@ -70,8 +90,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const requestedAccountId = (url.searchParams.get('ad_account_id') || '').trim();
-    const startDate = normalizeDateParam(url.searchParams.get('start_date'));
-    const endDate = normalizeDateParam(url.searchParams.get('end_date'));
+    const { startDate, endDate } = getClampedDateRange(url);
 
     let accessToken = getBearerToken(request);
     let resolvedAccountId = requestedAccountId;
@@ -138,7 +157,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const loadCampaigns = async (accountId: string) => {
+    const loadCampaigns = async (accountId: string, includeDateRange = true) => {
       const resource = toAccountResource(accountId);
       const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/campaigns`);
       graphUrl.searchParams.set(
@@ -150,7 +169,7 @@ export async function GET(request: Request) {
         JSON.stringify(['ACTIVE', 'PAUSED', 'ARCHIVED', 'WITH_ISSUES', 'DELETED'])
       );
       graphUrl.searchParams.set('limit', '200');
-      if (startDate && endDate) {
+      if (includeDateRange && startDate && endDate) {
         graphUrl.searchParams.set(
           'time_range',
           JSON.stringify({
@@ -172,9 +191,19 @@ export async function GET(request: Request) {
       return { response, parsed };
     };
 
-    let result = await loadCampaigns(resolvedAccountId);
+    let result = await loadCampaigns(resolvedAccountId, true);
     let response = result.response;
     let parsed = result.parsed;
+
+    // If Meta rejects date filters for the selected account/currency timezone combo, retry once without time_range.
+    if (!response.ok && startDate && endDate) {
+      const firstErrorMessage = extractErrorMessage(response.status, parsed);
+      if (firstErrorMessage.toLowerCase().includes('invalid parameter')) {
+        result = await loadCampaigns(resolvedAccountId, false);
+        response = result.response;
+        parsed = result.parsed;
+      }
+    }
 
     // If the account id sent by client is stale/invalid, auto-fallback to a valid managed account.
     if (managedConnection && managedUserId && !response.ok) {
@@ -218,9 +247,17 @@ export async function GET(request: Request) {
           normalizeMetaAccountId(fallbackAccountId) !== normalizeMetaAccountId(resolvedAccountId)
         ) {
           resolvedAccountId = fallbackAccountId;
-          result = await loadCampaigns(resolvedAccountId);
+          result = await loadCampaigns(resolvedAccountId, true);
           response = result.response;
           parsed = result.parsed;
+          if (!response.ok && startDate && endDate) {
+            const fallbackMessage = extractErrorMessage(response.status, parsed);
+            if (fallbackMessage.toLowerCase().includes('invalid parameter')) {
+              result = await loadCampaigns(resolvedAccountId, false);
+              response = result.response;
+              parsed = result.parsed;
+            }
+          }
         }
       }
     }

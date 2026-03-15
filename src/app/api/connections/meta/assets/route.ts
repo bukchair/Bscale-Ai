@@ -16,7 +16,11 @@ type MetaWhatsAppAccount = { id?: string; name?: string };
 const META_GRAPH_VERSION = 'v21.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
-const normalizeMetaAccountId = (value: string) => String(value || '').replace(/^act_/i, '').trim();
+const normalizeMetaAccountId = (value: string) => {
+  const trimmed = String(value || '').replace(/^act_/i, '').trim();
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  return digitsOnly || trimmed;
+};
 const toAccountResource = (value: string) => {
   const trimmed = normalizeMetaAccountId(value);
   if (!trimmed) return '';
