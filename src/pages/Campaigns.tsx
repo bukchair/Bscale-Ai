@@ -377,6 +377,7 @@ export function Campaigns() {
   useEffect(() => {
     let cancelled = false;
     const syncAll = async () => {
+      if (cancelled) return;
       setIsSyncing(true);
       try {
         await Promise.all([syncTikTokData(), syncMetaData(), syncGoogleData()]);
@@ -386,9 +387,22 @@ export function Campaigns() {
         }
       }
     };
+
     void syncAll();
+
+    const intervalId = window.setInterval(() => {
+      void syncAll();
+    }, 45_000);
+
+    const handleFocus = () => {
+      void syncAll();
+    };
+    window.addEventListener('focus', handleFocus);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [connections, startDateIso, endDateIso]);
 
