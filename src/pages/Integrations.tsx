@@ -946,7 +946,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     setSuccess(null);
     try {
       await clearConnectionSettings(id);
-      setExpandedId(null);
+      setExpandedId(id);
       setFormValues({});
       setToast({
         message: isHebrew ? 'החיבור אופס בהצלחה.' : 'Connection reset successfully.',
