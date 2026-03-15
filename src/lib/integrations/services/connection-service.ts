@@ -166,8 +166,24 @@ export const connectionService = {
       await tx.oauthState.deleteMany({
         where: { userId, platform },
       });
-      await tx.platformConnection.delete({
+      await tx.connectedAccount.deleteMany({
+        where: { platformConnectionId: connection.id },
+      });
+      await tx.platformConnection.update({
         where: { id: connection.id },
+        data: {
+          status: 'DISCONNECTED',
+          encryptedAccessToken: null,
+          encryptedRefreshToken: null,
+          tokenExpiresAt: null,
+          scopes: null,
+          tokenType: null,
+          externalUserId: null,
+          externalBusinessId: null,
+          metadata: null,
+          lastSyncAt: null,
+          lastError: null,
+        },
       });
     });
   },

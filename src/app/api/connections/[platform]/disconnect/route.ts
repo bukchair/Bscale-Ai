@@ -1,7 +1,7 @@
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { integrationOrchestrator } from '@/src/lib/integrations/services/integration-orchestrator';
 import { parsePlatformParam } from '@/src/lib/integrations/utils/platform-utils';
-import { ok, toErrorResponse } from '@/src/lib/integrations/utils/api-response';
+import { fail, ok, toErrorResponse } from '@/src/lib/integrations/utils/api-response';
 import { NextResponse } from 'next/server';
 
 type RouteContext = {
@@ -16,6 +16,9 @@ const runDisconnectFlow = async (context: RouteContext) => {
     await integrationOrchestrator.disconnect(user.id, platform);
     return ok('Platform disconnected successfully.', { disconnected: true });
   } catch (error) {
+    if (error instanceof Error && error.message) {
+      return fail('INTERNAL_ERROR', error.message, 500);
+    }
     return toErrorResponse(error, 'Failed to disconnect platform.');
   }
 };
