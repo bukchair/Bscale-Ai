@@ -81,7 +81,7 @@ export class GoogleAdsProvider extends BaseGoogleProvider {
     const accessible = await this.requestAds<{ resourceNames?: string[] }>({
       connectionId,
       path: '/customers:listAccessibleCustomers',
-      body: {},
+      method: 'GET',
       loginCustomerId: typeof loginCustomerId === 'string' ? loginCustomerId : null,
     });
 
