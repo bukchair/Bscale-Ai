@@ -48,6 +48,19 @@ interface ConnectionsContextType {
   migrateAiConnectionsFromUser: () => Promise<{ success: boolean; message: string }>;
 }
 
+type ManagedApiConnection = {
+  platform: 'GOOGLE_ADS' | 'GA4' | 'SEARCH_CONSOLE' | 'GMAIL' | 'META' | 'TIKTOK';
+  status: 'CONNECTED' | 'ERROR' | 'EXPIRED' | 'DISCONNECTED' | 'PENDING';
+  accounts?: Array<{
+    externalAccountId?: string;
+    name?: string;
+    isSelected?: boolean;
+    status?: string;
+    currency?: string | null;
+    timezone?: string | null;
+  }>;
+};
+
 const AI_CONNECTION_IDS = ['gemini', 'openai', 'claude'] as const;
 const PLATFORM_CONNECTION_IDS = ['google', 'meta', 'tiktok', 'woocommerce', 'shopify'] as const;
 const ADMIN_SALES_EMAIL = 'asher205@gmail.com';
@@ -166,6 +179,155 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const mapManagedStatusToLocal = (
+    status: ManagedApiConnection['status'] | undefined
+  ): ConnectionStatus => {
+    if (status === 'CONNECTED') return 'connected';
+    if (status === 'PENDING') return 'connecting';
+    if (status === 'ERROR' || status === 'EXPIRED') return 'error';
+    return 'disconnected';
+  };
+
+  const formatGoogleAdsAccountId = (value: string | undefined): string => {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (digits.length !== 10) return digits;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  };
+
+  const mergeManagedConnectionsIntoLocal = (
+    current: Connection[],
+    managedConnections: ManagedApiConnection[]
+  ): Connection[] => {
+    const byPlatform = new Map(managedConnections.map((row) => [row.platform, row] as const));
+    const ads = byPlatform.get('GOOGLE_ADS');
+    const ga4 = byPlatform.get('GA4');
+    const gsc = byPlatform.get('SEARCH_CONSOLE');
+    const gmail = byPlatform.get('GMAIL');
+    const meta = byPlatform.get('META');
+    const tiktok = byPlatform.get('TIKTOK');
+
+    return current.map((connection) => {
+      if (connection.id === 'google') {
+        const nextSubConnections =
+          connection.subConnections?.map((sub) => {
+            if (sub.id === 'google_ads') {
+              return { ...sub, status: mapManagedStatusToLocal(ads?.status) };
+            }
+            if (sub.id === 'ga4') {
+              return { ...sub, status: mapManagedStatusToLocal(ga4?.status) };
+            }
+            if (sub.id === 'gsc') {
+              return { ...sub, status: mapManagedStatusToLocal(gsc?.status) };
+            }
+            if (sub.id === 'gmail') {
+              return { ...sub, status: mapManagedStatusToLocal(gmail?.status) };
+            }
+            return sub;
+          }) || connection.subConnections;
+
+        const selectedAdsAccount =
+          ads?.accounts?.find((account) => account.isSelected) || ads?.accounts?.[0] || null;
+        const selectedGa4 =
+          ga4?.accounts?.find((account) => account.isSelected) || ga4?.accounts?.[0] || null;
+        const selectedGsc =
+          gsc?.accounts?.find((account) => account.isSelected) || gsc?.accounts?.[0] || null;
+        const selectedGmail =
+          gmail?.accounts?.find((account) => account.isSelected) || gmail?.accounts?.[0] || null;
+        const connectedSubCount = (nextSubConnections || []).filter((sub) => sub.status === 'connected').length;
+
+        const nextSettings: ConnectionSettings = {
+          ...(connection.settings || {}),
+        };
+
+        if (selectedAdsAccount?.externalAccountId) {
+          nextSettings.googleAdsId = formatGoogleAdsAccountId(selectedAdsAccount.externalAccountId);
+        }
+        if (selectedGa4?.externalAccountId) {
+          nextSettings.ga4Id = selectedGa4.externalAccountId;
+        }
+        if (selectedGsc?.externalAccountId) {
+          nextSettings.gscSiteUrl = selectedGsc.externalAccountId;
+        }
+        if (selectedGmail?.name) {
+          nextSettings.gmailAccount = selectedGmail.name;
+        }
+        if (ads?.accounts?.length) {
+          nextSettings.googleAdsAccounts = JSON.stringify(
+            ads.accounts.map((account) => ({
+              externalAccountId: account.externalAccountId,
+              name: account.name,
+              isSelected: Boolean(account.isSelected),
+              status: account.status,
+              currency: account.currency ?? null,
+              timezone: account.timezone ?? null,
+            }))
+          );
+          if (!nextSettings.googleAccessToken) {
+            nextSettings.googleAccessToken = 'server-managed';
+          }
+        }
+
+        const fallbackStatus =
+          ads || ga4 || gsc || gmail ? mapManagedStatusToLocal(ads?.status || ga4?.status || gsc?.status || gmail?.status) : connection.status;
+
+        return {
+          ...connection,
+          status: connectedSubCount > 0 ? 'connected' : fallbackStatus,
+          score: connectedSubCount > 0 ? Math.max(connection.score || 0, 95) : connection.score,
+          subConnections: nextSubConnections,
+          settings: nextSettings,
+        };
+      }
+
+      if (connection.id === 'meta' && meta) {
+        const selected =
+          meta.accounts?.find((account) => account.isSelected) || meta.accounts?.[0] || null;
+        return {
+          ...connection,
+          status: mapManagedStatusToLocal(meta.status),
+          score: mapManagedStatusToLocal(meta.status) === 'connected' ? Math.max(connection.score || 0, 95) : connection.score,
+          settings: {
+            ...(connection.settings || {}),
+            metaAdsId: selected?.externalAccountId || connection.settings?.metaAdsId || '',
+            metaToken: connection.settings?.metaToken || (selected ? 'server-managed' : ''),
+          },
+        };
+      }
+
+      if (connection.id === 'tiktok' && tiktok) {
+        const selected =
+          tiktok.accounts?.find((account) => account.isSelected) || tiktok.accounts?.[0] || null;
+        return {
+          ...connection,
+          status: mapManagedStatusToLocal(tiktok.status),
+          score:
+            mapManagedStatusToLocal(tiktok.status) === 'connected'
+              ? Math.max(connection.score || 0, 95)
+              : connection.score,
+          settings: {
+            ...(connection.settings || {}),
+            tiktokAdvertiserId:
+              selected?.externalAccountId || connection.settings?.tiktokAdvertiserId || '',
+            tiktokToken: connection.settings?.tiktokToken || (selected ? 'server-managed' : ''),
+          },
+        };
+      }
+
+      return connection;
+    });
+  };
+
+  const fetchManagedConnections = async (): Promise<ManagedApiConnection[] | null> => {
+    await ensureManagedApiSession();
+    const response = await fetch('/api/connections', { method: 'GET', cache: 'no-store' });
+    const text = await response.text();
+    const payload = parseManagedPayload(text);
+    if (!response.ok || !payload?.success || !Array.isArray(payload?.data?.connections)) {
+      return null;
+    }
+    return payload.data.connections as ManagedApiConnection[];
+  };
+
   const autoDiscoverAndSelectManagedAccounts = async (
     platformSlug: 'google-ads' | 'meta' | 'tiktok'
   ): Promise<void> => {
@@ -222,6 +384,20 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       success: true,
       message: payload.message || 'Connection test succeeded.',
     };
+  };
+
+  const syncManagedConnectionsToLocal = async () => {
+    try {
+      const managedConnections = await fetchManagedConnections();
+      if (!managedConnections) return;
+      setConnections((prev) => {
+        const merged = mergeManagedConnectionsIntoLocal(prev, managedConnections);
+        void persistUserConnections(merged);
+        return merged;
+      });
+    } catch (err) {
+      console.warn('Managed connections sync skipped:', err);
+    }
   };
 
   useEffect(() => {
@@ -422,6 +598,12 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    if (isLoading) return;
+    if (!auth.currentUser) return;
+    void syncManagedConnectionsToLocal();
+  }, [isLoading, dataOwnerUid]);
+
   const toggleConnection = async (id: string, subId?: string) => {
     if (isWorkspaceReadOnly) return;
     const newConnections = connections.map(c => {
@@ -594,6 +776,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
             ? connection.settings.googleAdsId.replace(/-/g, '').trim()
             : undefined;
         const result = await postManagedTest(managedPlatformSlug, fallbackAccountId);
+        await syncManagedConnectionsToLocal();
         if (result.success) {
           const updatedConnections = connections.map((c) =>
             c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: c.score || 100 } : c
