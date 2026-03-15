@@ -167,14 +167,46 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     tiktok: ['tiktok'],
   };
 
+  const waitForCurrentUser = async () => {
+    if (auth.currentUser) return auth.currentUser;
+    return new Promise<typeof auth.currentUser>((resolve) => {
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        unsubscribe();
+        resolve(auth.currentUser);
+      }, 2500);
+      const unsubscribe = auth.onAuthStateChanged((nextUser) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        unsubscribe();
+        resolve(nextUser);
+      });
+    });
+  };
+
   const ensureManagedApiSession = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const idToken = await user.getIdToken();
+    // If session cookie already exists and is valid, skip bootstrap.
+    const sessionCheck = await fetch('/api/connections', {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'include',
+    });
+    if (sessionCheck.ok) return;
+
+    const user = await waitForCurrentUser();
+    if (!user) {
+      throw new Error('Missing sign-in session. Please refresh and sign in again.');
+    }
+
+    const idToken = await user.getIdToken(true);
     const response = await fetch('/api/auth/session/bootstrap', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ idToken }),
+      credentials: 'include',
     });
     if (!response.ok) {
       throw new Error('Failed to initialize managed API session.');
@@ -385,6 +417,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const discoverResponse = await fetch(`/api/connections/${platformSlug}/accounts`, {
       method: 'GET',
       headers: { 'content-type': 'application/json' },
+      credentials: 'include',
     });
     const discoverText = await discoverResponse.text();
     const discoverPayload = parseManagedPayload(discoverText);
@@ -404,6 +437,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ accountIds }),
+      credentials: 'include',
     });
   };
 
@@ -418,6 +452,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ accountId }),
+      credentials: 'include',
     });
 
     const text = await response.text();
@@ -449,6 +484,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
+        credentials: 'include',
       });
 
       // Defensive fallback for edge proxy/method rewrite issues.
@@ -457,6 +493,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
           method: 'GET',
           headers: { accept: 'application/json' },
           cache: 'no-store',
+          credentials: 'include',
         });
       }
 
