@@ -7,7 +7,7 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
-import { fetchMetaCampaigns } from '../services/metaService';
+import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../services/metaService';
 import { fetchGoogleCampaigns, sendGmailNotification } from '../services/googleService';
 import { auth } from '../lib/firebase';
 
@@ -361,7 +361,10 @@ export function Campaigns() {
         
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Meta'), ...campaigns]);
       } catch (err) {
-        console.error("Failed to sync Meta data:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (!isMetaRateLimitMessage(message)) {
+          console.error("Failed to sync Meta data:", err);
+        }
       }
     }
   };

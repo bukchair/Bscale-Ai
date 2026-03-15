@@ -19,7 +19,7 @@ import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
 import { fetchGA4Report, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
-import { fetchMetaCampaigns } from '../services/metaService';
+import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../services/metaService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 import {
   fetchWooCommerceLatestOrders,
@@ -785,7 +785,10 @@ export function Dashboard() {
             hasCampaignsLive = true;
           }
         } catch (error) {
-          console.warn('Failed to load Meta campaigns', error);
+          const message = error instanceof Error ? error.message : String(error);
+          if (!isMetaRateLimitMessage(message)) {
+            console.warn('Failed to load Meta campaigns', error);
+          }
         }
       }
 

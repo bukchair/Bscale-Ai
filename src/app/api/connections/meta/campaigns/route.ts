@@ -5,6 +5,26 @@ import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 
 const META_GRAPH_VERSION = 'v21.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
+const META_CACHE_TTL_MS = 5 * 60 * 1000;
+type MetaCampaignsPayload = {
+  data: Array<Record<string, unknown>>;
+  meta: {
+    adAccountId: string;
+    insightsFallbackUsed: boolean;
+    dateRange: { startDate: string | null; endDate: string | null };
+    cached?: boolean;
+    stale?: boolean;
+    rateLimited?: boolean;
+  };
+};
+const metaCampaignsCache = new Map<
+  string,
+  {
+    savedAt: number;
+    accountId: string;
+    payload: MetaCampaignsPayload;
+  }
+>();
 const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const normalizeDateParam = (value: string | null) => {
   const trimmed = (value || '').trim();
@@ -88,6 +108,34 @@ const isMetaRateLimitError = (message: string) => {
     normalized.includes('rate-limiting') ||
     normalized.includes('ad-account') && normalized.includes('wait a bit')
   );
+};
+
+const buildMetaCacheKey = (accountId: string, startDate: string, endDate: string) =>
+  `${normalizeMetaAccountId(accountId)}|${startDate || 'none'}|${endDate || 'none'}`;
+
+const getFreshMetaCache = (key: string) => {
+  const hit = metaCampaignsCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.savedAt > META_CACHE_TTL_MS) return null;
+  return hit;
+};
+
+const getLatestMetaCacheByAccount = (accountId: string) => {
+  const normalizedAccountId = normalizeMetaAccountId(accountId);
+  let latest:
+    | {
+        savedAt: number;
+        accountId: string;
+        payload: MetaCampaignsPayload;
+      }
+    | null = null;
+  for (const value of metaCampaignsCache.values()) {
+    if (normalizeMetaAccountId(value.accountId) !== normalizedAccountId) continue;
+    if (!latest || value.savedAt > latest.savedAt) {
+      latest = value;
+    }
+  }
+  return latest;
 };
 
 const getCampaignRows = (parsed: unknown): Array<Record<string, unknown>> => {
@@ -182,6 +230,21 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { message: 'Meta account not selected. Reconnect Meta and select an ad account.' },
         { status: 400 }
+      );
+    }
+
+    const cacheKey = buildMetaCacheKey(resolvedAccountId, startDate, endDate);
+    const cached = getFreshMetaCache(cacheKey);
+    if (cached) {
+      return NextResponse.json(
+        {
+          ...cached.payload,
+          meta: {
+            ...cached.payload.meta,
+            cached: true,
+          },
+        },
+        { status: 200 }
       );
     }
 
@@ -342,6 +405,23 @@ export async function GET(request: Request) {
 
     if (!response.ok) {
       const message = extractErrorMessage(response.status, parsed);
+      if (isMetaRateLimitError(message)) {
+        const staleCache = getLatestMetaCacheByAccount(resolvedAccountId);
+        if (staleCache) {
+          return NextResponse.json(
+            {
+              ...staleCache.payload,
+              meta: {
+                ...staleCache.payload.meta,
+                cached: true,
+                stale: true,
+                rateLimited: true,
+              },
+            },
+            { status: 200 }
+          );
+        }
+      }
       const status = isMetaRateLimitError(message) ? 429 : response.status;
       return NextResponse.json({ message }, { status });
     }
@@ -385,20 +465,23 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json(
-      {
-        data: enrichedCampaigns,
-        meta: {
-          adAccountId: toAccountResource(resolvedAccountId),
-          insightsFallbackUsed,
-          dateRange: {
-            startDate: startDate || null,
-            endDate: endDate || null,
-          },
+    const payload: MetaCampaignsPayload = {
+      data: enrichedCampaigns,
+      meta: {
+        adAccountId: toAccountResource(resolvedAccountId),
+        insightsFallbackUsed,
+        dateRange: {
+          startDate: startDate || null,
+          endDate: endDate || null,
         },
       },
-      { status: 200 }
-    );
+    };
+    metaCampaignsCache.set(cacheKey, {
+      savedAt: Date.now(),
+      accountId: resolvedAccountId,
+      payload,
+    });
+    return NextResponse.json(payload, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Failed to fetch Meta campaigns.' },

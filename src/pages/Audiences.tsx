@@ -14,7 +14,7 @@ import {
 } from '../lib/firebase';
 import { getAudienceRecommendations, getAIKeysFromConnections, type AudienceRecommendation } from '../lib/gemini';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { fetchMetaCampaigns } from '../services/metaService';
+import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../services/metaService';
 import { fetchGoogleCampaigns } from '../services/googleService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 
@@ -149,7 +149,12 @@ export function Audiences() {
         const acc = meta.settings.metaAdsId || meta.settings.adAccountId || meta.settings.metaAdAccountId;
         result.meta = await fetchMetaCampaigns(metaToken, acc || undefined);
       } catch (e) {
-        result.meta = [{ error: String(e) }];
+        const message = e instanceof Error ? e.message : String(e);
+        if (isMetaRateLimitMessage(message)) {
+          result.meta = [];
+        } else {
+          result.meta = [{ error: String(e) }];
+        }
       }
     }
     const google = connections.find((c) => c.id === 'google');

@@ -17,12 +17,12 @@ const API_BASE = (() => {
 })();
 
 const META_CACHE_PREFIX = 'bscale:meta-campaigns:';
-const META_RATE_LIMIT_COOLDOWN_MS = 3 * 60 * 1000;
+const META_RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
 let metaRateLimitedUntil = 0;
 let lastSuccessfulMetaCampaigns: any[] = [];
 const metaInFlight = new Map<string, Promise<any[]>>();
 
-const isMetaRateLimitMessage = (message: string) => {
+export const isMetaRateLimitMessage = (message: string) => {
   const normalized = String(message || '').toLowerCase();
   return (
     normalized.includes('too many calls') ||
@@ -45,6 +45,25 @@ const loadCachedMetaCampaigns = (cacheKey: string) => {
   } catch {
     return null;
   }
+};
+
+const loadAnyCachedMetaCampaigns = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.startsWith(META_CACHE_PREFIX)) continue;
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { items?: any[] };
+      if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+        return parsed.items;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 };
 
 const saveCachedMetaCampaigns = (cacheKey: string, items: any[]) => {
@@ -140,6 +159,8 @@ export async function fetchMetaCampaigns(
     if (Date.now() < metaRateLimitedUntil) {
       const cached = loadCachedMetaCampaigns(cacheKey);
       if (cached && cached.length > 0) return cached;
+      const anyCached = loadAnyCachedMetaCampaigns();
+      if (anyCached && anyCached.length > 0) return anyCached;
       if (lastSuccessfulMetaCampaigns.length > 0) return lastSuccessfulMetaCampaigns;
       throw new Error('Meta is temporarily rate-limited. Please wait 2-3 minutes and retry.');
     }
@@ -184,6 +205,10 @@ export async function fetchMetaCampaigns(
         const cached = loadCachedMetaCampaigns(cacheKey);
         if (cached && cached.length > 0) {
           return cached;
+        }
+        const anyCached = loadAnyCachedMetaCampaigns();
+        if (anyCached && anyCached.length > 0) {
+          return anyCached;
         }
         if (lastSuccessfulMetaCampaigns.length > 0) {
           return lastSuccessfulMetaCampaigns;
