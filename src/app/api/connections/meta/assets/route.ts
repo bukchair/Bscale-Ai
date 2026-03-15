@@ -61,13 +61,35 @@ export async function GET() {
     const accessToken = await new MetaProvider().getAccessTokenForConnection(connection.id);
     const warnings: string[] = [];
 
-    const adAccounts = connection.connectedAccounts
+    let adAccounts = connection.connectedAccounts
       .filter((account) => account.status !== 'ARCHIVED')
       .map((account) => ({
         id: normalizeMetaAccountId(account.externalAccountId),
         name: account.name || `Ad account ${account.externalAccountId}`,
         isSelected: account.isSelected,
       }));
+
+    // Recovery path: if persisted Meta accounts are missing, discover and persist them now.
+    if (!adAccounts.length) {
+      try {
+        const discovered = await new MetaProvider().discoverAccounts(connection.id);
+        if (discovered.length > 0) {
+          await connectionService.saveDiscoveredAccounts(user.id, connection.id, 'META', discovered);
+          await connectionService.setSelectedAccounts(user.id, connection.id, [discovered[0].externalAccountId]);
+          adAccounts = discovered.map((account, index) => ({
+            id: normalizeMetaAccountId(account.externalAccountId),
+            name: account.name || `Ad account ${account.externalAccountId}`,
+            isSelected: index === 0,
+          }));
+        }
+      } catch (error) {
+        warnings.push(
+          error instanceof Error
+            ? error.message
+            : 'Failed to auto-discover Meta ad accounts.'
+        );
+      }
+    }
 
     const businessResponse = await fetchMetaGraph<{ data?: MetaBusiness[] }>(
       `/me/businesses?fields=id,name&limit=200&access_token=${encodeURIComponent(accessToken)}`

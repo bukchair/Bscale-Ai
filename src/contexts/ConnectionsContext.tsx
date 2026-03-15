@@ -236,6 +236,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   };
 
+  const normalizeGa4PropertyId = (value: string | undefined): string => {
+    const trimmed = String(value || '').trim().replace(/^properties\//i, '');
+    return /^\d+$/.test(trimmed) ? trimmed : '';
+  };
+
   const mergeManagedConnectionsIntoLocal = (
     current: Connection[],
     managedConnections: ManagedApiConnection[]
@@ -293,8 +298,12 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         if (selectedAdsAccount?.externalAccountId) {
           nextSettings.googleAdsId = formatGoogleAdsAccountId(selectedAdsAccount.externalAccountId);
         }
-        if (selectedGa4?.externalAccountId) {
-          nextSettings.ga4Id = selectedGa4.externalAccountId;
+        const selectedGa4PropertyId = normalizeGa4PropertyId(selectedGa4?.externalAccountId);
+        if (selectedGa4PropertyId) {
+          nextSettings.ga4Id = selectedGa4PropertyId;
+        } else if (nextSettings.ga4Id) {
+          // Keep only numeric GA4 Property IDs in settings to avoid G-Measurement IDs.
+          nextSettings.ga4Id = normalizeGa4PropertyId(nextSettings.ga4Id);
         }
         if (selectedGsc?.externalAccountId) {
           nextSettings.gscSiteUrl = selectedGsc.externalAccountId;
