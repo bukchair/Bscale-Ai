@@ -86,10 +86,18 @@ export async function generateNegativeKeywords(campaignData: string, apiKeyOrKey
   return JSON.parse(response.text || "{}");
 }
 
-export async function getOptimizationRecommendations(platformData: string, apiKeyOrKeys?: AIKeysOrApiKey) {
+export async function getOptimizationRecommendations(
+  platformData: string,
+  apiKeyOrKeys?: AIKeysOrApiKey,
+  responseLanguage: string = 'English'
+) {
   const prompt = `Analyze the following advertising data across platforms and provide 3 actionable optimization recommendations.
     Data: ${platformData}
-    Return the response in JSON format with a key "recommendations" containing an array of objects with keys "title", "description", "platform" (Google, Meta, TikTok, or All), and "impact" (High, Medium, Low).`;
+    Return the response in JSON format with a key "recommendations" containing an array of objects with keys "title", "description", "platform" (Google, Meta, TikTok, or All), and "impact" (High, Medium, Low).
+    IMPORTANT:
+    - "title" and "description" must be written in ${responseLanguage}.
+    - "platform" must remain one of: Google, Meta, TikTok, All.
+    - "impact" must remain one of: High, Medium, Low.`;
 
   if (isAIKeys(apiKeyOrKeys) && hasAnyAIKey(apiKeyOrKeys)) {
     return runWithMultiAI<{ recommendations?: any[] }>(prompt, apiKeyOrKeys);

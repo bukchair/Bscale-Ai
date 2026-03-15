@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizationRecommendations, getAIKeysFromConnections, hasAnyAIKey } from '../lib/gemini';
-import { CheckCircle2, AlertCircle, Loader2, Zap, Mail, Target, ImagePlus, Trash2, Clock3, CalendarClock, PlusCircle, Check } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Zap, Mail, Target, ImagePlus, Trash2, Clock3, CalendarClock, PlusCircle, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -159,6 +159,7 @@ export function Campaigns() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedRecs, setAppliedRecs] = useState<number[]>([]);
+  const [expandedRecs, setExpandedRecs] = useState<number[]>([]);
   const [realCampaigns, setRealCampaigns] = useState<any[]>([]);
   const CAMPAIGNS_CACHE_KEY = 'bscale:campaigns:realCampaigns:v1';
 
@@ -411,13 +412,26 @@ export function Campaigns() {
       const aiKeys = getAIKeysFromConnections(connections);
       if (!hasAnyAIKey(aiKeys)) {
         setRecommendations([]);
+        setExpandedRecs([]);
       } else {
         const dataToAnalyze = realCampaigns.length > 0 ? realCampaigns : mockCampaignData;
         const dataStr = JSON.stringify(dataToAnalyze);
-        const res = await getOptimizationRecommendations(dataStr, aiKeys);
-        if (res?.recommendations) {
-          setRecommendations(res.recommendations);
-        }
+        const recommendationLanguage =
+          language === 'he'
+            ? 'Hebrew'
+            : language === 'ru'
+              ? 'Russian'
+              : language === 'pt'
+                ? 'Portuguese'
+                : language === 'fr'
+                  ? 'French'
+                  : 'English';
+        const res = await getOptimizationRecommendations(dataStr, aiKeys, recommendationLanguage);
+        const normalized = Array.isArray(res?.recommendations)
+          ? res.recommendations.filter(Boolean)
+          : [];
+        setRecommendations(normalized);
+        setExpandedRecs([]);
       }
     } catch (error) {
       console.error("Failed to fetch recommendations", error);
@@ -554,12 +568,14 @@ export function Campaigns() {
     };
   }, [connections, startDateIso, endDateIso]);
 
-  useEffect(() => {
-    fetchRecommendations();
-  }, [realCampaigns]);
-
   const handleApply = (index: number) => {
     setAppliedRecs([...appliedRecs, index]);
+  };
+
+  const toggleRecExpanded = (index: number) => {
+    setExpandedRecs((prev) =>
+      prev.includes(index) ? prev.filter((item) => item !== index) : [...prev, index]
+    );
   };
 
   const handleSendEmail = async () => {
@@ -988,14 +1004,18 @@ export function Campaigns() {
               <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
             </div>
           ) : recommendations.length > 0 ? (
-            <ul className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ul className="space-y-2 max-h-[360px] overflow-y-auto pe-1">
               {recommendations.map((rec, index) => (
-                <li key={`ai-rec-${index}`} className="bg-white border rounded-lg p-4 shadow-sm">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center">
+                <li key={`ai-rec-${index}`} className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleRecExpanded(index)}
+                    className="w-full px-3 py-2.5 flex items-center justify-between gap-3 hover:bg-gray-50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
                         <span className={cn(
-                          "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ml-2",
+                          "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium",
                           rec.impact === 'High' ? "bg-red-100 text-red-800" :
                           rec.impact === 'Medium' ? "bg-yellow-100 text-yellow-800" :
                           "bg-green-100 text-green-800"
@@ -1006,32 +1026,42 @@ export function Campaigns() {
                             t('campaigns.impactLow')
                           }
                         </span>
-                        <span className="text-xs text-gray-500">{rec.platform}</span>
+                        <span className="text-[11px] text-gray-500 truncate">{rec.platform}</span>
                       </div>
-                      <h4 className="text-sm font-bold text-gray-900 mt-2">{rec.title}</h4>
-                      <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
+                      <h4 className="text-sm font-bold text-gray-900 truncate text-start">{rec.title}</h4>
                     </div>
-                  </div>
-                  <div className="mt-4">
-                    <button
-                      onClick={() => handleApply(index)}
-                      disabled={appliedRecs.includes(index)}
-                      className={cn(
-                        "w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                        appliedRecs.includes(index)
-                          ? "bg-green-50 text-green-700 border-green-200 cursor-not-allowed"
-                          : "text-white bg-indigo-600 hover:bg-indigo-700"
-                      )}
-                    >
-                      {appliedRecs.includes(index) ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 ml-2" />
-                          {t('campaigns.appliedSuccess')}
-                        </>
-                      ) : (
-                        t('campaigns.applyAuto')
-                      )}
-                    </button>
+                    {expandedRecs.includes(index) ? (
+                      <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
+                    )}
+                  </button>
+                  <div className={cn(
+                    "px-3 overflow-hidden transition-all duration-200",
+                    expandedRecs.includes(index) ? "max-h-60 pb-3" : "max-h-0"
+                  )}>
+                    <p className="text-xs text-gray-600 leading-relaxed">{rec.description}</p>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => handleApply(index)}
+                        disabled={appliedRecs.includes(index)}
+                        className={cn(
+                          "inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
+                          appliedRecs.includes(index)
+                            ? "bg-green-50 text-green-700 border-green-200 cursor-not-allowed"
+                            : "text-white bg-indigo-600 hover:bg-indigo-700"
+                        )}
+                      >
+                        {appliedRecs.includes(index) ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 ml-1.5" />
+                            {t('campaigns.appliedSuccess')}
+                          </>
+                        ) : (
+                          t('campaigns.applyAuto')
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
