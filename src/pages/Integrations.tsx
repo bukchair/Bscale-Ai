@@ -1794,6 +1794,8 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const socialConnections = connections.filter(c => c.category === 'Social');
   const ecommerceConnections = connections.filter(c => c.category === 'E-commerce');
   const connectedCount = connections.filter(c => c.status === 'connected').length;
+  const aiConnectedCount = aiConnections.filter((connection) => connection.status === 'connected').length;
+  const expandedAiConnection = aiConnections.find((connection) => connection.id === expandedId) || null;
   const wizardFields = WIZARD_FIELDS[wizardPlatform];
   const wizardConnection = connections.find((c) => c.id === wizardPlatform);
   const oauthTokenKey: Record<WizardPlatform, string | null> = {
@@ -2312,9 +2314,51 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
               : 'View-only mode is active. This user can view data but cannot edit connections or settings.'}
           </div>
         )}
+        {googleConnections.length > 0 && (
+          <section className="rounded-3xl border border-gray-200/80 bg-white/80 p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center text-white shadow-lg">
+                <Megaphone className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-black text-gray-900">{t('integrations.googleWorkspace')}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4">
+              {googleConnections.map(renderConnectionCard)}
+            </div>
+          </section>
+        )}
+
+        {socialConnections.length > 0 && (
+          <section className="rounded-3xl border border-gray-200/80 bg-white/80 p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg">
+                <Video className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-black text-gray-900">{t('integrations.socialMedia')}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4">
+              {socialConnections.map(renderConnectionCard)}
+            </div>
+          </section>
+        )}
+
+        {ecommerceConnections.length > 0 && (
+          <section className="rounded-3xl border border-gray-200/80 bg-white/80 p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <h2 className="text-lg font-black text-gray-900">{t('integrations.ecommerce')}</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 gap-4">
+              {ecommerceConnections.map(renderConnectionCard)}
+            </div>
+          </section>
+        )}
+
         {aiConnections.length > 0 && (
-          <section>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+          <section className="rounded-3xl border border-violet-200/80 bg-gradient-to-b from-violet-50/70 to-white p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
                   <Sparkles className="w-5 h-5" />
@@ -2324,63 +2368,70 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                   <p className="text-xs text-gray-500 font-medium">{t('integrations.sharedForAllUsers')}</p>
                 </div>
               </div>
-              {isAdmin && (
-                <button
-                  onClick={handleMigrateAi}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs sm:text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  {language === 'he'
-                    ? 'סנכרן חיבורי AI מהמשתמש שלי לכל המשתמשים'
-                    : 'Sync AI connections from my user to all users'}
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {aiConnections.map(renderConnectionCard)}
-            </div>
-          </section>
-        )}
-
-        {googleConnections.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-red-500 flex items-center justify-center text-white shadow-lg">
-                <Megaphone className="w-5 h-5" />
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold">
+                  {aiConnectedCount}/{aiConnections.length} {language === 'he' ? 'מחוברים' : 'connected'}
+                </span>
+                {isAdmin && (
+                  <button
+                    onClick={handleMigrateAi}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {language === 'he' ? 'סנכרון AI לכל המשתמשים' : 'Sync AI for all users'}
+                  </button>
+                )}
               </div>
-              <h2 className="text-lg font-black text-gray-900">{t('integrations.googleWorkspace')}</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {googleConnections.map(renderConnectionCard)}
-            </div>
-          </section>
-        )}
 
-        {socialConnections.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg">
-                <Video className="w-5 h-5" />
-              </div>
-              <h2 className="text-lg font-black text-gray-900">{t('integrations.socialMedia')}</h2>
+            <div className="rounded-2xl border border-violet-100 bg-white p-3 sm:p-4 space-y-2">
+              {aiConnections.map((connection) => {
+                const isConnected = connection.status === 'connected';
+                const isConnecting = connection.status === 'connecting';
+                const hasError = connection.status === 'error';
+                const isExpanded = expandedAiConnection?.id === connection.id;
+                return (
+                  <button
+                    key={`ai-row-${connection.id}`}
+                    onClick={() => handleExpand(connection)}
+                    className={cn(
+                      'w-full rounded-xl border px-3 py-2.5 flex items-center justify-between text-start transition-colors',
+                      isExpanded
+                        ? 'border-violet-300 bg-violet-50'
+                        : 'border-gray-200 bg-white hover:border-violet-200 hover:bg-violet-50/60'
+                    )}
+                  >
+                    <span className="text-sm font-bold text-gray-900 truncate">{t(connection.name)}</span>
+                    {isConnected ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {t('integrations.connected')}
+                      </span>
+                    ) : isConnecting ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> {t('integrations.connecting')}
+                      </span>
+                    ) : hasError ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-lg">
+                        <AlertCircle className="w-3.5 h-3.5" /> {t('integrations.errorStatus')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center text-xs font-medium text-gray-500 bg-gray-50 px-2 py-0.5 rounded-lg">
+                        {t('integrations.disconnected')}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {socialConnections.map(renderConnectionCard)}
-            </div>
-          </section>
-        )}
 
-        {ecommerceConnections.length > 0 && (
-          <section>
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg">
-                <ShoppingCart className="w-5 h-5" />
+            {expandedAiConnection && (
+              <div className="mt-4 rounded-2xl border border-violet-200 bg-white p-4 sm:p-5">
+                <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                  {t(expandedAiConnection.description)}
+                </p>
+                {renderIntegrationSettings(expandedAiConnection)}
               </div>
-              <h2 className="text-lg font-black text-gray-900">{t('integrations.ecommerce')}</h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {ecommerceConnections.map(renderConnectionCard)}
-            </div>
+            )}
           </section>
         )}
       </div>
