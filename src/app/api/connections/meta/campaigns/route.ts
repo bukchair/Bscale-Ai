@@ -150,10 +150,14 @@ const getInsightRows = (parsed: unknown): Array<Record<string, unknown>> => {
   return Array.isArray(rows) ? rows : [];
 };
 
-const hasEmbeddedInsights = (campaigns: Array<Record<string, unknown>>) =>
+const hasUsableEmbeddedInsights = (campaigns: Array<Record<string, unknown>>) =>
   campaigns.some((campaign) => {
-    const insights = (campaign as { insights?: { data?: unknown[] } }).insights;
-    return Array.isArray(insights?.data) && insights.data.length > 0;
+    const insights = (campaign as { insights?: { data?: Array<Record<string, unknown>> } }).insights;
+    const row = Array.isArray(insights?.data) && insights.data.length > 0 ? insights.data[0] : null;
+    if (!row || typeof row !== 'object') return false;
+    // A row that only contains spend/actions is not enough for campaign table metrics.
+    const metricKeys = ['impressions', 'clicks', 'reach', 'ctr', 'cpc', 'cpm', 'frequency'];
+    return metricKeys.some((key) => Object.prototype.hasOwnProperty.call(row, key));
   });
 
 const getBearerToken = (request: Request): string => {
@@ -263,7 +267,7 @@ export async function GET(request: Request) {
       const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/campaigns`);
       const baseFields = 'id,name,status,objective,start_time,stop_time';
       const insightsFields =
-        'insights{spend,inline_link_click_ctr,purchase_roas,roas,actions,action_values}';
+        'insights{spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_click_ctr,purchase_roas,roas,actions,action_values}';
       graphUrl.searchParams.set('fields', includeInsights ? `${baseFields},${insightsFields}` : baseFields);
       if (includeEffectiveStatus) {
         graphUrl.searchParams.set(
@@ -296,34 +300,57 @@ export async function GET(request: Request) {
 
     const loadCampaignInsights = async (accountId: string) => {
       const resource = toAccountResource(accountId);
-      const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/insights`);
-      graphUrl.searchParams.set('level', 'campaign');
-      graphUrl.searchParams.set('limit', '500');
-      graphUrl.searchParams.set(
-        'fields',
-        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values,purchase_roas,roas'
-      );
-      if (startDate && endDate) {
-        graphUrl.searchParams.set(
-          'time_range',
-          JSON.stringify({
-            since: startDate,
-            until: endDate,
-          })
-        );
-      }
-      graphUrl.searchParams.set('access_token', accessToken);
+      const fieldsVariants = [
+        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values,purchase_roas,roas',
+        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values',
+        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency',
+        'campaign_id,spend,impressions,clicks',
+      ];
 
-      const response = await fetch(graphUrl.toString());
-      const raw = await response.text();
-      let parsed: unknown = {};
-      try {
-        parsed = raw ? JSON.parse(raw) : {};
-      } catch {
-        parsed = { message: raw || 'Meta insights returned non-JSON response.' };
+      let lastResponse: Response | null = null;
+      let lastParsed: unknown = {};
+
+      for (const fields of fieldsVariants) {
+        const graphUrl = new URL(`${META_GRAPH_BASE}/${resource}/insights`);
+        graphUrl.searchParams.set('level', 'campaign');
+        graphUrl.searchParams.set('limit', '500');
+        graphUrl.searchParams.set('fields', fields);
+        if (startDate && endDate) {
+          graphUrl.searchParams.set(
+            'time_range',
+            JSON.stringify({
+              since: startDate,
+              until: endDate,
+            })
+          );
+        }
+        graphUrl.searchParams.set('access_token', accessToken);
+
+        const response = await fetch(graphUrl.toString());
+        const raw = await response.text();
+        let parsed: unknown = {};
+        try {
+          parsed = raw ? JSON.parse(raw) : {};
+        } catch {
+          parsed = { message: raw || 'Meta insights returned non-JSON response.' };
+        }
+
+        lastResponse = response;
+        lastParsed = parsed;
+        if (response.ok) {
+          return { response, parsed };
+        }
+
+        const message = extractErrorMessage(response.status, parsed).toLowerCase();
+        if (!message.includes('invalid parameter')) {
+          break;
+        }
       }
 
-      return { response, parsed };
+      return {
+        response: lastResponse as Response,
+        parsed: lastParsed,
+      };
     };
 
     const attemptCampaignLoad = async (accountId: string) => {
@@ -431,7 +458,7 @@ export async function GET(request: Request) {
     let insightsFallbackUsed = false;
 
     // If campaign payload has no embedded insights (or partial), enrich via account insights endpoint.
-    if (campaigns.length > 0 && !hasEmbeddedInsights(campaigns)) {
+    if (campaigns.length > 0 && !hasUsableEmbeddedInsights(campaigns)) {
       try {
         const insightsResult = await loadCampaignInsights(resolvedAccountId);
         if (insightsResult.response.ok) {
