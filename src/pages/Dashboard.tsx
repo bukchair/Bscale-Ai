@@ -66,11 +66,9 @@ export function Dashboard() {
 
     const loadGoogleData = async () => {
       try {
-        if (propertyId) {
-          const ga4Data = await fetchGA4LiveData(accessToken, propertyId, resolvedRange);
-          if (!isCancelled) {
-            setGa4LiveData(ga4Data);
-          }
+        const ga4Data = await fetchGA4LiveData(accessToken, propertyId || undefined, resolvedRange);
+        if (!isCancelled) {
+          setGa4LiveData(ga4Data);
         }
       } catch (err) {
         console.error("Failed to load GA4 live data:", err);

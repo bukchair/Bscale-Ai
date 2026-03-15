@@ -605,17 +605,34 @@ async function startServer() {
     const propertyId = req.query.property_id;
     const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
-    if (!accessToken || !propertyId) {
-      return res.status(400).json({ message: "Missing access token or property ID" });
+    if (!accessToken) {
+      return res.status(400).json({ message: "Missing access token" });
     }
 
-    const normalizedPropertyId = String(propertyId).replace("properties/", "");
-    const realtimeUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runRealtimeReport`;
-    const reportUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`;
     const headers = { Authorization: `Bearer ${accessToken}` };
     const dateRanges = [{ startDate, endDate }];
+    const normalizePropertyId = (value: string) => value.replace("properties/", "").trim();
 
-    try {
+    const discoverFirstGa4PropertyId = async (): Promise<string | null> => {
+      try {
+        const response = await axios.get("https://analyticsadmin.googleapis.com/v1alpha/accountSummaries", {
+          params: { pageSize: 200 },
+          headers,
+        });
+        const firstProperty = (response.data.accountSummaries || [])
+          .flatMap((summary: any) => summary.propertySummaries || [])
+          .find((property: any) => property?.property);
+        if (!firstProperty?.property) return null;
+        return normalizePropertyId(String(firstProperty.property));
+      } catch {
+        return null;
+      }
+    };
+
+    const fetchGa4LiveForProperty = async (normalizedPropertyId: string) => {
+      const realtimeUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runRealtimeReport`;
+      const reportUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`;
+
       const [activeNowRes, totalUsersRes, topPagesRes, sourcesRes] = await Promise.all([
         axios.post(realtimeUrl, { metrics: [{ name: "activeUsers" }] }, { headers }),
         axios.post(reportUrl, {
@@ -657,16 +674,51 @@ async function startServer() {
         percent: totalSourceUsers > 0 ? Math.round((row.users / totalSourceUsers) * 100) : 0
       }));
 
-      res.json({
+      return {
         activeUsers,
         totalUsers,
         topPages,
-        trafficSources
-      });
-    } catch (error) {
-      console.error("GA4 live API Error:", (error as any)?.response?.data || (error as any)?.message || error);
-      res.status(500).json({ message: getAxiosErrorMessage(error, "Failed to fetch live GA4 data") });
+        trafficSources,
+        propertyIdUsed: normalizedPropertyId,
+      };
+    };
+
+    const requestedPropertyId =
+      typeof propertyId === "string" && propertyId.trim()
+        ? normalizePropertyId(String(propertyId))
+        : "";
+    const candidateIds: string[] = [];
+    if (requestedPropertyId) {
+      candidateIds.push(requestedPropertyId);
     }
+
+    const discoveredPropertyId = await discoverFirstGa4PropertyId();
+    if (discoveredPropertyId && !candidateIds.includes(discoveredPropertyId)) {
+      candidateIds.push(discoveredPropertyId);
+    }
+
+    if (!candidateIds.length) {
+      return res.status(400).json({
+        message: "No accessible GA4 property was found. Reconnect Google and select/enter a valid GA4 Property ID.",
+      });
+    }
+
+    let lastError: unknown = null;
+    for (const candidateId of candidateIds) {
+      try {
+        const payload = await fetchGa4LiveForProperty(candidateId);
+        return res.json(payload);
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+    }
+
+    console.error("GA4 live API Error:", (lastError as any)?.response?.data || (lastError as any)?.message || lastError);
+    return res.status(500).json({
+      message: getAxiosErrorMessage(lastError, "Failed to fetch live GA4 data"),
+      attemptedPropertyIds: candidateIds,
+    });
   });
 
   app.post("/api/google/gmail/send", async (req, res) => {

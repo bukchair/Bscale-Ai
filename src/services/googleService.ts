@@ -168,12 +168,13 @@ export interface DateRangeParams {
 
 export async function fetchGA4LiveData(
   accessToken: string,
-  propertyId: string,
+  propertyId?: string,
   dateRange?: DateRangeParams
 ): Promise<GA4LiveData> {
-  const search = new URLSearchParams({
-    property_id: propertyId,
-  });
+  const search = new URLSearchParams();
+  if (propertyId && String(propertyId).trim()) {
+    search.set('property_id', String(propertyId).trim());
+  }
   if (dateRange) {
     search.set('start_date', dateRange.startDate);
     search.set('end_date', dateRange.endDate);
