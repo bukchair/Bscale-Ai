@@ -935,6 +935,13 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
 
   const handleHardResetConnection = async (id: string) => {
     if (blockIfReadOnly()) return;
+    const confirmDelete = window.confirm(
+      isHebrew
+        ? 'למחוק את החיבור וההגדרות שנשמרו לפלטפורמה זו?'
+        : 'Delete this connection and its saved settings?'
+    );
+    if (!confirmDelete) return;
+
     setError(null);
     setSuccess(null);
     try {
@@ -1479,6 +1486,15 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                     {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plug className="w-4 h-4" />}
                     {t('integrations.saveAndConnect')}
                   </button>
+                  {!isConnecting ? (
+                    <button
+                      onClick={() => handleHardResetConnection(integration.id)}
+                      className="px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 border-2 border-red-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {isHebrew ? 'מחק חיבור' : 'Delete connection'}
+                    </button>
+                  ) : null}
                   {isConnecting ? (
                     <button
                       onClick={() => handleHardResetConnection(integration.id)}
