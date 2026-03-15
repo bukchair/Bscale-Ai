@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { fetchGoogleDiscovery } from '../services/googleService';
+import { fetchGA4Report, fetchGoogleDiscovery } from '../services/googleService';
 
 type ConnectionFlowState = {
   integrated: boolean;
@@ -51,6 +51,8 @@ export function Integrations() {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [testingId, setTestingId] = useState<string | null>(null);
   const [discoveringGoogle, setDiscoveringGoogle] = useState(false);
+  const [ga4ValidationLoading, setGa4ValidationLoading] = useState(false);
+  const [ga4ValidationResult, setGa4ValidationResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [metaAssetsLoading, setMetaAssetsLoading] = useState(false);
   const [metaAssets, setMetaAssets] = useState<MetaAssetsData | null>(null);
   const [connectionFlowState, setConnectionFlowState] = useState<Record<string, ConnectionFlowState>>({});
@@ -366,6 +368,74 @@ export function Integrations() {
     }
   };
 
+  const normalizeGa4PropertyId = (value: string) => String(value || '').replace(/^properties\//i, '').trim();
+
+  const handleValidateGa4Property = async () => {
+    const googleConn = connections.find((c) => c.id === 'google');
+    const accessToken = formValues.googleAccessToken || googleConn?.settings?.googleAccessToken || '';
+    const rawPropertyId =
+      formValues.ga4PropertyId ||
+      formValues.ga4Id ||
+      googleConn?.settings?.ga4PropertyId ||
+      googleConn?.settings?.ga4Id ||
+      '';
+    const propertyId = normalizeGa4PropertyId(rawPropertyId);
+
+    if (!propertyId) {
+      setGa4ValidationResult({
+        type: 'error',
+        message: isHebrew ? 'יש להזין GA4 Property ID לפני בדיקה.' : 'Please enter a GA4 Property ID before testing.',
+      });
+      return;
+    }
+
+    if (/^G-[A-Z0-9]+$/i.test(propertyId)) {
+      setGa4ValidationResult({
+        type: 'error',
+        message: isHebrew
+          ? 'הוזן Measurement ID (מתחיל ב‑G-). צריך להזין GA4 Property ID מספרי.'
+          : 'A Measurement ID (starts with G-) was entered. Please use a numeric GA4 Property ID.',
+      });
+      return;
+    }
+
+    if (!accessToken) {
+      setGa4ValidationResult({
+        type: 'error',
+        message: isHebrew
+          ? 'חסר Google Access Token. יש לבצע חיבור Google לפני בדיקת GA4.'
+          : 'Missing Google access token. Please connect Google before testing GA4.',
+      });
+      return;
+    }
+
+    setGa4ValidationLoading(true);
+    setGa4ValidationResult(null);
+    try {
+      const result = await fetchGA4Report(accessToken, propertyId);
+      const rowsCount = Array.isArray((result as any)?.rows) ? (result as any).rows.length : 0;
+      setFormValues((prev) => ({ ...prev, ga4PropertyId: propertyId, ga4Id: propertyId }));
+      setGa4ValidationResult({
+        type: 'success',
+        message: isHebrew
+          ? `GA4 Property ID תקין ונגיש. (שורות דוח: ${rowsCount})`
+          : `GA4 Property ID is valid and accessible. (report rows: ${rowsCount})`,
+      });
+    } catch (err) {
+      setGa4ValidationResult({
+        type: 'error',
+        message:
+          err instanceof Error && err.message
+            ? err.message
+            : isHebrew
+            ? 'בדיקת GA4 נכשלה.'
+            : 'GA4 validation failed.',
+      });
+    } finally {
+      setGa4ValidationLoading(false);
+    }
+  };
+
   React.useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       console.log("Received postMessage:", event.data);
@@ -455,6 +525,9 @@ export function Integrations() {
 
   const handleInputChange = (key: string, value: string) => {
     setFormValues(prev => ({ ...prev, [key]: value }));
+    if (key === 'ga4PropertyId' || key === 'ga4Id') {
+      setGa4ValidationResult(null);
+    }
     if (expandedId && supportsStructuredFlow(expandedId)) {
       patchFlowState(expandedId, { tested: false });
     }
@@ -816,6 +889,25 @@ export function Integrations() {
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4PropertyId')}</label>
                         <input type="text" placeholder="123456789 (property ID)" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4PropertyId || formValues.ga4Id || ""} onChange={(e) => handleInputChange('ga4PropertyId', e.target.value)} />
+                        <button
+                          type="button"
+                          onClick={() => void handleValidateGa4Property()}
+                          disabled={ga4ValidationLoading}
+                          className="mt-2 w-full flex items-center justify-center gap-2 bg-white border border-indigo-200 text-indigo-700 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-50 transition-all disabled:opacity-60"
+                        >
+                          {ga4ValidationLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          {isHebrew ? 'בדוק תקינות GA4 Property ID' : 'Test GA4 Property ID'}
+                        </button>
+                        {ga4ValidationResult && (
+                          <p
+                            className={cn(
+                              "mt-1.5 text-[10px] font-bold",
+                              ga4ValidationResult.type === 'success' ? "text-emerald-700" : "text-red-600"
+                            )}
+                          >
+                            {ga4ValidationResult.message}
+                          </p>
+                        )}
                       </div>
                       <div className="sm:col-span-2">
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.searchConsoleSiteUrl')}</label>
