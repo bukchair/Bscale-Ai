@@ -39,22 +39,63 @@ export async function GET(request: Request) {
 
     let accessToken = getBearerToken(request);
     let resolvedAccountId = requestedAccountId;
+    let managedConnection:
+      | Awaited<ReturnType<typeof connectionService.getByUserPlatform>>
+      | null = null;
+    let managedUserId = '';
 
     // Use managed server token when client token is missing or intentionally masked.
     if (!accessToken || accessToken === 'server-managed') {
       const user = await requireAuthenticatedUser();
-      const connection = await connectionService.getByUserPlatform(user.id, 'META');
-      if (!connection) {
+      managedUserId = user.id;
+      managedConnection = await connectionService.getByUserPlatform(user.id, 'META');
+      if (!managedConnection) {
         return NextResponse.json({ message: 'Meta connection is not available for this user.' }, { status: 400 });
       }
       if (!resolvedAccountId) {
-        resolvedAccountId = pickSelectedAccountId(connection);
+        resolvedAccountId = pickSelectedAccountId(managedConnection);
       }
-      accessToken = await new MetaProvider().getAccessTokenForConnection(connection.id);
+      accessToken = await new MetaProvider().getAccessTokenForConnection(managedConnection.id);
+    }
+
+    // Fallback: if connected account wasn't selected/saved, auto-discover and select first.
+    if (!resolvedAccountId && managedConnection && managedUserId) {
+      try {
+        const discovered = await new MetaProvider().discoverAccounts(managedConnection.id);
+        if (discovered.length > 0) {
+          await connectionService.saveDiscoveredAccounts(managedUserId, managedConnection.id, 'META', discovered);
+          await connectionService.setSelectedAccounts(managedUserId, managedConnection.id, [
+            discovered[0].externalAccountId,
+          ]);
+          resolvedAccountId = discovered[0].externalAccountId;
+        }
+      } catch {
+        // Keep fallback flow below for token-only mode.
+      }
+    }
+
+    // Token-only mode fallback: discover first ad account directly from Meta API.
+    if (!resolvedAccountId && accessToken && accessToken !== 'server-managed') {
+      try {
+        const discoverUrl = new URL(`${META_GRAPH_BASE}/me/adaccounts`);
+        discoverUrl.searchParams.set('fields', 'account_id');
+        discoverUrl.searchParams.set('limit', '1');
+        discoverUrl.searchParams.set('access_token', accessToken);
+        const discoverResponse = await fetch(discoverUrl.toString());
+        const discoverPayload = (await discoverResponse.json().catch(() => null)) as
+          | { data?: Array<{ account_id?: string }> }
+          | null;
+        resolvedAccountId = String(discoverPayload?.data?.[0]?.account_id || '').trim();
+      } catch {
+        // If discovery fails, we return explicit error below.
+      }
     }
 
     if (!resolvedAccountId) {
-      return NextResponse.json({ message: 'Missing Meta ad account ID.' }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Meta account not selected. Reconnect Meta and select an ad account.' },
+        { status: 400 }
+      );
     }
 
     const accountResource = toAccountResource(resolvedAccountId);

@@ -1,7 +1,10 @@
+import { auth } from '../lib/firebase';
+
 const viteEnv =
   typeof import.meta !== 'undefined'
     ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
     : undefined;
+
 const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
 const API_BASE = (() => {
   if (!configuredApiBase || typeof window === 'undefined') return '';
@@ -13,7 +16,21 @@ const API_BASE = (() => {
   }
 })();
 
+const ensureManagedApiSession = async (accessToken: string) => {
+  if (accessToken !== 'server-managed') return;
+  const user = auth.currentUser;
+  if (!user) return;
+  const idToken = await user.getIdToken();
+  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+};
+
 export async function fetchMetaAdAccounts(accessToken: string) {
+  await ensureManagedApiSession(accessToken);
+
   if (accessToken === 'server-managed') {
     const managedResponse = await fetch(`${API_BASE}/api/connections/meta/accounts`, {
       method: 'GET',
@@ -56,6 +73,8 @@ export async function fetchMetaCampaigns(
   startDate?: string,
   endDate?: string
 ) {
+  await ensureManagedApiSession(accessToken);
+
   const query = new URLSearchParams();
   if (adAccountId) query.set('ad_account_id', adAccountId);
   if (startDate) query.set('start_date', startDate);
