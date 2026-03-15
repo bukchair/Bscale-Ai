@@ -103,6 +103,11 @@ type WooCampaignProduct = {
 
 type WooPublishScope = 'category' | 'product';
 
+type PlatformCopyDraft = {
+  title: string;
+  description: string;
+};
+
 const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 const PLATFORM_MEDIA_LIMITS: Record<PlatformName, MediaLimits> = {
@@ -246,6 +251,11 @@ export function Campaigns() {
       : 'Select a WooCommerce category or product to promote.',
     markFullDay: isHebrew ? 'סמן יום מלא' : 'Mark full day',
     unmarkFullDay: isHebrew ? 'בטל יום מלא' : 'Unmark full day',
+    platformCopyTitle: isHebrew ? 'כותרת ותיאור מותאמים לפי פלטפורמה' : 'Platform-fit title and description',
+    platformCopySubtitle: isHebrew
+      ? 'נוצר אוטומטית לפי חוקי אורך מומלצים של כל פלטפורמה.'
+      : 'Generated automatically according to recommended length rules per platform.',
+    applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
@@ -331,6 +341,7 @@ export function Campaigns() {
   const [editingCampaign, setEditingCampaign] = useState<EditCampaignDraft | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
   const [wooProducts, setWooProducts] = useState<WooCampaignProduct[]>([]);
   const [wooLoading, setWooLoading] = useState(false);
   const [wooPublishScope, setWooPublishScope] = useState<WooPublishScope>('category');
@@ -423,6 +434,17 @@ export function Campaigns() {
     if (!selectedWooProductId) return null;
     return wooProducts.find((product) => String(product.id) === String(selectedWooProductId)) || null;
   }, [wooProducts, selectedWooProductId]);
+
+  const inferredWooTitle = useMemo(() => {
+    if (!isWooConnected) return '';
+    if (wooPublishScope === 'product' && selectedWooProduct?.name) {
+      return selectedWooProduct.name;
+    }
+    if (wooPublishScope === 'category' && selectedWooCategory) {
+      return `${selectedWooCategory} Campaign`;
+    }
+    return '';
+  }, [isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
 
   const audienceSuggestions = useMemo(() => {
     const combined = [
@@ -522,6 +544,12 @@ export function Campaigns() {
       );
     }
   }, [wooPublishScope, selectedWooProductId, wooProductsFiltered]);
+
+  useEffect(() => {
+    if (!inferredWooTitle) return;
+    setShortTitleInput((prev) => (prev.trim() ? prev : inferredWooTitle));
+    setCampaignNameInput((prev) => (prev.trim() ? prev : inferredWooTitle));
+  }, [inferredWooTitle]);
 
   useEffect(() => {
     setWeeklySchedule((prev) => {
@@ -1198,8 +1226,44 @@ export function Campaigns() {
           ? 'French'
           : 'English';
 
+      const platformTextRules = {
+        Google: {
+          titleMax: 30,
+          descriptionMax: 90,
+          note: 'Search-style short headline and concise value description.',
+        },
+        Meta: {
+          titleMax: 40,
+          descriptionMax: 125,
+          note: 'Feed/Reels style hook headline and conversational primary text.',
+        },
+        TikTok: {
+          titleMax: 40,
+          descriptionMax: 100,
+          note: 'Short hook and mobile-first caption style.',
+        },
+      };
+
+      const wooContext = isWooConnected
+        ? {
+            publishScope: wooPublishScope,
+            category: selectedWooCategory || null,
+            product:
+              wooPublishScope === 'product' && selectedWooProduct
+                ? {
+                    id: selectedWooProduct.id,
+                    name: selectedWooProduct.name,
+                    categories: selectedWooProduct.categories,
+                    price: selectedWooProduct.price || null,
+                  }
+                : null,
+          }
+        : null;
+
+      const fallbackTitle = shortTitleInput.trim() || inferredWooTitle || campaignNameInput.trim();
+
       const contextPayload = {
-        shortTitle: shortTitleInput.trim(),
+        shortTitle: fallbackTitle,
         currentForm: {
           campaignNameInput,
           objective,
@@ -1211,6 +1275,8 @@ export function Campaigns() {
         connectedPlatforms: connectedAdPlatforms,
         selectedPlatforms,
         campaignData: realCampaigns.slice(0, 120),
+        wooContext,
+        platformTextRules,
       };
 
       const [strategyResult, audienceResult] = await Promise.all([
@@ -1220,6 +1286,11 @@ export function Campaigns() {
 
       setAiAudienceProvider('AI');
 
+      if (strategyResult?.shortTitle) {
+        setShortTitleInput(String(strategyResult.shortTitle).trim());
+      } else if (!shortTitleInput.trim() && inferredWooTitle) {
+        setShortTitleInput(inferredWooTitle);
+      }
       if (strategyResult?.campaignName) setCampaignNameInput(strategyResult.campaignName);
       if (
         strategyResult?.objective &&
@@ -1240,6 +1311,27 @@ export function Campaigns() {
         setProductType(strategyResult.productType);
       }
       if (strategyResult?.serviceType) setServiceTypeInput(strategyResult.serviceType);
+
+      const nextPlatformCopy: Partial<Record<PlatformName, PlatformCopyDraft>> = {};
+      (['Google', 'Meta', 'TikTok'] as const).forEach((platform) => {
+        const item = strategyResult?.platformCopy?.[platform];
+        if (!item) return;
+        nextPlatformCopy[platform] = {
+          title: String(item.title || '').trim(),
+          description: String(item.description || '').trim(),
+        };
+      });
+      if (Object.keys(nextPlatformCopy).length > 0) {
+        setPlatformCopyDrafts(nextPlatformCopy);
+        const primaryPlatform = (selectedPlatforms[0] || 'Google') as PlatformName;
+        const primaryCopy = nextPlatformCopy[primaryPlatform] || nextPlatformCopy.Google || null;
+        if (primaryCopy) {
+          if (primaryCopy.title) setCampaignNameInput(primaryCopy.title);
+          if (primaryCopy.description) setCampaignBrief(primaryCopy.description);
+        }
+      } else {
+        setPlatformCopyDrafts({});
+      }
 
       const strategyAudiences = Array.isArray(strategyResult?.audiences)
         ? strategyResult.audiences.map((value) => String(value).trim()).filter(Boolean)
@@ -1312,6 +1404,13 @@ export function Campaigns() {
     }
   };
 
+  const applyPlatformCopyToFields = (platform: PlatformName) => {
+    const draft = platformCopyDrafts[platform];
+    if (!draft) return;
+    if (draft.title) setCampaignNameInput(draft.title);
+    if (draft.description) setCampaignBrief(draft.description);
+  };
+
   const handleCreateScheduledCampaign = async () => {
     setBuilderMessage(null);
     setPublishResults([]);
@@ -1358,6 +1457,7 @@ export function Campaigns() {
           wooProductId: wooPublishScope === 'product' ? selectedWooProductId || null : null,
           wooProductName:
             wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+          platformCopyDrafts,
           mediaMeta: uploadedAssets.map((asset) => ({
             name: asset.name,
             type: asset.type,
@@ -1413,6 +1513,7 @@ export function Campaigns() {
       setCampaignBrief('');
       setSelectedAudiences([]);
       setAiGeneratedAudienceNames([]);
+      setPlatformCopyDrafts({});
       setTimeRules([]);
       setUploadedAssets((prev) => {
         prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
@@ -1838,6 +1939,62 @@ export function Campaigns() {
               </p>
             )}
           </div>
+          {Object.keys(platformCopyDrafts).length > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+              <h4 className="text-sm font-bold text-violet-900 mb-1">{text.platformCopyTitle}</h4>
+              <p className="text-xs text-violet-700 mb-3">{text.platformCopySubtitle}</p>
+              <div className="space-y-3">
+                {(['Google', 'Meta', 'TikTok'] as const)
+                  .filter((platform) => Boolean(platformCopyDrafts[platform]))
+                  .map((platform) => {
+                    const draft = platformCopyDrafts[platform] as PlatformCopyDraft;
+                    return (
+                      <div key={`platform-copy-${platform}`} className="rounded-lg border border-violet-100 bg-white p-3">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <p className="text-xs font-bold text-violet-900">{platform}</p>
+                          <button
+                            type="button"
+                            onClick={() => applyPlatformCopyToFields(platform)}
+                            className="inline-flex items-center rounded-md border border-violet-300 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-50"
+                          >
+                            {text.applyPlatformCopy}
+                          </button>
+                        </div>
+                        <input
+                          value={draft.title}
+                          onChange={(e) =>
+                            setPlatformCopyDrafts((prev) => ({
+                              ...prev,
+                              [platform]: {
+                                ...(prev[platform] || { title: '', description: '' }),
+                                title: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs mb-2"
+                          placeholder={isHebrew ? 'כותרת מותאמת פלטפורמה' : 'Platform title'}
+                        />
+                        <textarea
+                          value={draft.description}
+                          onChange={(e) =>
+                            setPlatformCopyDrafts((prev) => ({
+                              ...prev,
+                              [platform]: {
+                                ...(prev[platform] || { title: '', description: '' }),
+                                description: e.target.value,
+                              },
+                            }))
+                          }
+                          rows={2}
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                          placeholder={isHebrew ? 'תיאור מותאם פלטפורמה' : 'Platform description'}
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">{text.campaignName}</label>

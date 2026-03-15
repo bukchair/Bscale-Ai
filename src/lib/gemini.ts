@@ -196,6 +196,7 @@ Return ONLY valid JSON with this exact structure (write in Hebrew for title, des
 }
 
 export interface CampaignBuilderSuggestion {
+  shortTitle?: string;
   campaignName?: string;
   objective?: 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
   contentType?: 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
@@ -215,6 +216,11 @@ export interface CampaignBuilderSuggestion {
     minRoas: number;
     reason?: string;
   }>;
+  platformCopy?: {
+    Google?: { title: string; description: string };
+    Meta?: { title: string; description: string };
+    TikTok?: { title: string; description: string };
+  };
 }
 
 export async function getCampaignBuilderSuggestions(
@@ -229,6 +235,7 @@ ${contextData}
 
 Return ONLY strict JSON with this structure:
 {
+  "shortTitle": "short title in ${responseLanguage}",
   "campaignName": "short campaign name in ${responseLanguage}",
   "objective": "sales|traffic|leads|awareness|retargeting",
   "contentType": "product|offer|educational|testimonial|video",
@@ -249,7 +256,21 @@ Return ONLY strict JSON with this structure:
       "minRoas": 0,
       "reason": "short reason in ${responseLanguage}"
     }
-  ]
+  ],
+  "platformCopy": {
+    "Google": {
+      "title": "headline up to 30 chars when possible",
+      "description": "description up to 90 chars when possible"
+    },
+    "Meta": {
+      "title": "short headline up to 40 chars",
+      "description": "primary text around 80-125 chars"
+    },
+    "TikTok": {
+      "title": "hook title up to 40 chars",
+      "description": "caption text up to 100 chars"
+    }
+  }
 }
 
 Rules:
