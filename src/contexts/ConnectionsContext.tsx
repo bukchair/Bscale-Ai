@@ -437,29 +437,45 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   };
 
   const disconnectManagedConnection = async (
-    platformSlug: ManagedPlatformSlug
+    platformSlug: ManagedPlatformSlug,
+    options?: { skipBootstrap?: boolean }
   ): Promise<void> => {
-    await ensureManagedApiSession();
-
-    let response = await fetch(`/api/connections/${platformSlug}/disconnect`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    // Defensive fallback for edge proxy/method rewrite issues.
-    if (response.status === 405) {
-      response = await fetch(`/api/connections/${platformSlug}/disconnect`, {
-        method: 'GET',
-        headers: { accept: 'application/json' },
-        cache: 'no-store',
-      });
+    if (!options?.skipBootstrap) {
+      await ensureManagedApiSession();
     }
 
-    const text = await response.text();
-    const payload = parseManagedPayload(text);
+    const runDisconnectRequest = async () => {
+      let response = await fetch(`/api/connections/${platformSlug}/disconnect`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      // Defensive fallback for edge proxy/method rewrite issues.
+      if (response.status === 405) {
+        response = await fetch(`/api/connections/${platformSlug}/disconnect`, {
+          method: 'GET',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
+      }
+
+      const text = await response.text();
+      const payload = parseManagedPayload(text);
+      return { response, payload, text };
+    };
+
+    let { response, payload, text } = await runDisconnectRequest();
+
+    // Session may expire between calls; retry once after re-bootstrap.
+    if (response.status === 401 || response.status === 403) {
+      await ensureManagedApiSession();
+      ({ response, payload, text } = await runDisconnectRequest());
+    }
+
     if (!response.ok || !payload?.success) {
-      throw new Error(payload?.message || `Failed to disconnect ${platformSlug}.`);
+      const fallbackMessage = text ? text.slice(0, 180) : `Failed to disconnect ${platformSlug}.`;
+      throw new Error(payload?.message || fallbackMessage || `Failed to disconnect ${platformSlug}.`);
     }
   };
 
@@ -804,15 +820,15 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const managedPlatformSlugs = managedPlatformsByConnectionId[id as Connection['id']] || [];
     let disconnectFailures: string[] = [];
     if (managedPlatformSlugs.length > 0) {
-      const results = await Promise.allSettled(
-        managedPlatformSlugs.map(async (platformSlug) => {
-          await disconnectManagedConnection(platformSlug);
-        })
-      );
-      disconnectFailures = results
-        .map((result, index) => ({ result, platformSlug: managedPlatformSlugs[index] }))
-        .filter((entry) => entry.result.status === 'rejected')
-        .map((entry) => entry.platformSlug);
+      await ensureManagedApiSession();
+      for (const platformSlug of managedPlatformSlugs) {
+        try {
+          await disconnectManagedConnection(platformSlug, { skipBootstrap: true });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'unknown error';
+          disconnectFailures.push(`${platformSlug} (${reason})`);
+        }
+      }
     }
 
     const next = connections.map((c) =>
