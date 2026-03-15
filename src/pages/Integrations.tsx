@@ -6,11 +6,54 @@ import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { auth } from '../lib/firebase';
 
+type ManagedGoogleAdsAccount = {
+  externalAccountId: string;
+  name?: string;
+  isSelected?: boolean;
+  status?: string;
+  currency?: string | null;
+  timezone?: string | null;
+};
+
 const viteEnv =
   typeof import.meta !== 'undefined'
     ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
     : undefined;
 const API_BASE = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL) || '';
+
+const normalizeGoogleAdsAccountId = (value: string) => value.replace(/\D/g, '');
+
+const formatGoogleAdsAccountId = (value: string) => {
+  const digits = normalizeGoogleAdsAccountId(value);
+  if (digits.length !== 10) return digits || value;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
+
+const parseManagedGoogleAdsAccounts = (raw: string | undefined): ManagedGoogleAdsAccount[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const row = item as Record<string, unknown>;
+        const externalAccountId = String(row.externalAccountId || '').trim();
+        if (!externalAccountId) return null;
+        return {
+          externalAccountId,
+          name: typeof row.name === 'string' ? row.name : '',
+          isSelected: Boolean(row.isSelected),
+          status: typeof row.status === 'string' ? row.status : undefined,
+          currency: typeof row.currency === 'string' ? row.currency : null,
+          timezone: typeof row.timezone === 'string' ? row.timezone : null,
+        } as ManagedGoogleAdsAccount;
+      })
+      .filter((item): item is ManagedGoogleAdsAccount => Boolean(item));
+  } catch {
+    return [];
+  }
+};
 
 const iconMap: Record<string, React.ElementType> = {
   'gemini': Sparkles,
@@ -384,19 +427,33 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     }
   };
 
+  const bootstrapManagedSession = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const idToken = await currentUser.getIdToken();
+    await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+  };
+
+  const persistManagedGoogleSelection = async (googleAdsId: string) => {
+    const normalizedId = normalizeGoogleAdsAccountId(googleAdsId);
+    if (!normalizedId) return;
+    await bootstrapManagedSession();
+    await fetch(`${API_BASE}/api/connections/google-ads/select-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountIds: [normalizedId] }),
+    });
+  };
+
   const startManagedOAuth = async (
     platformSlug: 'google-ads' | 'meta' | 'tiktok',
     failureMessage: string
   ) => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      const idToken = await currentUser.getIdToken();
-      await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-    }
+    await bootstrapManagedSession();
 
     const response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
       method: 'POST',
@@ -570,6 +627,21 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     try {
       // Show a more realistic verification process
       await updateConnectionSettings(id, settingsToSave);
+      if (id === 'google' && settingsToSave.googleAdsId) {
+        try {
+          await persistManagedGoogleSelection(settingsToSave.googleAdsId);
+        } catch (selectionError) {
+          setToast({
+            message:
+              language === 'he'
+                ? 'החיבור נשמר, אך בחירת חשבון ברירת המחדל ל-Google Ads נכשלה. נסה שוב.'
+                : 'Connection was saved, but default Google Ads account selection failed. Please retry.',
+            type: 'error',
+          });
+          setTimeout(() => setToast(null), 3500);
+          console.warn('Failed to persist managed Google Ads selection:', selectionError);
+        }
+      }
       setExpandedId(null);
       const connectionName = connections.find((c) => c.id === id)?.name || '';
       const successTemplate = t('integrations.success');
@@ -793,10 +865,59 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                   </div>
                   {isConnected && (
                     <>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adsAccountId')}</label>
-                        <input type="text" placeholder="123-456-7890" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.googleAdsId || ""} onChange={(e) => handleInputChange('googleAdsId', e.target.value)} />
-                      </div>
+                      {(() => {
+                        const managedAccounts = parseManagedGoogleAdsAccounts(formValues.googleAdsAccounts);
+                        if (managedAccounts.length > 0) {
+                          return (
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                                {language === 'he'
+                                  ? 'חשבון ברירת מחדל ל-Google Ads'
+                                  : 'Default Google Ads account'}
+                              </label>
+                              <select
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                                value={
+                                  formValues.googleAdsId
+                                    ? formatGoogleAdsAccountId(formValues.googleAdsId)
+                                    : formatGoogleAdsAccountId(managedAccounts[0]?.externalAccountId || '')
+                                }
+                                onChange={(e) => handleInputChange('googleAdsId', e.target.value)}
+                              >
+                                {managedAccounts.map((account) => {
+                                  const formatted = formatGoogleAdsAccountId(account.externalAccountId);
+                                  const suffix = account.currency ? ` · ${account.currency}` : '';
+                                  return (
+                                    <option key={account.externalAccountId} value={formatted}>
+                                      {account.name || formatted} ({formatted}){suffix}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <p className="mt-1 text-[10px] text-gray-500">
+                                {language === 'he'
+                                  ? `יובאו ${managedAccounts.length} חשבונות. בחר ברירת מחדל לבדיקה וסנכרון.`
+                                  : `${managedAccounts.length} accounts imported. Choose the default for test and sync.`}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                              {t('integrations.adsAccountId')}
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="123-456-7890"
+                              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
+                              dir="ltr"
+                              value={formValues.googleAdsId || ''}
+                              onChange={(e) => handleInputChange('googleAdsId', e.target.value)}
+                            />
+                          </div>
+                        );
+                      })()}
                       <div>
                         <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4MeasurementId')}</label>
                         <input type="text" placeholder="G-XXXXXXXXXX" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4Id || ""} onChange={(e) => handleInputChange('ga4Id', e.target.value)} />
