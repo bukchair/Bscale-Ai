@@ -23,19 +23,38 @@ const providers = {
 const normalizeCustomerId = (value: string) => value.replace(/\D/g, '');
 
 export const googleLegacyBridge = {
-  async getConnectionWithAccessToken(userId: string, platform: BridgePlatform) {
-    const connection = (await connectionService.getByUserPlatform(
+  async getConnectionWithAccessToken(
+    userId: string,
+    platform: BridgePlatform,
+    options?: { allowGoogleAdsFallback?: boolean }
+  ) {
+    const primaryConnection = (await connectionService.getByUserPlatform(
       userId,
       platform
     )) as BridgeConnection | null;
 
-    if (!connection) {
-      throw new Error(`No ${platform} connection is available for this user.`);
+    if (primaryConnection) {
+      const provider = providers[platform];
+      const accessToken = await provider.getAccessTokenForConnection(primaryConnection.id);
+      return { connection: primaryConnection, accessToken, resolvedPlatform: platform as BridgePlatform };
     }
 
-    const provider = providers[platform];
-    const accessToken = await provider.getAccessTokenForConnection(connection.id);
-    return { connection, accessToken };
+    if (options?.allowGoogleAdsFallback && platform !== 'GOOGLE_ADS') {
+      const fallbackConnection = (await connectionService.getByUserPlatform(
+        userId,
+        'GOOGLE_ADS'
+      )) as BridgeConnection | null;
+      if (fallbackConnection) {
+        const accessToken = await providers.GOOGLE_ADS.getAccessTokenForConnection(fallbackConnection.id);
+        return {
+          connection: fallbackConnection,
+          accessToken,
+          resolvedPlatform: 'GOOGLE_ADS' as BridgePlatform,
+        };
+      }
+    }
+
+    throw new Error(`No ${platform} connection is available for this user.`);
   },
 
   getLoginCustomerId(metadata: unknown): string | null {

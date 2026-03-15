@@ -12,7 +12,12 @@ type SearchStreamChunk = {
 
 export class GoogleAdsProvider extends BaseGoogleProvider {
   readonly platform = 'GOOGLE_ADS' as const;
-  readonly oauthScopes = ['https://www.googleapis.com/auth/adwords'] as const;
+  readonly oauthScopes = [
+    'https://www.googleapis.com/auth/adwords',
+    'https://www.googleapis.com/auth/analytics.readonly',
+    'https://www.googleapis.com/auth/webmasters.readonly',
+    'https://www.googleapis.com/auth/gmail.send',
+  ] as const;
   readonly capabilities: readonly ProviderCapability[] = [
     'ACCOUNT_DISCOVERY',
     'REPORTING_TEST',

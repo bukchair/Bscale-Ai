@@ -161,9 +161,17 @@ export async function sendGmailNotification(accessToken: string, to: string, sub
   return response.json();
 }
 
-export async function fetchGA4Report(accessToken: string, propertyId?: string) {
-  const query = propertyId ? `?property_id=${encodeURIComponent(propertyId)}` : '';
-  const response = await fetch(`${API_BASE}/api/google/analytics/report${query}`, {
+export async function fetchGA4Report(
+  accessToken: string,
+  propertyId?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  const query = new URLSearchParams();
+  if (propertyId) query.set('property_id', propertyId);
+  if (startDate) query.set('start_date', startDate);
+  if (endDate) query.set('end_date', endDate);
+  const response = await fetch(`${API_BASE}/api/google/analytics/report?${query.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

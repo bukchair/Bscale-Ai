@@ -31,7 +31,9 @@ const toBase64Url = (input: string) =>
 export async function POST(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
-    const { accessToken } = await googleLegacyBridge.getConnectionWithAccessToken(user.id, 'GMAIL');
+    const { accessToken } = await googleLegacyBridge.getConnectionWithAccessToken(user.id, 'GMAIL', {
+      allowGoogleAdsFallback: true,
+    });
     const payload = (await request.json().catch(() => ({}))) as SendBody;
 
     if (!payload.to || !payload.subject || !payload.body) {

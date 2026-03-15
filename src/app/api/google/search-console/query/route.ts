@@ -36,7 +36,8 @@ export async function GET(request: Request) {
     const user = await requireAuthenticatedUser();
     const { connection, accessToken } = await googleLegacyBridge.getConnectionWithAccessToken(
       user.id,
-      'SEARCH_CONSOLE'
+      'SEARCH_CONSOLE',
+      { allowGoogleAdsFallback: true }
     );
     const url = new URL(request.url);
     const querySiteUrl = (url.searchParams.get('site_url') || '').trim();
@@ -46,9 +47,37 @@ export async function GET(request: Request) {
       connection.connectedAccounts.find((account) => account.isSelected)?.externalAccountId ||
       connection.connectedAccounts[0]?.externalAccountId ||
       '';
-    const siteUrl = (querySiteUrl || fallbackSiteUrl).trim();
+    let siteUrl = (querySiteUrl || fallbackSiteUrl).trim();
+
     if (!siteUrl) {
-      return NextResponse.json({ message: 'Missing site_url for Search Console query.' }, { status: 400 });
+      const discoverResponse = await fetch(`${SEARCH_CONSOLE_API}/sites`, {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+      });
+      const discoverRaw = await discoverResponse.text();
+      let discoverParsed: unknown = {};
+      try {
+        discoverParsed = discoverRaw ? JSON.parse(discoverRaw) : {};
+      } catch {
+        discoverParsed = null;
+      }
+      if (discoverResponse.ok) {
+        const firstSite =
+          discoverParsed && typeof discoverParsed === 'object'
+            ? ((discoverParsed as { siteEntry?: Array<{ siteUrl?: string }> }).siteEntry?.[0]?.siteUrl || '')
+            : '';
+        siteUrl = String(firstSite || '').trim();
+      }
+    }
+
+    if (!siteUrl) {
+      return NextResponse.json(
+        { message: 'Missing site_url for Search Console query. Select a site in integrations.' },
+        { status: 400 }
+      );
     }
 
     const encodedSite = encodeURIComponent(siteUrl);

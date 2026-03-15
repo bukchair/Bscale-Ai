@@ -644,7 +644,29 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
     if (!auth.currentUser) return;
-    void syncManagedConnectionsToLocal();
+    let isCancelled = false;
+
+    const runSync = async () => {
+      if (isCancelled) return;
+      await syncManagedConnectionsToLocal();
+    };
+
+    void runSync();
+
+    const intervalId = window.setInterval(() => {
+      void runSync();
+    }, 45_000);
+
+    const handleFocus = () => {
+      void runSync();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [isLoading, dataOwnerUid]);
 
   const toggleConnection = async (id: string, subId?: string) => {

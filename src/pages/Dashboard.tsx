@@ -647,64 +647,60 @@ export function Dashboard() {
 
       if (google?.settings?.googleAccessToken) {
         const token = google.settings.googleAccessToken;
-        const ga4Connected = Boolean(
-          google.subConnections?.some((sub) => sub.id === 'ga4' && sub.status === 'connected')
-        );
-        const gscConnected = Boolean(
-          google.subConnections?.some((sub) => sub.id === 'gsc' && sub.status === 'connected')
-        );
-
-        if (ga4Connected || google.settings.ga4Id) {
-          try {
-            const report = await fetchGA4Report(token, google.settings.ga4Id || undefined);
-            const rows = Array.isArray(report.rows) ? report.rows : [];
-            let totalUsers = 0;
-            let activeNow = 0;
-            rows.forEach((row: any) => {
-              const metrics = row.metricValues || row.metrics || [];
-              totalUsers += moneyFromUnknown(metrics?.[0]?.value);
-            });
-            if (rows.length) {
-              const latestMetrics = rows[rows.length - 1]?.metricValues || rows[rows.length - 1]?.metrics || [];
-              activeNow = moneyFromUnknown(latestMetrics?.[0]?.value);
-            }
-            ga4Live = {
-              activeNow: toNumber(activeNow, DEMO_GA4_STATS.activeNow),
-              totalUsers: toNumber(totalUsers, DEMO_GA4_STATS.totalUsers),
-            };
-            hasGa4Live = ga4Live.activeNow > 0 || ga4Live.totalUsers > 0;
-          } catch (error) {
-            console.warn('Failed to load GA4 stats', error);
+        try {
+          const report = await fetchGA4Report(
+            token,
+            google.settings.ga4Id || undefined,
+            startIsoDateOnly,
+            endIsoDateOnly
+          );
+          const rows = Array.isArray(report.rows) ? report.rows : [];
+          let totalUsers = 0;
+          let activeNow = 0;
+          rows.forEach((row: any) => {
+            const metrics = row.metricValues || row.metrics || [];
+            totalUsers += moneyFromUnknown(metrics?.[0]?.value);
+          });
+          if (rows.length) {
+            const latestMetrics = rows[rows.length - 1]?.metricValues || rows[rows.length - 1]?.metrics || [];
+            activeNow = moneyFromUnknown(latestMetrics?.[0]?.value);
           }
+          ga4Live = {
+            activeNow: toNumber(activeNow, DEMO_GA4_STATS.activeNow),
+            totalUsers: toNumber(totalUsers, DEMO_GA4_STATS.totalUsers),
+          };
+          hasGa4Live = ga4Live.activeNow > 0 || ga4Live.totalUsers > 0;
+        } catch (error) {
+          console.warn('Failed to load GA4 stats', error);
         }
 
-        if (gscConnected || google.settings.siteUrl || google.settings.gscSiteUrl) {
-          try {
-            const gsc = await fetchGSCData(
-              token,
-              google.settings.siteUrl || google.settings.gscSiteUrl || undefined
-            );
-            const rows = Array.isArray(gsc.rows) ? gsc.rows : [];
-            let clicks = 0;
-            let impressions = 0;
-            let positionSum = 0;
-            rows.forEach((row: any) => {
-              clicks += toNumber(row.clicks, 0);
-              impressions += toNumber(row.impressions, 0);
-              positionSum += toNumber(row.position, 0);
-            });
-            const avgPosition = rows.length ? positionSum / rows.length : 0;
-            const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-            gscLive = {
-              clicks: toNumber(clicks, DEMO_GSC_STATS.clicks),
-              impressions: toNumber(impressions, DEMO_GSC_STATS.impressions),
-              avgPosition: toNumber(avgPosition, DEMO_GSC_STATS.avgPosition),
-              ctr: toNumber(ctr, DEMO_GSC_STATS.ctr),
-            };
-            hasGscLive = gscLive.clicks > 0 || gscLive.impressions > 0;
-          } catch (error) {
-            console.warn('Failed to load GSC stats', error);
-          }
+        try {
+          const gsc = await fetchGSCData(
+            token,
+            google.settings.siteUrl || google.settings.gscSiteUrl || undefined,
+            startIsoDateOnly,
+            endIsoDateOnly
+          );
+          const rows = Array.isArray(gsc.rows) ? gsc.rows : [];
+          let clicks = 0;
+          let impressions = 0;
+          let positionSum = 0;
+          rows.forEach((row: any) => {
+            clicks += toNumber(row.clicks, 0);
+            impressions += toNumber(row.impressions, 0);
+            positionSum += toNumber(row.position, 0);
+          });
+          const avgPosition = rows.length ? positionSum / rows.length : 0;
+          const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+          gscLive = {
+            clicks: toNumber(clicks, DEMO_GSC_STATS.clicks),
+            impressions: toNumber(impressions, DEMO_GSC_STATS.impressions),
+            avgPosition: toNumber(avgPosition, DEMO_GSC_STATS.avgPosition),
+            ctr: toNumber(ctr, DEMO_GSC_STATS.ctr),
+          };
+          hasGscLive = gscLive.clicks > 0 || gscLive.impressions > 0;
+        } catch (error) {
+          console.warn('Failed to load GSC stats', error);
         }
 
         const googleCustomerId =
