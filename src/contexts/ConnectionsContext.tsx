@@ -158,31 +158,57 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const parseManagedPayload = (raw: string) => {
+    try {
+      return raw ? (JSON.parse(raw) as { success?: boolean; message?: string; errorCode?: string; data?: any }) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const autoDiscoverAndSelectManagedAccounts = async (
+    platformSlug: 'google-ads' | 'meta' | 'tiktok'
+  ): Promise<void> => {
+    await ensureManagedApiSession();
+    const discoverResponse = await fetch(`/api/connections/${platformSlug}/accounts`, {
+      method: 'GET',
+      headers: { 'content-type': 'application/json' },
+    });
+    const discoverText = await discoverResponse.text();
+    const discoverPayload = parseManagedPayload(discoverText);
+
+    if (!discoverResponse.ok || !discoverPayload?.success) {
+      return;
+    }
+
+    const accounts = Array.isArray(discoverPayload.data?.accounts) ? discoverPayload.data.accounts : [];
+    const accountIds = accounts
+      .map((account: { externalAccountId?: string }) => String(account.externalAccountId || '').trim())
+      .filter(Boolean);
+
+    if (!accountIds.length) return;
+
+    await fetch(`/api/connections/${platformSlug}/select-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountIds }),
+    });
+  };
+
   const postManagedTest = async (
-    platformSlug: 'google-ads' | 'meta' | 'tiktok',
-    accountId?: string
+    platformSlug: 'google-ads' | 'meta' | 'tiktok'
   ): Promise<{ success: boolean; message: string }> => {
     await ensureManagedApiSession();
+    await autoDiscoverAndSelectManagedAccounts(platformSlug);
+
     const response = await fetch(`/api/connections/${platformSlug}/test`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId }),
+      body: JSON.stringify({}),
     });
 
     const text = await response.text();
-    let payload:
-      | {
-          success?: boolean;
-          message?: string;
-          errorCode?: string;
-        }
-      | null = null;
-
-    try {
-      payload = text ? (JSON.parse(text) as typeof payload) : null;
-    } catch {
-      payload = null;
-    }
+    const payload = parseManagedPayload(text);
 
     if (!response.ok || !payload?.success) {
       return {
@@ -562,14 +588,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const managedPlatformSlug = managedPlatformByConnectionId[id as Connection['id']];
     if (managedPlatformSlug) {
       try {
-        const normalizedGoogleAccountId =
-          id === 'google' && connection.settings?.googleAdsId
-            ? connection.settings.googleAdsId.replace(/-/g, '').trim()
-            : undefined;
-        const result = await postManagedTest(
-          managedPlatformSlug,
-          normalizedGoogleAccountId
-        );
+        const result = await postManagedTest(managedPlatformSlug);
         if (result.success) {
           const updatedConnections = connections.map((c) =>
             c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: c.score || 100 } : c
