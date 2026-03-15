@@ -194,3 +194,91 @@ Return ONLY valid JSON with this exact structure (write in Hebrew for title, des
     return { recommendations: [] };
   }
 }
+
+export interface CampaignBuilderSuggestion {
+  campaignName?: string;
+  objective?: 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
+  contentType?: 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
+  productType?: 'fashion' | 'beauty' | 'tech' | 'home' | 'fitness' | 'services' | 'other';
+  serviceType?: string;
+  audiences?: string[];
+  recommendedHoursByPlatform?: {
+    Google?: number[];
+    Meta?: number[];
+    TikTok?: number[];
+  };
+  targetingRules?: Array<{
+    platform: 'Google' | 'Meta' | 'TikTok';
+    startHour: number;
+    endHour: number;
+    action: 'boost' | 'limit' | 'pause';
+    minRoas: number;
+    reason?: string;
+  }>;
+}
+
+export async function getCampaignBuilderSuggestions(
+  contextData: string,
+  apiKeyOrKeys?: AIKeysOrApiKey,
+  responseLanguage: string = 'Hebrew'
+): Promise<CampaignBuilderSuggestion> {
+  const prompt = `You are an ad strategy planner for Google, Meta and TikTok.
+Given campaign context and connected platform performance data, return one smart editable campaign setup.
+Context data:
+${contextData}
+
+Return ONLY strict JSON with this structure:
+{
+  "campaignName": "short campaign name in ${responseLanguage}",
+  "objective": "sales|traffic|leads|awareness|retargeting",
+  "contentType": "product|offer|educational|testimonial|video",
+  "productType": "fashion|beauty|tech|home|fitness|services|other",
+  "serviceType": "free text in ${responseLanguage}",
+  "audiences": ["..."],
+  "recommendedHoursByPlatform": {
+    "Google": [9,10,11,18,19],
+    "Meta": [12,13,20,21],
+    "TikTok": [19,20,21,22]
+  },
+  "targetingRules": [
+    {
+      "platform": "Google|Meta|TikTok",
+      "startHour": 0,
+      "endHour": 23,
+      "action": "boost|limit|pause",
+      "minRoas": 0,
+      "reason": "short reason in ${responseLanguage}"
+    }
+  ]
+}
+
+Rules:
+- Keep hours integers between 0 and 23.
+- Keep arrays concise and practical.
+- Ensure objective/contentType/productType are from allowed values only.`;
+
+  if (isAIKeys(apiKeyOrKeys) && hasAnyAIKey(apiKeyOrKeys)) {
+    try {
+      const data = await runWithMultiAI<CampaignBuilderSuggestion>(prompt, apiKeyOrKeys);
+      return data || {};
+    } catch (e) {
+      console.warn('getCampaignBuilderSuggestions failed', e);
+      return {};
+    }
+  }
+
+  const ai = getAI(typeof apiKeyOrKeys === 'string' ? apiKeyOrKeys : undefined);
+  if (!ai) return {};
+  try {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const parsed = JSON.parse(response.text || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    console.warn('getCampaignBuilderSuggestions failed', e);
+    return {};
+  }
+}

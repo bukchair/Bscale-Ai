@@ -1,6 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { getOptimizationRecommendations, getAIKeysFromConnections, hasAnyAIKey } from '../lib/gemini';
-import { CheckCircle2, AlertCircle, Loader2, Zap, Mail, Target, ImagePlus, Trash2, Clock3, CalendarClock, PlusCircle, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  getOptimizationRecommendations,
+  getAIKeysFromConnections,
+  hasAnyAIKey,
+  getAudienceRecommendations,
+  getCampaignBuilderSuggestions,
+} from '../lib/gemini';
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Zap,
+  Mail,
+  Target,
+  ImagePlus,
+  Trash2,
+  Clock3,
+  CalendarClock,
+  PlusCircle,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Video,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -21,9 +44,9 @@ const mockCampaignData = [
 type ContentType = 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
 type ProductType = 'fashion' | 'beauty' | 'tech' | 'home' | 'fitness' | 'services' | 'other';
 type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
-type SlotKey = 'morning' | 'afternoon' | 'evening' | 'night';
 type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 type RuleAction = 'boost' | 'limit' | 'pause';
+type PlatformName = 'Google' | 'Meta' | 'TikTok';
 
 type UploadedAsset = {
   id: string;
@@ -32,45 +55,37 @@ type UploadedAsset = {
   type: string;
   previewUrl: string;
   file: File;
+  mediaType: 'image' | 'video';
+  width?: number;
+  height?: number;
 };
 
 type TimeRule = {
   id: string;
-  platform: string;
-  slot: SlotKey;
+  platform: PlatformName;
+  startHour: number;
+  endHour: number;
   action: RuleAction;
   minRoas: number;
+  reason?: string;
 };
 
-type DaySchedule = Record<DayKey, Record<SlotKey, boolean>>;
-type WeeklySchedule = Record<string, DaySchedule>;
+type DayHours = Record<DayKey, number[]>;
+type WeeklySchedule = Record<string, DayHours>;
 
-const PLATFORM_CONNECTION_MAP: Record<string, string> = {
-  Google: 'google',
-  Meta: 'meta',
-  TikTok: 'tiktok',
+type MediaLimits = {
+  imageMaxMb: number;
+  videoMaxMb: number;
+  maxImageWidth: number;
+  maxImageHeight: number;
 };
 
-const SLOT_RANGES: Record<SlotKey, string> = {
-  morning: '06:00-11:00',
-  afternoon: '11:00-16:00',
-  evening: '16:00-21:00',
-  night: '21:00-01:00',
-};
+const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
-const BEST_TIME_WINDOWS: Record<string, { slot: SlotKey; roas: number; cpa: number }[]> = {
-  Google: [
-    { slot: 'evening', roas: 4.2, cpa: 28 },
-    { slot: 'afternoon', roas: 3.6, cpa: 34 },
-  ],
-  Meta: [
-    { slot: 'night', roas: 4.1, cpa: 26 },
-    { slot: 'evening', roas: 3.7, cpa: 29 },
-  ],
-  TikTok: [
-    { slot: 'evening', roas: 3.4, cpa: 31 },
-    { slot: 'night', roas: 3.2, cpa: 33 },
-  ],
+const PLATFORM_MEDIA_LIMITS: Record<PlatformName, MediaLimits> = {
+  Google: { imageMaxMb: 5, videoMaxMb: 100, maxImageWidth: 1200, maxImageHeight: 1200 },
+  Meta: { imageMaxMb: 30, videoMaxMb: 500, maxImageWidth: 1440, maxImageHeight: 1440 },
+  TikTok: { imageMaxMb: 20, videoMaxMb: 500, maxImageWidth: 1080, maxImageHeight: 1920 },
 };
 
 const SMART_AUDIENCE_BY_CONTENT: Record<ContentType, string[]> = {
@@ -99,14 +114,14 @@ const SMART_AUDIENCE_BY_OBJECTIVE: Record<ObjectiveType, string[]> = {
   retargeting: ['Site visitors 30d', 'Product viewers 14d', 'Initiated checkout 14d'],
 };
 
-const createEmptyDaySchedule = (): DaySchedule => ({
-  mon: { morning: false, afternoon: false, evening: false, night: false },
-  tue: { morning: false, afternoon: false, evening: false, night: false },
-  wed: { morning: false, afternoon: false, evening: false, night: false },
-  thu: { morning: false, afternoon: false, evening: false, night: false },
-  fri: { morning: false, afternoon: false, evening: false, night: false },
-  sat: { morning: false, afternoon: false, evening: false, night: false },
-  sun: { morning: false, afternoon: false, evening: false, night: false },
+const createEmptyDaySchedule = (): DayHours => ({
+  mon: [],
+  tue: [],
+  wed: [],
+  thu: [],
+  fri: [],
+  sat: [],
+  sun: [],
 });
 
 export function Campaigns() {
@@ -120,12 +135,22 @@ export function Campaigns() {
   const text = {
     builderTitle: isHebrew ? 'יוצר קמפיינים אינטראקטיבי' : 'Interactive campaign builder',
     builderSubtitle: isHebrew
-      ? 'יצירת מודעות עם קהלים חכמים, העלאת תמונות אמיתית, חוקי זמן ולוח תזמון שבועי לכל פלטפורמה.'
-      : 'Create campaigns with smart audiences, real image upload, time targeting rules, and weekly scheduling.',
+      ? 'יצירת מודעות עם קהלים חכמים, העלאת תמונה/וידאו, חוקי טירגוט לפי שעות ולוח תזמון שבועי.'
+      : 'Create campaigns with smart audiences, image/video upload, hourly targeting rules, and weekly scheduling.',
+    smartWindowTitle: isHebrew ? 'חלון תכנון חכם עם AI' : 'Smart AI planning window',
+    smartWindowSubtitle: isHebrew
+      ? 'הכנס כותרת קצרה והמערכת תציע קהלים, מטרה, סוג תוכן, סוג מוצר/שירות ושעות ביצוע מומלצות.'
+      : 'Enter a short title and the system suggests audiences, objective, content type, product/service type, and recommended hours.',
+    shortTitle: isHebrew ? 'כותרת קצרה' : 'Short title',
+    analyzeWithAi: isHebrew ? 'נתח עם AI' : 'Analyze with AI',
+    aiAudienceFromConnections: isHebrew
+      ? 'קהלים חכמים מנותחים מנתוני החיבורים הפעילים'
+      : 'Smart audiences analyzed from connected platform data',
     campaignName: isHebrew ? 'שם קמפיין' : 'Campaign name',
     objective: isHebrew ? 'מטרת קמפיין' : 'Campaign objective',
     contentType: isHebrew ? 'אופי פוסט/תוכן' : 'Post/Product content type',
     productType: isHebrew ? 'סוג מוצר/שירות' : 'Product/service type',
+    serviceType: isHebrew ? 'סוג שירות / קטגוריה עסקית' : 'Service type / business category',
     description: isHebrew ? 'תיאור קצר לפוסט או מוצר' : 'Short post/product brief',
     selectPlatforms: isHebrew ? 'בחירת פלטפורמות מחוברות' : 'Select connected platforms',
     noConnectedPlatforms: isHebrew ? 'אין פלטפורמות פרסום מחוברות כרגע.' : 'No advertising platforms are currently connected.',
@@ -134,23 +159,29 @@ export function Campaigns() {
       ? 'המלצות אוטומטיות לפי אופי התוכן, סוג המוצר ומטרת הקמפיין.'
       : 'Auto recommendations by content nature, product type, and campaign objective.',
     addCustomAudience: isHebrew ? 'הוסף קהל ידני' : 'Add custom audience',
-    uploadTitle: isHebrew ? 'העלאת תמונות למודעות (אמיתי)' : 'Upload ad images (real upload)',
+    uploadTitle: isHebrew ? 'העלאת מדיה למודעות (תמונה / וידאו)' : 'Upload ad media (image / video)',
     uploadHint: isHebrew
-      ? 'התמונות מועלות מהמחשב שלך ומוכנות לפרסום בפלטפורמות המחוברות.'
-      : 'Images are uploaded from your device and prepared for connected platforms.',
-    uploadButton: isHebrew ? 'בחר תמונות' : 'Choose images',
-    timingRulesTitle: isHebrew ? 'חוקי טירגוט לפי שעות ביצועים' : 'Performance based time targeting rules',
-    weeklyTitle: isHebrew ? 'לוח זמנים שבועי לקמפיינים' : 'Weekly campaign schedule board',
-    createDraft: isHebrew ? 'צור קמפיין מתוזמן' : 'Create scheduled campaign',
-    publishedOk: isHebrew ? 'הקמפיינים נוצרו בהצלחה ברשימת הניהול.' : 'Campaign drafts were created successfully in management list.',
+      ? 'התמונות יעברו הקטנה חכמה אוטומטית לפי תנאי הפלטפורמות בלי פגיעה נראית לעין באיכות.'
+      : 'Images are auto-resized smartly to fit platform requirements with no visible quality loss.',
+    uploadButton: isHebrew ? 'בחר תמונה / וידאו' : 'Choose image / video',
+    noDataPersistenceNote: isHebrew
+      ? 'הערה: נתוני המדיה אינם נשמרים לאחר פרסום המודעה.'
+      : 'Note: media data is not stored after ad publication.',
+    timingRulesTitle: isHebrew ? 'חוקי טירגוט לפי שעות ביצועים (AI)' : 'AI hourly performance targeting rules',
+    weeklyTitle: isHebrew ? 'לוח זמנים שבועי לפי שעות (גובר על כל החוקים)' : 'Weekly hourly schedule (overrides all other rules)',
+    createDraft: isHebrew ? 'צור קמפיין מתוזמן בפלטפורמה' : 'Create scheduled campaign in platform',
+    publishedOk: isHebrew ? 'הקמפיינים נוצרו בהצלחה בפלטפורמות שנבחרו.' : 'Campaigns were created successfully on selected platforms.',
+    publishedPartial: isHebrew ? 'חלק מהפלטפורמות נכשלו. בדוק פירוט תוצאות.' : 'Some platforms failed. Check detailed results.',
     requireFields: isHebrew ? 'נדרש שם קמפיין ובחירת לפחות פלטפורמה אחת.' : 'Campaign name and at least one platform are required.',
-    requireAsset: isHebrew ? 'יש להעלות לפחות תמונה אחת כדי ליצור מודעה.' : 'Upload at least one image to create ad campaigns.',
+    requireAsset: isHebrew ? 'יש להעלות לפחות קובץ מדיה אחד כדי ליצור קמפיין.' : 'Upload at least one media file to create campaign.',
     connectedOnly: isHebrew ? 'זמין רק בפלטפורמות מחוברות' : 'Available only for connected platforms',
-    bestWindows: isHebrew ? 'חלונות הזמן עם ביצועים טובים' : 'Best performing time windows',
+    bestWindows: isHebrew ? 'שעות ביצועים מומלצות (AI)' : 'AI recommended performance hours',
     addRule: isHebrew ? 'הוסף חוק' : 'Add rule',
-    weeklyActiveSlots: isHebrew ? 'משבצות פעילות' : 'Active slots',
+    weeklyActiveSlots: isHebrew ? 'שעות פעילות' : 'Active hours',
     createdCampaigns: isHebrew ? 'קמפיינים פעילים ומתוזמנים' : 'Active and scheduled campaigns',
     syncLive: isHebrew ? 'מסנכרן נתונים בזמן אמת...' : 'Syncing real-time data...',
+    creatingLiveCampaigns: isHebrew ? 'יוצר קמפיינים חיים...' : 'Creating live campaigns...',
+    aiMissing: isHebrew ? 'אין כרגע חיבור למנוע AI פעיל.' : 'No active AI engine connection found.',
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
@@ -207,9 +238,11 @@ export function Campaigns() {
 
   // Interactive campaign builder state
   const [campaignNameInput, setCampaignNameInput] = useState('');
+  const [shortTitleInput, setShortTitleInput] = useState('');
   const [objective, setObjective] = useState<ObjectiveType>('sales');
   const [contentType, setContentType] = useState<ContentType>('product');
   const [productType, setProductType] = useState<ProductType>('other');
+  const [serviceTypeInput, setServiceTypeInput] = useState('');
   const [campaignBrief, setCampaignBrief] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [selectedAudiences, setSelectedAudiences] = useState<string[]>([]);
@@ -217,11 +250,20 @@ export function Campaigns() {
   const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([]);
   const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({});
   const [selectedSchedulePlatform, setSelectedSchedulePlatform] = useState<string>('Google');
+  const [selectedScheduleDay, setSelectedScheduleDay] = useState<DayKey>('mon');
   const [timeRules, setTimeRules] = useState<TimeRule[]>([]);
-  const [rulePlatform, setRulePlatform] = useState<string>('Google');
-  const [ruleSlot, setRuleSlot] = useState<SlotKey>('evening');
+  const [rulePlatform, setRulePlatform] = useState<PlatformName>('Google');
+  const [ruleStartHour, setRuleStartHour] = useState<number>(18);
+  const [ruleEndHour, setRuleEndHour] = useState<number>(22);
   const [ruleAction, setRuleAction] = useState<RuleAction>('boost');
   const [ruleMinRoas, setRuleMinRoas] = useState<number>(3);
+  const [ruleReason, setRuleReason] = useState<string>('');
+  const [aiAudienceLoading, setAiAudienceLoading] = useState(false);
+  const [aiAudienceProvider, setAiAudienceProvider] = useState<string>('');
+  const [aiGeneratedAudienceNames, setAiGeneratedAudienceNames] = useState<string[]>([]);
+  const [aiRecommendedHoursByPlatform, setAiRecommendedHoursByPlatform] = useState<Record<string, number[]>>({});
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+  const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; message: string; campaignId?: string }>>([]);
 
   const connectedAdPlatforms = useMemo(() => {
     const options: string[] = [];
@@ -257,13 +299,6 @@ export function Campaigns() {
     { value: 'other', label: isHebrew ? 'אחר' : 'Other' },
   ];
 
-  const slotLabels: Record<SlotKey, string> = {
-    morning: isHebrew ? 'בוקר' : 'Morning',
-    afternoon: isHebrew ? 'צהריים' : 'Afternoon',
-    evening: isHebrew ? 'ערב' : 'Evening',
-    night: isHebrew ? 'לילה' : 'Night',
-  };
-
   const dayLabels: Record<DayKey, string> = {
     mon: isHebrew ? 'שני' : 'Mon',
     tue: isHebrew ? 'שלישי' : 'Tue',
@@ -274,14 +309,36 @@ export function Campaigns() {
     sun: isHebrew ? 'ראשון' : 'Sun',
   };
 
+  const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, hour) => hour), []);
+  const formatHour = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+  const formatHourRange = (startHour: number, endHour: number) =>
+    `${formatHour(startHour)}-${formatHour(endHour)}`;
+
+  const effectiveMediaLimits = useMemo(() => {
+    const activePlatforms = selectedPlatforms.filter((p): p is PlatformName =>
+      p === 'Google' || p === 'Meta' || p === 'TikTok'
+    );
+    if (!activePlatforms.length) return PLATFORM_MEDIA_LIMITS.Google;
+    return activePlatforms.reduce<MediaLimits>((acc, platform) => {
+      const current = PLATFORM_MEDIA_LIMITS[platform];
+      return {
+        imageMaxMb: Math.min(acc.imageMaxMb, current.imageMaxMb),
+        videoMaxMb: Math.min(acc.videoMaxMb, current.videoMaxMb),
+        maxImageWidth: Math.min(acc.maxImageWidth, current.maxImageWidth),
+        maxImageHeight: Math.min(acc.maxImageHeight, current.maxImageHeight),
+      };
+    }, PLATFORM_MEDIA_LIMITS[activePlatforms[0]]);
+  }, [selectedPlatforms]);
+
   const audienceSuggestions = useMemo(() => {
     const combined = [
+      ...aiGeneratedAudienceNames,
       ...SMART_AUDIENCE_BY_CONTENT[contentType],
       ...SMART_AUDIENCE_BY_PRODUCT[productType],
       ...SMART_AUDIENCE_BY_OBJECTIVE[objective],
     ];
     return [...new Set(combined)];
-  }, [contentType, productType, objective]);
+  }, [aiGeneratedAudienceNames, contentType, productType, objective]);
 
   useEffect(() => {
     if (connectedAdPlatforms.length === 0) {
@@ -293,7 +350,11 @@ export function Campaigns() {
       return filtered.length ? filtered : [connectedAdPlatforms[0]];
     });
     setSelectedSchedulePlatform((prev) => (connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]));
-    setRulePlatform((prev) => (connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]));
+    setRulePlatform((prev) =>
+      connectedAdPlatforms.includes(prev)
+        ? (prev as PlatformName)
+        : ((connectedAdPlatforms[0] || 'Google') as PlatformName)
+    );
   }, [connectedAdPlatforms]);
 
   useEffect(() => {
@@ -646,19 +707,137 @@ export function Campaigns() {
     setCustomAudience('');
   };
 
-  const handleAssetUpload: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+  const normalizeHour = (value: number) => {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(23, Math.round(value)));
+  };
+
+  const sanitizeHours = (hours: number[]) =>
+    [...new Set(hours.map((hour) => normalizeHour(hour)))].sort((a, b) => a - b);
+
+  const loadImageElement = (file: File) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Failed to load image for optimization.'));
+      };
+      img.src = url;
+    });
+
+  const resizeImageForPlatforms = async (file: File) => {
+    const img = await loadImageElement(file);
+    const { width, height } = img;
+    const scale = Math.min(
+      1,
+      effectiveMediaLimits.maxImageWidth / Math.max(width, 1),
+      effectiveMediaLimits.maxImageHeight / Math.max(height, 1)
+    );
+    if (scale >= 1) {
+      return {
+        file,
+        width,
+        height,
+      };
+    }
+
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return { file, width, height };
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+    const preferredType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const quality = preferredType === 'image/png' ? undefined : 0.92;
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, preferredType, quality)
+    );
+    if (!blob) return { file, width, height };
+    const ext = preferredType === 'image/png' ? '.png' : '.jpg';
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    const nextFile = new File([blob], `${baseName}${ext}`, {
+      type: preferredType,
+      lastModified: Date.now(),
+    });
+    return {
+      file: nextFile,
+      width: targetWidth,
+      height: targetHeight,
+    };
+  };
+
+  const handleAssetUpload: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
     const files = Array.from(event.target.files || []) as File[];
     if (!files.length) return;
-    const imageFiles = files.filter((file) => file.type.startsWith('image/'));
-    const mapped: UploadedAsset[] = imageFiles.map((file) => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }));
-    setUploadedAssets((prev) => [...prev, ...mapped].slice(0, 12));
+    const imageMaxBytes = effectiveMediaLimits.imageMaxMb * 1024 * 1024;
+    const videoMaxBytes = effectiveMediaLimits.videoMaxMb * 1024 * 1024;
+
+    const mapped: UploadedAsset[] = [];
+    for (const file of files) {
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      if (!isImage && !isVideo) continue;
+
+      if (isImage && file.size > imageMaxBytes) {
+        setBuilderMessage(
+          isHebrew
+            ? `קובץ תמונה "${file.name}" גדול מדי לתנאי הפלטפורמות שנבחרו.`
+            : `Image "${file.name}" is too large for selected platform requirements.`
+        );
+        continue;
+      }
+      if (isVideo && file.size > videoMaxBytes) {
+        setBuilderMessage(
+          isHebrew
+            ? `קובץ וידאו "${file.name}" גדול מדי לתנאי הפלטפורמות שנבחרו.`
+            : `Video "${file.name}" is too large for selected platform requirements.`
+        );
+        continue;
+      }
+
+      let optimizedFile = file;
+      let width: number | undefined;
+      let height: number | undefined;
+      if (isImage) {
+        try {
+          const optimized = await resizeImageForPlatforms(file);
+          optimizedFile = optimized.file;
+          width = optimized.width;
+          height = optimized.height;
+        } catch {
+          optimizedFile = file;
+        }
+      }
+
+      mapped.push({
+        id: `${optimizedFile.name}-${optimizedFile.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: optimizedFile.name,
+        size: optimizedFile.size,
+        type: optimizedFile.type,
+        file: optimizedFile,
+        previewUrl: URL.createObjectURL(optimizedFile),
+        mediaType: isVideo ? 'video' : 'image',
+        width,
+        height,
+      });
+    }
+
+    if (mapped.length > 0) {
+      setUploadedAssets((prev) => [...prev, ...mapped].slice(0, 12));
+      setBuilderMessage(null);
+    }
     event.target.value = '';
   };
 
@@ -670,16 +849,18 @@ export function Campaigns() {
     });
   };
 
-  const toggleScheduleCell = (platform: string, day: DayKey, slot: SlotKey) => {
+  const toggleScheduleHour = (platform: string, day: DayKey, hour: number) => {
     setWeeklySchedule((prev) => {
       const next: WeeklySchedule = { ...prev };
       if (!next[platform]) next[platform] = createEmptyDaySchedule();
+      const normalizedHour = normalizeHour(hour);
+      const currentHours = Array.isArray(next[platform][day]) ? next[platform][day] : [];
+      const hasHour = currentHours.includes(normalizedHour);
       next[platform] = {
         ...next[platform],
-        [day]: {
-          ...next[platform][day],
-          [slot]: !next[platform][day][slot],
-        },
+        [day]: hasHour
+          ? currentHours.filter((value) => value !== normalizedHour)
+          : sanitizeHours([...currentHours, normalizedHour]),
       };
       return next;
     });
@@ -688,30 +869,175 @@ export function Campaigns() {
   const getActiveSlotsCount = (platform: string): number => {
     const schedule = weeklySchedule[platform];
     if (!schedule) return 0;
-    return (Object.keys(schedule) as DayKey[]).reduce((sum, day) => {
-      const dayCount = (Object.keys(schedule[day]) as SlotKey[]).filter((slot) => schedule[day][slot]).length;
-      return sum + dayCount;
-    }, 0);
+    return DAY_KEYS.reduce((sum, day) => sum + (schedule[day]?.length || 0), 0);
   };
 
   const addTimeRule = () => {
     if (!rulePlatform) return;
+    const startHour = normalizeHour(ruleStartHour);
+    const endHour = normalizeHour(ruleEndHour);
+    if (endHour <= startHour) {
+      setBuilderMessage(
+        isHebrew
+          ? 'שעת סיום חייבת להיות גדולה משעת התחלה.'
+          : 'End hour must be greater than start hour.'
+      );
+      return;
+    }
     const next: TimeRule = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       platform: rulePlatform,
-      slot: ruleSlot,
+      startHour,
+      endHour,
       action: ruleAction,
       minRoas: ruleMinRoas,
+      reason: ruleReason.trim() || undefined,
     };
     setTimeRules((prev) => [next, ...prev]);
+    setRuleReason('');
   };
 
   const removeTimeRule = (id: string) => {
     setTimeRules((prev) => prev.filter((rule) => rule.id !== id));
   };
 
-  const handleCreateScheduledCampaign = () => {
+  const handleAutoAudienceAndStrategy = async () => {
     setBuilderMessage(null);
+    setAiAudienceLoading(true);
+    try {
+      const aiKeys = getAIKeysFromConnections(connections);
+      if (!hasAnyAIKey(aiKeys)) {
+        setBuilderMessage(text.aiMissing);
+        return;
+      }
+      const responseLanguage =
+        language === 'he'
+          ? 'Hebrew'
+          : language === 'ru'
+          ? 'Russian'
+          : language === 'pt'
+          ? 'Portuguese'
+          : language === 'fr'
+          ? 'French'
+          : 'English';
+
+      const contextPayload = {
+        shortTitle: shortTitleInput.trim(),
+        currentForm: {
+          campaignNameInput,
+          objective,
+          contentType,
+          productType,
+          serviceTypeInput,
+          campaignBrief,
+        },
+        connectedPlatforms: connectedAdPlatforms,
+        selectedPlatforms,
+        campaignData: realCampaigns.slice(0, 120),
+      };
+
+      const [strategyResult, audienceResult] = await Promise.all([
+        getCampaignBuilderSuggestions(JSON.stringify(contextPayload), aiKeys, responseLanguage),
+        getAudienceRecommendations(JSON.stringify(contextPayload), aiKeys),
+      ]);
+
+      setAiAudienceProvider('AI');
+
+      if (strategyResult?.campaignName) setCampaignNameInput(strategyResult.campaignName);
+      if (
+        strategyResult?.objective &&
+        ['sales', 'traffic', 'leads', 'awareness', 'retargeting'].includes(strategyResult.objective)
+      ) {
+        setObjective(strategyResult.objective);
+      }
+      if (
+        strategyResult?.contentType &&
+        ['product', 'offer', 'educational', 'testimonial', 'video'].includes(strategyResult.contentType)
+      ) {
+        setContentType(strategyResult.contentType);
+      }
+      if (
+        strategyResult?.productType &&
+        ['fashion', 'beauty', 'tech', 'home', 'fitness', 'services', 'other'].includes(strategyResult.productType)
+      ) {
+        setProductType(strategyResult.productType);
+      }
+      if (strategyResult?.serviceType) setServiceTypeInput(strategyResult.serviceType);
+
+      const strategyAudiences = Array.isArray(strategyResult?.audiences)
+        ? strategyResult.audiences.map((value) => String(value).trim()).filter(Boolean)
+        : [];
+      const aiAudienceNames =
+        Array.isArray(audienceResult?.recommendations) && audienceResult.recommendations.length > 0
+          ? audienceResult.recommendations
+              .map((item) => String(item?.suggestedName || item?.title || '').trim())
+              .filter(Boolean)
+          : [];
+      const mergedAudienceNames = [...new Set([...strategyAudiences, ...aiAudienceNames])];
+      if (mergedAudienceNames.length > 0) {
+        setAiGeneratedAudienceNames(mergedAudienceNames);
+        setSelectedAudiences((prev) => [...new Set([...prev, ...mergedAudienceNames])]);
+      }
+
+      const recommendedHoursByPlatform = strategyResult?.recommendedHoursByPlatform || {};
+      const sanitizedHourMap: Record<string, number[]> = {};
+      (Object.keys(recommendedHoursByPlatform) as Array<'Google' | 'Meta' | 'TikTok'>).forEach((platform) => {
+        const raw = Array.isArray(recommendedHoursByPlatform[platform])
+          ? recommendedHoursByPlatform[platform]
+          : [];
+        sanitizedHourMap[platform] = sanitizeHours(raw.map((hour) => Number(hour)));
+      });
+      setAiRecommendedHoursByPlatform(sanitizedHourMap);
+      if (Object.keys(sanitizedHourMap).length > 0) {
+        setWeeklySchedule((prev) => {
+          const next: WeeklySchedule = { ...prev };
+          Object.entries(sanitizedHourMap).forEach(([platform, hours]) => {
+            if (!next[platform]) next[platform] = createEmptyDaySchedule();
+            DAY_KEYS.forEach((day) => {
+              next[platform][day] = hours;
+            });
+          });
+          return next;
+        });
+      }
+
+      if (Array.isArray(strategyResult?.targetingRules) && strategyResult.targetingRules.length > 0) {
+        const aiRules: TimeRule[] = strategyResult.targetingRules
+          .map((rule, index) => {
+            const platform = String(rule.platform || '').trim();
+            if (!['Google', 'Meta', 'TikTok'].includes(platform)) return null;
+            const startHour = normalizeHour(Number(rule.startHour));
+            const endHour = normalizeHour(Number(rule.endHour));
+            if (endHour <= startHour) return null;
+            const action: RuleAction =
+              rule.action === 'boost' || rule.action === 'limit' || rule.action === 'pause'
+                ? rule.action
+                : 'boost';
+            return {
+              id: `ai-rule-${Date.now()}-${index}`,
+              platform: platform as PlatformName,
+              startHour,
+              endHour,
+              action,
+              minRoas: toAmount(rule.minRoas) || 2,
+              reason: rule.reason ? String(rule.reason) : undefined,
+            };
+          })
+          .filter(Boolean) as TimeRule[];
+        if (aiRules.length > 0) {
+          setTimeRules((prev) => [...aiRules, ...prev]);
+        }
+      }
+    } catch (error) {
+      setBuilderMessage(error instanceof Error ? error.message : 'AI generation failed.');
+    } finally {
+      setAiAudienceLoading(false);
+    }
+  };
+
+  const handleCreateScheduledCampaign = async () => {
+    setBuilderMessage(null);
+    setPublishResults([]);
     if (!campaignNameInput.trim() || selectedPlatforms.length === 0) {
       setBuilderMessage(text.requireFields);
       return;
@@ -721,33 +1047,86 @@ export function Campaigns() {
       return;
     }
 
-    const created = selectedPlatforms.map((platform) => {
-      const activeSlots = getActiveSlotsCount(platform);
-      return {
-        id: `local-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: campaignNameInput.trim(),
-        platform,
-        status: activeSlots > 0 ? 'Scheduled' : 'Draft',
-        spend: 0,
-        roas: 0,
-        cpa: 0,
-        objective,
-        brief: campaignBrief.trim(),
-        audiences: selectedAudiences,
-        mediaCount: uploadedAssets.length,
-      };
-    });
+    setIsCreatingCampaign(true);
+    try {
+      const response = await fetch('/api/campaigns/scheduled', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          campaignName: campaignNameInput.trim(),
+          shortTitle: shortTitleInput.trim(),
+          objective,
+          contentType,
+          productType,
+          serviceType: serviceTypeInput.trim(),
+          brief: campaignBrief.trim(),
+          platforms: selectedPlatforms,
+          audiences: selectedAudiences,
+          timeRules,
+          weeklySchedule,
+          mediaMeta: uploadedAssets.map((asset) => ({
+            name: asset.name,
+            type: asset.type,
+            size: asset.size,
+            width: asset.width,
+            height: asset.height,
+          })),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      const results = Array.isArray(payload?.results) ? payload.results : [];
+      setPublishResults(results);
 
-    setCreatedCampaigns((prev) => [...created, ...prev]);
-    setBuilderMessage(text.publishedOk);
-    setCampaignNameInput('');
-    setCampaignBrief('');
-    setSelectedAudiences([]);
-    setTimeRules([]);
-    setUploadedAssets((prev) => {
-      prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
-      return [];
-    });
+      const created = selectedPlatforms.map((platform) => {
+        const activeHours = getActiveSlotsCount(platform);
+        const platformResult = results.find((item: any) => String(item?.platform || '') === platform);
+        return {
+          id: `live-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: campaignNameInput.trim(),
+          platform,
+          status:
+            platformResult?.ok === true
+              ? activeHours > 0
+                ? 'Scheduled'
+                : 'Draft'
+              : 'Error',
+          spend: 0,
+          roas: 0,
+          cpa: 0,
+          objective,
+          brief: campaignBrief.trim(),
+          audiences: selectedAudiences,
+          mediaCount: uploadedAssets.length,
+        };
+      });
+      setCreatedCampaigns((prev) => [...created, ...prev]);
+
+      const successCount = results.filter((item: any) => item?.ok).length;
+      setBuilderMessage(
+        successCount === selectedPlatforms.length
+          ? text.publishedOk
+          : successCount > 0
+            ? text.publishedPartial
+            : payload?.message || text.publishedPartial
+      );
+
+      setCampaignNameInput('');
+      setShortTitleInput('');
+      setCampaignBrief('');
+      setSelectedAudiences([]);
+      setAiGeneratedAudienceNames([]);
+      setTimeRules([]);
+      setUploadedAssets((prev) => {
+        prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
+        return [];
+      });
+    } catch (error) {
+      setBuilderMessage(error instanceof Error ? error.message : 'Failed to create scheduled campaign.');
+    } finally {
+      setIsCreatingCampaign(false);
+    }
   };
 
   const hasConnectedAdPlatform = Boolean(
@@ -1110,7 +1489,36 @@ export function Campaigns() {
         </div>
 
         <div className="p-4 sm:p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+            <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4" />
+              {text.smartWindowTitle}
+            </h4>
+            <p className="text-xs text-indigo-700 mb-3">{text.smartWindowSubtitle}</p>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-start">
+              <input
+                value={shortTitleInput}
+                onChange={(e) => setShortTitleInput(e.target.value)}
+                className="w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder={isHebrew ? 'למשל: קמפיין אביב למוצר חדש' : 'e.g. Spring launch for new product'}
+              />
+              <button
+                type="button"
+                onClick={handleAutoAudienceAndStrategy}
+                disabled={aiAudienceLoading || !shortTitleInput.trim()}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {text.analyzeWithAi}
+              </button>
+            </div>
+            {aiAudienceProvider && (
+              <p className="mt-2 text-[11px] text-indigo-700">
+                {text.aiAudienceFromConnections} · {aiAudienceProvider}
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-600 mb-1">{text.campaignName}</label>
               <input
@@ -1161,6 +1569,15 @@ export function Campaigns() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.serviceType}</label>
+              <input
+                value={serviceTypeInput}
+                onChange={(e) => setServiceTypeInput(e.target.value)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder={isHebrew ? 'לדוגמה: שירות פרימיום לעסקים' : 'e.g. Premium service for SMBs'}
+              />
             </div>
           </div>
 
@@ -1263,18 +1680,31 @@ export function Campaigns() {
               {text.uploadTitle}
             </h4>
             <p className="text-xs text-gray-500 mb-3">{text.uploadHint}</p>
+            <p className="text-[11px] text-gray-500 mb-2">
+              {isHebrew
+                ? `תנאי התאמה נוכחיים: תמונה עד ${effectiveMediaLimits.imageMaxMb}MB, וידאו עד ${effectiveMediaLimits.videoMaxMb}MB, מקסימום ${effectiveMediaLimits.maxImageWidth}×${effectiveMediaLimits.maxImageHeight}.`
+                : `Current compatibility limits: image up to ${effectiveMediaLimits.imageMaxMb}MB, video up to ${effectiveMediaLimits.videoMaxMb}MB, max ${effectiveMediaLimits.maxImageWidth}×${effectiveMediaLimits.maxImageHeight}.`}
+            </p>
             <label className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-sm font-bold text-gray-700 hover:bg-gray-50 cursor-pointer">
               <ImagePlus className="w-4 h-4" />
               {text.uploadButton}
-              <input type="file" accept="image/*" multiple className="hidden" onChange={handleAssetUpload} />
+              <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleAssetUpload} />
             </label>
+            <p className="mt-2 text-[11px] text-gray-500">{text.noDataPersistenceNote}</p>
             {uploadedAssets.length > 0 && (
               <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
                 {uploadedAssets.map((asset) => (
                   <div key={asset.id} className="relative border border-gray-200 rounded-lg overflow-hidden bg-white">
-                    <img src={asset.previewUrl} alt={asset.name} className="h-20 w-full object-cover" />
+                    {asset.mediaType === 'video' ? (
+                      <video src={asset.previewUrl} className="h-20 w-full object-cover" controls muted />
+                    ) : (
+                      <img src={asset.previewUrl} alt={asset.name} className="h-20 w-full object-cover" />
+                    )}
                     <div className="p-1.5">
-                      <p className="text-[10px] text-gray-600 truncate">{asset.name}</p>
+                      <p className="text-[10px] text-gray-600 truncate flex items-center gap-1">
+                        {asset.mediaType === 'video' ? <Video className="w-3 h-3" /> : <ImagePlus className="w-3 h-3" />}
+                        {asset.name}
+                      </p>
                     </div>
                     <button
                       type="button"
@@ -1300,19 +1730,22 @@ export function Campaigns() {
                 {connectedAdPlatforms.map((platform) => (
                   <div key={platform} className="text-xs bg-white border border-amber-100 rounded-md px-2 py-1.5">
                     <span className="font-bold text-amber-900">{platform}: </span>
-                    {(BEST_TIME_WINDOWS[platform] || []).map((w, idx) => (
-                      <span key={`${platform}-${w.slot}`} className="text-amber-800">
-                        {idx > 0 ? ' | ' : ''}
-                        {slotLabels[w.slot]} ({SLOT_RANGES[w.slot]}) · ROAS {w.roas.toFixed(1)} · CPA {formatCurrency(w.cpa)}
+                    {(aiRecommendedHoursByPlatform[platform] || []).length > 0 ? (
+                      <span className="text-amber-800">
+                        {(aiRecommendedHoursByPlatform[platform] || []).map((hour) => formatHour(hour)).join(' · ')}
                       </span>
-                    ))}
+                    ) : (
+                      <span className="text-amber-700">
+                        {isHebrew ? 'אין מספיק נתוני שעות להמלצה כרגע.' : 'Not enough hourly data for recommendation yet.'}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
                 <select
                   value={rulePlatform}
-                  onChange={(e) => setRulePlatform(e.target.value)}
+                  onChange={(e) => setRulePlatform(e.target.value as PlatformName)}
                   className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
                 >
                   {connectedAdPlatforms.map((platform) => (
@@ -1322,16 +1755,29 @@ export function Campaigns() {
                   ))}
                 </select>
                 <select
-                  value={ruleSlot}
-                  onChange={(e) => setRuleSlot(e.target.value as SlotKey)}
+                  value={ruleStartHour}
+                  onChange={(e) => setRuleStartHour(Number(e.target.value))}
                   className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
                 >
-                  {(Object.keys(slotLabels) as SlotKey[]).map((slot) => (
-                    <option key={slot} value={slot}>
-                      {slotLabels[slot]} ({SLOT_RANGES[slot]})
+                  {hourOptions.map((hour) => (
+                    <option key={`start-${hour}`} value={hour}>
+                      {isHebrew ? 'מתחיל' : 'Start'} {formatHour(hour)}
                     </option>
                   ))}
                 </select>
+                <select
+                  value={ruleEndHour}
+                  onChange={(e) => setRuleEndHour(Number(e.target.value))}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                >
+                  {hourOptions.map((hour) => (
+                    <option key={`end-${hour}`} value={hour}>
+                      {isHebrew ? 'מסתיים' : 'End'} {formatHour(hour)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <select
                   value={ruleAction}
                   onChange={(e) => setRuleAction(e.target.value as RuleAction)}
@@ -1351,21 +1797,29 @@ export function Campaigns() {
                     className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
                     placeholder="ROAS"
                   />
-                  <button
-                    type="button"
-                    onClick={addTimeRule}
-                    className="px-3 py-2 rounded-md bg-amber-600 text-white text-xs font-bold hover:bg-amber-700"
-                  >
-                    {text.addRule}
-                  </button>
                 </div>
+                <input
+                  value={ruleReason}
+                  onChange={(e) => setRuleReason(e.target.value)}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                  placeholder={isHebrew ? 'סיבה/הערה לחוק' : 'Rule reason / note'}
+                />
+              </div>
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={addTimeRule}
+                  className="px-3 py-2 rounded-md bg-amber-600 text-white text-xs font-bold hover:bg-amber-700"
+                >
+                  {text.addRule}
+                </button>
               </div>
               {timeRules.length > 0 && (
                 <div className="mt-3 space-y-1.5">
                   {timeRules.map((rule) => (
                     <div key={rule.id} className="flex items-center justify-between rounded-md bg-white border border-amber-100 px-2 py-1.5 text-xs">
                       <span>
-                        <strong>{rule.platform}</strong> · {slotLabels[rule.slot]} ·{' '}
+                        <strong>{rule.platform}</strong> · {formatHourRange(rule.startHour, rule.endHour)} ·{' '}
                         {rule.action === 'boost'
                           ? isHebrew
                             ? 'הגדל'
@@ -1378,6 +1832,7 @@ export function Campaigns() {
                           ? 'השהה'
                           : 'Pause'}{' '}
                         · ROAS ≥ {rule.minRoas.toFixed(1)}
+                        {rule.reason ? ` · ${rule.reason}` : ''}
                       </span>
                       <button
                         type="button"
@@ -1416,45 +1871,43 @@ export function Campaigns() {
                       </button>
                     ))}
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-[520px] w-full text-xs border border-emerald-100 rounded-lg overflow-hidden">
-                      <thead className="bg-emerald-100/60">
-                        <tr>
-                          <th className="px-2 py-1 text-start">{isHebrew ? 'יום' : 'Day'}</th>
-                          {(Object.keys(slotLabels) as SlotKey[]).map((slot) => (
-                            <th key={`slot-head-${slot}`} className="px-2 py-1 text-center">
-                              {slotLabels[slot]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white">
-                        {(Object.keys(dayLabels) as DayKey[]).map((day) => (
-                          <tr key={`day-${day}`} className="border-t border-emerald-50">
-                            <td className="px-2 py-1.5 font-semibold text-gray-700">{dayLabels[day]}</td>
-                            {(Object.keys(slotLabels) as SlotKey[]).map((slot) => {
-                              const active = weeklySchedule[selectedSchedulePlatform]?.[day]?.[slot] || false;
-                              return (
-                                <td key={`${day}-${slot}`} className="px-2 py-1.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleScheduleCell(selectedSchedulePlatform, day, slot)}
-                                    className={cn(
-                                      'inline-flex h-6 w-6 items-center justify-center rounded-md border',
-                                      active
-                                        ? 'bg-emerald-600 border-emerald-600 text-white'
-                                        : 'bg-white border-gray-300 text-gray-400 hover:border-emerald-300'
-                                    )}
-                                  >
-                                    {active && <Check className="w-3.5 h-3.5" />}
-                                  </button>
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {DAY_KEYS.map((day) => (
+                      <button
+                        key={`day-tab-${day}`}
+                        type="button"
+                        onClick={() => setSelectedScheduleDay(day)}
+                        className={cn(
+                          'px-2 py-1 rounded-md text-[11px] font-bold border',
+                          selectedScheduleDay === day
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-emerald-800 border-emerald-200'
+                        )}
+                      >
+                        {dayLabels[day]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-12 gap-1.5">
+                    {hourOptions.map((hour) => {
+                      const active =
+                        weeklySchedule[selectedSchedulePlatform]?.[selectedScheduleDay]?.includes(hour) || false;
+                      return (
+                        <button
+                          key={`${selectedSchedulePlatform}-${selectedScheduleDay}-${hour}`}
+                          type="button"
+                          onClick={() => toggleScheduleHour(selectedSchedulePlatform, selectedScheduleDay, hour)}
+                          className={cn(
+                            'px-2 py-1 rounded-md border text-[10px] font-semibold',
+                            active
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                          )}
+                        >
+                          {formatHour(hour)}
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               ) : (
@@ -1472,13 +1925,33 @@ export function Campaigns() {
             <button
               type="button"
               onClick={handleCreateScheduledCampaign}
-              disabled={selectedPlatforms.length === 0}
+              disabled={selectedPlatforms.length === 0 || isCreatingCampaign}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
             >
-              <Target className="w-4 h-4" />
-              {text.createDraft}
+              {isCreatingCampaign ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+              {isCreatingCampaign ? text.creatingLiveCampaigns : text.createDraft}
             </button>
           </div>
+
+          {publishResults.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs space-y-1.5">
+              {publishResults.map((result, index) => (
+                <div key={`publish-${result.platform}-${index}`} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className={cn('font-bold', result.ok ? 'text-emerald-700' : 'text-rose-700')}>
+                      {result.platform}
+                    </span>{' '}
+                    <span className="text-gray-600">{result.message}</span>
+                  </div>
+                  {result.campaignId && (
+                    <span className="text-[11px] text-gray-500" dir="ltr">
+                      #{result.campaignId}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {builderMessage && (
             <div className={cn(
