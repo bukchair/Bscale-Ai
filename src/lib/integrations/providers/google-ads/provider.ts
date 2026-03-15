@@ -4,7 +4,7 @@ import { BaseGoogleProvider } from '@/src/lib/integrations/providers/google-shar
 import type { DiscoveredAccount, ProviderCapability, TestResult } from '@/src/lib/integrations/core/types';
 import { ExternalApiError, NoAccountsFoundError, ProviderConfigError } from '@/src/lib/integrations/core/errors';
 
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v18';
+const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
 
 type SearchStreamChunk = {
   results?: Array<Record<string, unknown>>;
