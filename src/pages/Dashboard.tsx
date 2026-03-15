@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { DollarSign, Users, MousePointerClick, TrendingUp, Activity, Search, ShoppingCart, Target, Eye, ArrowRight, Zap, Megaphone, LineChart, Store, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -8,6 +8,8 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
 import { auth } from '../lib/firebase';
 import { fetchGA4LiveData, fetchGSCData, GA4LiveData } from '../services/googleService';
+import { fetchMetaAdAccounts, fetchMetaCampaigns } from '../services/metaService';
+import { fetchWooCommerceProducts } from '../services/woocommerceService';
 import { useAppNavigation } from '../contexts/AppNavigationContext';
 
 export function Dashboard() {
@@ -20,14 +22,14 @@ export function Dashboard() {
   const [ga4LiveData, setGa4LiveData] = useState<GA4LiveData | null>(null);
   const [ga4Error, setGa4Error] = useState<string | null>(null);
   const [gscTotals, setGscTotals] = useState<{ clicks: number; impressions: number; position: number; ctr: number } | null>(null);
+  const [overviewSyncStage, setOverviewSyncStage] = useState<'idle' | 'google-meta' | 'woocommerce'>('idle');
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
   const isShopifyConnected = connections.find(c => c.id === 'shopify')?.status === 'connected';
   const isStoreConnected = isWooConnected || isShopifyConnected;
 
-  // Generate dynamic data based on connected platforms' settings
-  const dashboardData = useMemo(() => {
+  const buildDashboardData = useCallback(() => {
     // Collect all settings keys to create a unique seed
     const baseSeed = connectedPlatforms.map(c =>
       Object.values(c.settings || {}).join('')
@@ -50,10 +52,14 @@ export function Dashboard() {
     return data;
   }, [connectedPlatforms, isStoreConnected, resolvedRange.endDate, resolvedRange.startDate]);
 
+  const [dashboardData, setDashboardData] = useState(() => buildDashboardData());
+
   const { chartData, totalRevenue, totalSpend, roas, netProfit } = dashboardData;
 
   useEffect(() => {
     const googleConnection = connections.find(c => c.id === 'google');
+    const metaConnection = connections.find(c => c.id === 'meta');
+    const wooConnection = connections.find(c => c.id === 'woocommerce');
     const accessToken = googleConnection?.settings?.googleAccessToken;
     const propertyId = googleConnection?.settings?.ga4PropertyId || googleConnection?.settings?.ga4Id;
     const siteUrl = googleConnection?.settings?.gscSiteUrl;
@@ -62,12 +68,17 @@ export function Dashboard() {
       setGa4LiveData(null);
       setGa4Error(null);
       setGscTotals(null);
+      setDashboardData(buildDashboardData());
+      setOverviewSyncStage('idle');
       return;
     }
 
     let isCancelled = false;
 
-    const loadGoogleData = async () => {
+    const loadOverviewData = async () => {
+      if (isCancelled) return;
+      setOverviewSyncStage('google-meta');
+
       try {
         const ga4Data = await fetchGA4LiveData(accessToken, propertyId || undefined, resolvedRange);
         if (!isCancelled) {
@@ -102,16 +113,69 @@ export function Dashboard() {
           setGscTotals(null);
         }
       }
+
+      // Stage 1 continues: ensure Meta connection is synced before WooCommerce.
+      try {
+        const metaToken = metaConnection?.settings?.metaToken;
+        if (metaConnection?.status === 'connected' && metaToken) {
+          let metaAdsId =
+            metaConnection.settings?.metaAdsId ||
+            metaConnection.settings?.adAccountId ||
+            metaConnection.settings?.metaAdAccountId ||
+            '';
+
+          if (!metaAdsId) {
+            try {
+              const accounts = await fetchMetaAdAccounts(metaToken);
+              metaAdsId = String(accounts?.[0]?.account_id || accounts?.[0]?.id || '').trim();
+            } catch (metaAccountErr) {
+              console.warn('Failed to discover Meta ad accounts during overview sync:', metaAccountErr);
+            }
+          }
+
+          if (metaAdsId) {
+            await fetchMetaCampaigns(metaToken, metaAdsId);
+          }
+        }
+      } catch (metaErr) {
+        console.warn('Failed to sync Meta campaigns during overview sync:', metaErr);
+      }
+
+      if (isCancelled) return;
+      setOverviewSyncStage('woocommerce');
+
+      // Stage 2: WooCommerce sync runs only after Google + Meta stage.
+      try {
+        if (
+          wooConnection?.status === 'connected' &&
+          wooConnection.settings?.storeUrl &&
+          wooConnection.settings?.wooKey &&
+          wooConnection.settings?.wooSecret
+        ) {
+          await fetchWooCommerceProducts(
+            wooConnection.settings.storeUrl,
+            wooConnection.settings.wooKey,
+            wooConnection.settings.wooSecret
+          );
+        }
+      } catch (wooErr) {
+        console.warn('Failed to sync WooCommerce during overview sync:', wooErr);
+      }
+
+      if (!isCancelled) {
+        setDashboardData(buildDashboardData());
+        setOverviewSyncStage('idle');
+      }
     };
 
-    loadGoogleData();
-    const intervalId = window.setInterval(loadGoogleData, 60000);
+    loadOverviewData();
+    const intervalId = window.setInterval(loadOverviewData, 60000);
 
     return () => {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [connections, resolvedRange.endDate, resolvedRange.startDate]);
+  }, [connections, resolvedRange.endDate, resolvedRange.startDate, buildDashboardData]);
 
   const useGa4Fallback = !ga4LiveData && !ga4Error;
   const ga4ActiveUsers = ga4LiveData?.activeUsers ?? (useGa4Fallback ? 42 : 0);
@@ -165,6 +229,17 @@ export function Dashboard() {
         <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">
           {t('dashboard.welcomeSubtitle')}
         </p>
+        {overviewSyncStage !== 'idle' && (
+          <p className="text-xs mt-2 font-bold text-indigo-600">
+            {overviewSyncStage === 'google-meta'
+              ? (isHebrew
+                  ? 'מסנכרן קודם חיבורי Google + Meta...'
+                  : 'Syncing Google + Meta connections first...')
+              : (isHebrew
+                  ? 'מסנכרן עכשיו נתוני WooCommerce...'
+                  : 'Now syncing WooCommerce data...')}
+          </p>
+        )}
       </div>
 
       {/* Quick Smart Actions */}
