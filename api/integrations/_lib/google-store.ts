@@ -2,7 +2,6 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import axios from 'axios';
-import Database from 'better-sqlite3';
 
 export type GoogleServiceSlug = 'google-ads' | 'ga4' | 'search-console' | 'gmail';
 export type GoogleServiceKey = 'google_ads' | 'ga4' | 'search_console' | 'gmail';
@@ -35,6 +34,11 @@ type ExchangeTokenResponse = {
   token_type?: string;
 };
 
+type StoreSchema = {
+  oauthStates: OAuthStateRow[];
+  connections: GoogleConnectionRow[];
+};
+
 const SERVICE_SCOPE_BY_SLUG: Record<GoogleServiceSlug, string> = {
   'google-ads': 'https://www.googleapis.com/auth/adwords',
   ga4: 'https://www.googleapis.com/auth/analytics.readonly',
@@ -56,74 +60,45 @@ const SERVICE_SLUG_BY_KEY: Record<GoogleServiceKey, GoogleServiceSlug> = {
   gmail: 'gmail',
 };
 
-const getDbPath = () => {
+const getStorePath = () => {
   const configuredPath = process.env.GOOGLE_INTEGRATIONS_DB_PATH?.trim();
-  if (configuredPath) {
-    return path.isAbsolute(configuredPath)
-      ? configuredPath
-      : path.join(process.cwd(), configuredPath);
-  }
-  return path.join(process.cwd(), '.data', 'google-integrations.db');
-};
-
-let dbSingleton: Database.Database | null = null;
-
-const getDb = () => {
-  if (dbSingleton) return dbSingleton;
-  const dbPath = getDbPath();
-  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS google_oauth_states (
-      state TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      service_slug TEXT NOT NULL,
-      expires_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS integration_connections (
-      user_id TEXT NOT NULL,
-      provider TEXT NOT NULL,
-      service TEXT NOT NULL,
-      status TEXT NOT NULL,
-      access_token TEXT,
-      refresh_token TEXT,
-      token_expiry INTEGER,
-      scope TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, provider, service)
-    );
-  `);
-  dbSingleton = db;
-  return dbSingleton;
+  const fallback = '.data/google-integrations-store.json';
+  const relativePath = configuredPath || fallback;
+  return path.isAbsolute(relativePath) ? relativePath : path.join(process.cwd(), relativePath);
 };
 
 const nowMs = () => Date.now();
 
-const upsertConnectionStmt = () =>
-  getDb().prepare(`
-    INSERT INTO integration_connections (
-      user_id, provider, service, status, access_token, refresh_token, token_expiry, scope, created_at, updated_at
-    ) VALUES (
-      @user_id, 'google', @service, @status, @access_token, @refresh_token, @token_expiry, @scope, @created_at, @updated_at
-    )
-    ON CONFLICT(user_id, provider, service) DO UPDATE SET
-      status = excluded.status,
-      access_token = excluded.access_token,
-      refresh_token = CASE
-        WHEN excluded.refresh_token IS NOT NULL AND excluded.refresh_token <> '' THEN excluded.refresh_token
-        ELSE integration_connections.refresh_token
-      END,
-      token_expiry = excluded.token_expiry,
-      scope = excluded.scope,
-      updated_at = excluded.updated_at
-  `);
+const ensureStoreFile = () => {
+  const storePath = getStorePath();
+  fs.mkdirSync(path.dirname(storePath), { recursive: true });
+  if (!fs.existsSync(storePath)) {
+    const seed: StoreSchema = { oauthStates: [], connections: [] };
+    fs.writeFileSync(storePath, JSON.stringify(seed), 'utf8');
+  }
+};
+
+const readStore = (): StoreSchema => {
+  ensureStoreFile();
+  const raw = fs.readFileSync(getStorePath(), 'utf8');
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoreSchema>;
+    return {
+      oauthStates: Array.isArray(parsed.oauthStates) ? parsed.oauthStates : [],
+      connections: Array.isArray(parsed.connections) ? parsed.connections : [],
+    };
+  } catch {
+    return { oauthStates: [], connections: [] };
+  }
+};
+
+const writeStore = (next: StoreSchema) => {
+  ensureStoreFile();
+  fs.writeFileSync(getStorePath(), JSON.stringify(next), 'utf8');
+};
 
 const sanitizeUserId = (value: unknown) => {
-  const str = typeof value === 'string' ? value.trim() : '';
-  return str;
+  return typeof value === 'string' ? value.trim() : '';
 };
 
 const refreshAccessToken = async (refreshToken: string): Promise<ExchangeTokenResponse> => {
@@ -149,6 +124,38 @@ const refreshAccessToken = async (refreshToken: string): Promise<ExchangeTokenRe
   return response.data;
 };
 
+const upsertConnection = (input: Omit<GoogleConnectionRow, 'provider'> & { provider?: 'google' }) => {
+  const store = readStore();
+  const idx = store.connections.findIndex(
+    (row) => row.user_id === input.user_id && row.service === input.service
+  );
+  const row: GoogleConnectionRow = {
+    provider: 'google',
+    user_id: input.user_id,
+    service: input.service,
+    status: input.status,
+    access_token: input.access_token,
+    refresh_token: input.refresh_token,
+    token_expiry: input.token_expiry,
+    scope: input.scope,
+    updated_at: input.updated_at,
+  };
+
+  if (idx >= 0) {
+    const previous = store.connections[idx];
+    // Keep existing refresh token if new payload does not include one.
+    row.refresh_token =
+      row.refresh_token && row.refresh_token.trim()
+        ? row.refresh_token
+        : previous.refresh_token || null;
+    store.connections[idx] = row;
+  } else {
+    store.connections.push(row);
+  }
+
+  writeStore(store);
+};
+
 export const googleServiceCatalog = {
   allSlugs(): GoogleServiceSlug[] {
     return ['google-ads', 'ga4', 'search-console', 'gmail'];
@@ -165,19 +172,16 @@ export const googleServiceCatalog = {
 };
 
 export const resolveGoogleServiceSlug = (value: string): GoogleServiceSlug | null => {
-  if (value in SERVICE_SCOPE_BY_SLUG) {
-    return value as GoogleServiceSlug;
-  }
+  if (value in SERVICE_SCOPE_BY_SLUG) return value as GoogleServiceSlug;
   return null;
 };
 
 export const resolveUserIdFromRequest = (req: { query?: any; headers?: any; body?: any }): string => {
   const fromQuery = sanitizeUserId(req.query?.user_id);
   if (fromQuery) return fromQuery;
-  const fromHeaders = sanitizeUserId(req.headers?.['x-user-id']);
-  if (fromHeaders) return fromHeaders;
-  const fromBody = sanitizeUserId(req.body?.user_id);
-  return fromBody;
+  const fromHeader = sanitizeUserId(req.headers?.['x-user-id']);
+  if (fromHeader) return fromHeader;
+  return sanitizeUserId(req.body?.user_id);
 };
 
 export const buildGoogleOAuthUrl = (args: {
@@ -188,15 +192,15 @@ export const buildGoogleOAuthUrl = (args: {
 }) => {
   const state = crypto.randomBytes(24).toString('hex');
   const expiresAt = nowMs() + 10 * 60 * 1000;
-
-  getDb()
-    .prepare(
-      `
-      INSERT INTO google_oauth_states (state, user_id, service_slug, expires_at)
-      VALUES (?, ?, ?, ?)
-    `
-    )
-    .run(state, args.userId, args.serviceSlug, expiresAt);
+  const store = readStore();
+  store.oauthStates = store.oauthStates.filter((item) => item.expires_at > nowMs());
+  store.oauthStates.push({
+    state,
+    user_id: args.userId,
+    service_slug: args.serviceSlug,
+    expires_at: expiresAt,
+  });
+  writeStore(store);
 
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID || '',
@@ -216,23 +220,14 @@ export const buildGoogleOAuthUrl = (args: {
 };
 
 export const consumeOAuthState = (state: string, serviceSlug: GoogleServiceSlug): OAuthStateRow | null => {
-  const row = getDb()
-    .prepare(
-      `
-      SELECT state, user_id, service_slug, expires_at
-      FROM google_oauth_states
-      WHERE state = ?
-      LIMIT 1
-    `
-    )
-    .get(state) as OAuthStateRow | undefined;
-
-  if (!row) return null;
-  getDb().prepare(`DELETE FROM google_oauth_states WHERE state = ?`).run(state);
-
-  if (row.service_slug !== serviceSlug) return null;
-  if (row.expires_at < nowMs()) return null;
-  return row;
+  const store = readStore();
+  const found = store.oauthStates.find((item) => item.state === state) || null;
+  store.oauthStates = store.oauthStates.filter((item) => item.state !== state);
+  writeStore(store);
+  if (!found) return null;
+  if (found.service_slug !== serviceSlug) return null;
+  if (found.expires_at < nowMs()) return null;
+  return found;
 };
 
 export const exchangeCodeForServiceToken = async (args: {
@@ -270,63 +265,53 @@ export const saveServiceConnection = (args: {
   const service = googleServiceCatalog.slugToService(args.serviceSlug);
   const issuedAt = nowMs();
   const expiresIn = Math.max(30, Number(args.token.expires_in || 3600));
-  const tokenExpiry = issuedAt + expiresIn * 1000;
-
-  upsertConnectionStmt().run({
+  upsertConnection({
     user_id: args.userId,
     service,
     status: 'connected',
     access_token: args.token.access_token || null,
     refresh_token: args.token.refresh_token || null,
-    token_expiry: tokenExpiry,
+    token_expiry: issuedAt + expiresIn * 1000,
     scope: args.token.scope || googleServiceCatalog.scopeForSlug(args.serviceSlug),
-    created_at: issuedAt,
     updated_at: issuedAt,
   });
 };
 
 export const disconnectServiceConnection = (args: { userId: string; serviceSlug: GoogleServiceSlug }) => {
-  const service = googleServiceCatalog.slugToService(args.serviceSlug);
   const at = nowMs();
-  upsertConnectionStmt().run({
+  upsertConnection({
     user_id: args.userId,
-    service,
+    service: googleServiceCatalog.slugToService(args.serviceSlug),
     status: 'disconnected',
     access_token: null,
     refresh_token: null,
     token_expiry: null,
     scope: null,
-    created_at: at,
     updated_at: at,
   });
 };
 
 export const listGoogleServiceConnections = (userId: string): GoogleConnectionRow[] => {
-  const rows = getDb()
-    .prepare(
-      `
-      SELECT user_id, provider, service, status, access_token, refresh_token, token_expiry, scope, updated_at
-      FROM integration_connections
-      WHERE user_id = ? AND provider = 'google'
-    `
-    )
-    .all(userId) as GoogleConnectionRow[];
+  const store = readStore();
+  const rows = store.connections.filter(
+    (item) => item.user_id === userId && item.provider === 'google'
+  );
+  const byService = new Map(rows.map((item) => [item.service, item]));
 
-  const existingByService = new Map(rows.map((row) => [row.service, row]));
   return (['google_ads', 'ga4', 'search_console', 'gmail'] as GoogleServiceKey[]).map((service) => {
-    const existing = existingByService.get(service);
-    if (existing) return existing;
-    return {
-      user_id: userId,
-      provider: 'google',
-      service,
-      status: 'disconnected',
-      access_token: null,
-      refresh_token: null,
-      token_expiry: null,
-      scope: null,
-      updated_at: 0,
-    };
+    return (
+      byService.get(service) || {
+        user_id: userId,
+        provider: 'google',
+        service,
+        status: 'disconnected',
+        access_token: null,
+        refresh_token: null,
+        token_expiry: null,
+        scope: null,
+        updated_at: 0,
+      }
+    );
   });
 };
 
@@ -334,18 +319,12 @@ export const getServiceConnection = (args: {
   userId: string;
   service: GoogleServiceKey;
 }): GoogleConnectionRow | null => {
-  const row = getDb()
-    .prepare(
-      `
-      SELECT user_id, provider, service, status, access_token, refresh_token, token_expiry, scope, updated_at
-      FROM integration_connections
-      WHERE user_id = ? AND provider = 'google' AND service = ?
-      LIMIT 1
-    `
-    )
-    .get(args.userId, args.service) as GoogleConnectionRow | undefined;
-
-  return row || null;
+  const store = readStore();
+  return (
+    store.connections.find(
+      (row) => row.user_id === args.userId && row.provider === 'google' && row.service === args.service
+    ) || null
+  );
 };
 
 export const getValidServiceAccessToken = async (args: {
@@ -357,29 +336,25 @@ export const getValidServiceAccessToken = async (args: {
     throw new Error(`Google service ${args.service} is not connected.`);
   }
 
-  const accessToken = row.access_token || '';
-  const refreshTokenValue = row.refresh_token || '';
-  const expiry = Number(row.token_expiry || 0);
-  const isAccessStillValid = Boolean(accessToken && expiry > nowMs() + 60_000);
-  if (isAccessStillValid) return accessToken;
+  if (row.access_token && Number(row.token_expiry || 0) > nowMs() + 60_000) {
+    return row.access_token;
+  }
 
-  if (!refreshTokenValue) {
+  if (!row.refresh_token) {
     throw new Error(`Google service ${args.service} token expired and no refresh token is available.`);
   }
 
-  const refreshed = await refreshAccessToken(refreshTokenValue);
+  const refreshed = await refreshAccessToken(row.refresh_token);
   const issuedAt = nowMs();
-  const refreshedExpiry = issuedAt + Math.max(30, Number(refreshed.expires_in || 3600)) * 1000;
-
-  upsertConnectionStmt().run({
+  const nextExpiry = issuedAt + Math.max(30, Number(refreshed.expires_in || 3600)) * 1000;
+  upsertConnection({
     user_id: args.userId,
     service: args.service,
     status: 'connected',
     access_token: refreshed.access_token || null,
     refresh_token: refreshed.refresh_token || null,
-    token_expiry: refreshedExpiry,
+    token_expiry: nextExpiry,
     scope: refreshed.scope || row.scope || null,
-    created_at: issuedAt,
     updated_at: issuedAt,
   });
 
@@ -400,7 +375,10 @@ export const toPublicGoogleServicePayload = (row: GoogleConnectionRow) => ({
 });
 
 // Prevent Vercel API route build errors if this helper file is scanned as a function.
-export default function _libGoogleStoreHandler(_req: unknown, res: { statusCode?: number; end: (body?: string) => void }) {
+export default function _libGoogleStoreHandler(
+  _req: unknown,
+  res: { statusCode?: number; end: (body?: string) => void }
+) {
   res.statusCode = 404;
   res.end('Not Found');
 }
