@@ -18,9 +18,11 @@ const API_BASE = (() => {
 
 const META_CACHE_PREFIX = 'bscale:meta-campaigns:';
 const META_RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
+const META_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
 let metaRateLimitedUntil = 0;
 let lastSuccessfulMetaCampaigns: any[] = [];
 const metaInFlight = new Map<string, Promise<any[]>>();
+let metaNextAllowedRequestAt = 0;
 
 export const isMetaRateLimitMessage = (message: string) => {
   const normalized = String(message || '').toLowerCase();
@@ -40,8 +42,13 @@ const loadCachedMetaCampaigns = (cacheKey: string) => {
   try {
     const raw = window.localStorage.getItem(cacheKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { items?: any[] };
-    return Array.isArray(parsed.items) ? parsed.items : null;
+    const parsed = JSON.parse(raw) as { savedAt?: number; items?: any[] };
+    const savedAt = Number(parsed.savedAt || 0);
+    if (!Array.isArray(parsed.items)) return null;
+    return {
+      savedAt: Number.isFinite(savedAt) ? savedAt : 0,
+      items: parsed.items,
+    };
   } catch {
     return null;
   }
@@ -49,21 +56,28 @@ const loadCachedMetaCampaigns = (cacheKey: string) => {
 
 const loadAnyCachedMetaCampaigns = () => {
   if (typeof window === 'undefined') return null;
+  let latest: { savedAt: number; items: any[] } | null = null;
   try {
     for (let i = 0; i < window.localStorage.length; i += 1) {
       const key = window.localStorage.key(i);
       if (!key || !key.startsWith(META_CACHE_PREFIX)) continue;
       const raw = window.localStorage.getItem(key);
       if (!raw) continue;
-      const parsed = JSON.parse(raw) as { items?: any[] };
+      const parsed = JSON.parse(raw) as { savedAt?: number; items?: any[] };
       if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-        return parsed.items;
+        const savedAt = Number(parsed.savedAt || 0);
+        if (!latest || savedAt > latest.savedAt) {
+          latest = {
+            savedAt: Number.isFinite(savedAt) ? savedAt : 0,
+            items: parsed.items,
+          };
+        }
       }
     }
   } catch {
     // ignore
   }
-  return null;
+  return latest;
 };
 
 const saveCachedMetaCampaigns = (cacheKey: string, items: any[]) => {
@@ -156,13 +170,25 @@ export async function fetchMetaCampaigns(
   if (inFlight) return inFlight;
 
   const run = async () => {
+    const cached = loadCachedMetaCampaigns(cacheKey);
+    const now = Date.now();
+    if (cached?.items?.length && now - cached.savedAt < META_CLIENT_CACHE_TTL_MS) {
+      return cached.items;
+    }
+
     if (Date.now() < metaRateLimitedUntil) {
-      const cached = loadCachedMetaCampaigns(cacheKey);
-      if (cached && cached.length > 0) return cached;
+      if (cached?.items?.length) return cached.items;
       const anyCached = loadAnyCachedMetaCampaigns();
-      if (anyCached && anyCached.length > 0) return anyCached;
+      if (anyCached?.items?.length) return anyCached.items;
       if (lastSuccessfulMetaCampaigns.length > 0) return lastSuccessfulMetaCampaigns;
       throw new Error('Meta is temporarily rate-limited. Please wait 2-3 minutes and retry.');
+    }
+
+    if (now < metaNextAllowedRequestAt) {
+      if (cached?.items?.length) return cached.items;
+      const anyCached = loadAnyCachedMetaCampaigns();
+      if (anyCached?.items?.length) return anyCached.items;
+      if (lastSuccessfulMetaCampaigns.length > 0) return lastSuccessfulMetaCampaigns;
     }
 
     const loadCampaigns = async (candidateAccountId?: string) => {
@@ -202,13 +228,14 @@ export async function fetchMetaCampaigns(
       const message = String((payload as any)?.message || 'Failed to fetch Meta campaigns');
       if (isMetaRateLimitMessage(message) || response.status === 429) {
         metaRateLimitedUntil = Date.now() + META_RATE_LIMIT_COOLDOWN_MS;
-        const cached = loadCachedMetaCampaigns(cacheKey);
-        if (cached && cached.length > 0) {
-          return cached;
+        metaNextAllowedRequestAt = Date.now() + META_RATE_LIMIT_COOLDOWN_MS;
+        const cachedHit = loadCachedMetaCampaigns(cacheKey);
+        if (cachedHit?.items?.length) {
+          return cachedHit.items;
         }
         const anyCached = loadAnyCachedMetaCampaigns();
-        if (anyCached && anyCached.length > 0) {
-          return anyCached;
+        if (anyCached?.items?.length) {
+          return anyCached.items;
         }
         if (lastSuccessfulMetaCampaigns.length > 0) {
           return lastSuccessfulMetaCampaigns;
@@ -302,6 +329,7 @@ export async function fetchMetaCampaigns(
     saveCachedMetaCampaigns(cacheKey, mapped);
     if (mapped.length > 0) {
       lastSuccessfulMetaCampaigns = mapped;
+      metaNextAllowedRequestAt = Date.now() + 90_000;
     }
     return mapped;
   };

@@ -195,6 +195,7 @@ export function Campaigns() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [builderMessage, setBuilderMessage] = useState<string | null>(null);
+  const [metaSyncNotice, setMetaSyncNotice] = useState<string | null>(null);
 
   // Filtering and Sorting State
   const [searchQuery, setSearchQuery] = useState('');
@@ -469,9 +470,16 @@ export function Campaigns() {
           const mergedMeta = mergePlatformCampaignsPreferRich(existingMeta, campaigns, hasMetaMetrics);
           return [...prev.filter(c => c.platform !== 'Meta'), ...mergedMeta];
         });
+        setMetaSyncNotice(null);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (!isMetaRateLimitMessage(message)) {
+        if (isMetaRateLimitMessage(message)) {
+          setMetaSyncNotice(
+            isHebrew
+              ? 'מטא מגביל כרגע קריאות API. מוצגים נתונים אחרונים זמינים.'
+              : 'Meta is currently rate-limiting API calls. Showing the latest available data.'
+          );
+        } else {
           console.error("Failed to sync Meta data:", err);
         }
       }
@@ -773,24 +781,6 @@ export function Campaigns() {
 
   const platforms = ['All', ...new Set(allCampaigns.map(c => c.platform))];
   const statuses = ['All', ...new Set(allCampaigns.map(c => normalizeCampaignStatus(c.status)))];
-  const groupedCampaigns = useMemo(() => {
-    const grouped = filteredAndSortedCampaigns.reduce<Record<string, any[]>>((acc, campaign) => {
-      const key = campaign.platform || (isHebrew ? 'ללא פלטפורמה' : 'Unknown platform');
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(campaign);
-      return acc;
-    }, {});
-
-    const preferredOrder = ['Google', 'Meta', 'TikTok'];
-    return Object.entries(grouped).sort(([a], [b]) => {
-      const ai = preferredOrder.indexOf(a);
-      const bi = preferredOrder.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
-  }, [filteredAndSortedCampaigns, isHebrew]);
 
   return (
     <div className="space-y-6">
@@ -886,125 +876,91 @@ export function Campaigns() {
         </div>
 
         <div className="p-4 sm:p-6 space-y-4">
-          {groupedCampaigns.length === 0 ? (
+          {metaSyncNotice && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {metaSyncNotice}
+            </div>
+          )}
+          {filteredAndSortedCampaigns.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500">
               {!hasConnectedAdPlatform ? t('campaigns.connectPlatforms') : t('campaigns.noCampaigns')}
             </div>
           ) : (
-            groupedCampaigns.map(([platformName, campaigns]) => (
-              <div key={`platform-group-${platformName}`} className="rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                  <span className="font-bold text-sm text-gray-900">{platformName}</span>
-                  <span className="text-xs text-gray-500">{campaigns.length}</span>
-                </div>
-                <div className="overflow-x-auto">
-                  {(() => {
-                    const isMetaGroup = platformName.toLowerCase() === 'meta';
-                    const isGoogleGroup = platformName.toLowerCase() === 'google';
-                    return (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-white">
-                      <tr>
-                        <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.campaignName')}</th>
-                        <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.status')}</th>
-                        {isGoogleGroup && (
-                          <>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Type</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Sub type</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Bidding</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Impr.</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Clicks</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">CTR</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Avg CPC</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Avg CPM</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Cost / Conv</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Conv.</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Conv. Value</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Search IS</th>
-                          </>
-                        )}
-                        {isMetaGroup && (
-                          <>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Objective</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Impr.</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Clicks</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">CTR</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">CPC</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">CPM</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Reach</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Freq.</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Conv.</th>
-                            <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Conv. Value</th>
-                          </>
-                        )}
-                        <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.spend')}</th>
-                        <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.roas')}</th>
-                        <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.cpa')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {campaigns.map((campaign) => (
-                        <tr key={`campaign-row-${platformName}-${campaign.id}`}>
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-white">
+                    <tr>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.campaignName')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.platform')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.status')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{isHebrew ? 'סוג / יעד' : 'Type / Objective'}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Impr.</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Clicks</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">CTR</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.spend')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.roas')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{t('campaigns.cpa')}</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">Conv.</th>
+                      <th className="px-4 py-2 text-start text-[11px] font-bold text-gray-500 uppercase tracking-wide">{isHebrew ? 'מקור נתונים' : 'Data source'}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {filteredAndSortedCampaigns.map((campaign) => {
+                      const unifiedStatus = normalizeCampaignStatus(campaign.status);
+                      const platform = String(campaign.platform || '');
+                      const typeOrObjective =
+                        platform === 'Meta'
+                          ? campaign.objective || '—'
+                          : platform === 'Google'
+                            ? campaign.advertisingChannelSubType || campaign.advertisingChannelType || '—'
+                            : campaign.campaignType || campaign.objective || '—';
+                      const hasMetrics =
+                        platform === 'Meta'
+                          ? hasMetaMetrics(campaign)
+                          : platform === 'Google'
+                            ? hasGoogleMetrics(campaign)
+                            : (toAmount(campaign.impressions) + toAmount(campaign.clicks) + toAmount(campaign.spend)) > 0;
+
+                      return (
+                        <tr key={`campaign-row-${platform}-${campaign.id}`}>
                           <td className="px-4 py-2.5 text-sm font-medium text-gray-900">
                             <div className="max-w-[220px] truncate" title={String(campaign.name || '')}>
                               {campaign.name}
                             </div>
                           </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-700">{platform || '—'}</td>
                           <td className="px-4 py-2.5 text-sm">
-                            {(() => {
-                              const unifiedStatus = normalizeCampaignStatus(campaign.status);
-                              return (
                             <span className={cn(
                               "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
-                                  getStatusBadgeClass(unifiedStatus)
+                              getStatusBadgeClass(unifiedStatus)
                             )}>
-                                  {unifiedStatus}
+                              {unifiedStatus}
                             </span>
-                              );
-                            })()}
                           </td>
-                          {isGoogleGroup && (
-                            <>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{campaign.advertisingChannelType || '—'}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{campaign.advertisingChannelSubType || '—'}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{campaign.biddingStrategyType || '—'}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.impressions).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.clicks).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatPercent(campaign.ctr)}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.cpc))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.cpm))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.costPerConversion))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.conversions).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.conversionValue))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatPercent(toAmount(campaign.searchImpressionShare) * 100)}</td>
-                            </>
-                          )}
-                          {isMetaGroup && (
-                            <>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{campaign.objective || '—'}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.impressions).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.clicks).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatPercent(campaign.ctr)}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.cpc))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.cpm))}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.reach).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.frequency).toFixed(2)}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.conversions).toLocaleString()}</td>
-                              <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.conversionValue))}</td>
-                            </>
-                          )}
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{typeOrObjective}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.impressions).toLocaleString()}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.clicks).toLocaleString()}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatPercent(campaign.ctr)}</td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.spend))}</td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.roas).toFixed(2)}x</td>
                           <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{formatCurrency(toAmount(campaign.cpa))}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-600">{toAmount(campaign.conversions).toLocaleString()}</td>
+                          <td className="px-4 py-2.5 whitespace-nowrap text-sm">
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium",
+                              hasMetrics ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                            )}>
+                              {hasMetrics ? (isHebrew ? 'חי' : 'Live') : (isHebrew ? 'חסר מדדים' : 'Missing metrics')}
+                            </span>
+                          </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                    );
-                  })()}
-                </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            ))
+            </div>
           )}
         </div>
       </section>
