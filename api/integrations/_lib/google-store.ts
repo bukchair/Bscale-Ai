@@ -398,3 +398,9 @@ export const toPublicGoogleServicePayload = (row: GoogleConnectionRow) => ({
   scope: row.scope,
   updatedAt: row.updated_at,
 });
+
+// Prevent Vercel API route build errors if this helper file is scanned as a function.
+export default function _libGoogleStoreHandler(_req: unknown, res: { statusCode?: number; end: (body?: string) => void }) {
+  res.statusCode = 404;
+  res.end('Not Found');
+}
