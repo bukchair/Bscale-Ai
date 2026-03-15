@@ -491,6 +491,13 @@ async function startServer() {
     }
   });
 
+  // Backward-compatible alias used by older frontend builds.
+  app.get("/api/connections/meta/campaigns", (req, res) => {
+    const queryIndex = req.originalUrl.indexOf("?");
+    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : "";
+    res.redirect(307, `/api/meta/campaigns${query}`);
+  });
+
   const postGooglePopupMessage = (options: {
     type: "OAUTH_AUTH_SUCCESS" | "OAUTH_AUTH_ERROR";
     service: string;

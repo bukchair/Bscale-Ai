@@ -12,6 +12,8 @@ const parseUrl = (req: IncomingMessage) => {
 };
 
 const getDateRangeFromQuery = (url: URL, defaultDays = 30) => {
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
   const startDateQuery = url.searchParams.get('start_date') || '';
   const endDateQuery = url.searchParams.get('end_date') || '';
   const startDate =
@@ -20,13 +22,15 @@ const getDateRangeFromQuery = (url: URL, defaultDays = 30) => {
     DATE_PATTERN.test(endDateQuery) ? endDateQuery : null;
 
   if (startDate && endDate) {
-    return startDate <= endDate
-      ? { startDate, endDate }
-      : { startDate: endDate, endDate: startDate };
+    // Meta insights rejects future dates; clamp to today.
+    const clampedStart = startDate > todayIso ? todayIso : startDate;
+    const clampedEnd = endDate > todayIso ? todayIso : endDate;
+    return clampedStart <= clampedEnd
+      ? { startDate: clampedStart, endDate: clampedEnd }
+      : { startDate: clampedEnd, endDate: clampedStart };
   }
 
-  const today = new Date();
-  const end = today.toISOString().split('T')[0];
+  const end = todayIso;
   const start = new Date(today);
   start.setDate(start.getDate() - (defaultDays - 1));
   return {
@@ -52,7 +56,36 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 const normalizeAdAccountId = (value: string) => {
   const trimmed = String(value || '').trim();
   if (!trimmed) return '';
-  return trimmed.startsWith('act_') ? trimmed : `act_${trimmed}`;
+  const normalized = trimmed.replace(/^act_/i, '');
+  return `act_${normalized}`;
+};
+
+const isRecoverableMetaRequestError = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  const payload = error.response?.data as any;
+  const code = Number(payload?.error?.code || 0);
+  const message = String(payload?.error?.message || payload?.message || error.message || '').toLowerCase();
+  if (status === 400 || status === 404) return true;
+  if (code === 100 || code === 190) return true;
+  return (
+    message.includes('invalid parameter') ||
+    message.includes('unsupported get request') ||
+    message.includes('unknown path components')
+  );
+};
+
+const discoverFirstMetaAdAccount = async (accessToken: string) => {
+  const accountsResponse = await axios.get('https://graph.facebook.com/v19.0/me/adaccounts', {
+    params: {
+      fields: 'id,account_id,name',
+      limit: 50,
+      access_token: accessToken,
+    },
+  });
+  const firstAccount = (accountsResponse.data?.data || [])[0];
+  const discoveredId = String(firstAccount?.account_id || firstAccount?.id || '').trim();
+  return discoveredId ? normalizeAdAccountId(discoveredId) : '';
 };
 
 const pickRoas = (insight: any): number => {
@@ -79,35 +112,53 @@ export default async function handler(req: Req, res: ServerResponse) {
 
   try {
     if (!adAccountId) {
-      const accountsResponse = await axios.get('https://graph.facebook.com/v19.0/me/adaccounts', {
+      adAccountId = await discoverFirstMetaAdAccount(accessToken);
+      if (!adAccountId) {
+        return sendJson(res, 400, { message: 'No Meta ad account found for this token.' });
+      }
+    }
+
+    let activeAdAccountId = adAccountId;
+    let campaigns: any[] = [];
+    try {
+      const campaignsResponse = await axios.get(`https://graph.facebook.com/v19.0/${activeAdAccountId}/campaigns`, {
         params: {
-          fields: 'account_id,name',
-          limit: 50,
+          fields: 'id,name,status,objective,start_time,stop_time',
+          limit: 500,
           access_token: accessToken,
         },
       });
-      const firstAccount = (accountsResponse.data?.data || [])[0];
-      const discoveredId = String(firstAccount?.account_id || '').trim();
-      if (!discoveredId) {
-        return sendJson(res, 400, { message: 'No Meta ad account found for this token.' });
+      campaigns = Array.isArray(campaignsResponse.data?.data) ? campaignsResponse.data.data : [];
+    } catch (campaignsError) {
+      if (!isRecoverableMetaRequestError(campaignsError)) {
+        throw campaignsError;
       }
-      adAccountId = normalizeAdAccountId(discoveredId);
+
+      const discoveredFallbackId = await discoverFirstMetaAdAccount(accessToken).catch(() => '');
+      if (!discoveredFallbackId || discoveredFallbackId === activeAdAccountId) {
+        throw campaignsError;
+      }
+
+      activeAdAccountId = discoveredFallbackId;
+      const fallbackCampaignsResponse = await axios.get(
+        `https://graph.facebook.com/v19.0/${activeAdAccountId}/campaigns`,
+        {
+          params: {
+            fields: 'id,name,status,objective,start_time,stop_time',
+            limit: 500,
+            access_token: accessToken,
+          },
+        }
+      );
+      campaigns = Array.isArray(fallbackCampaignsResponse.data?.data)
+        ? fallbackCampaignsResponse.data.data
+        : [];
     }
-
-    const campaignsResponse = await axios.get(`https://graph.facebook.com/v19.0/${adAccountId}/campaigns`, {
-      params: {
-        fields: 'id,name,status,objective,start_time,stop_time',
-        limit: 500,
-        access_token: accessToken,
-      },
-    });
-
-    const campaigns = Array.isArray(campaignsResponse.data?.data) ? campaignsResponse.data.data : [];
     const insightsByCampaign = new Map<string, any>();
     let liveMetricsAvailable = false;
 
     try {
-      const insightsResponse = await axios.get(`https://graph.facebook.com/v19.0/${adAccountId}/insights`, {
+      const insightsResponse = await axios.get(`https://graph.facebook.com/v19.0/${activeAdAccountId}/insights`, {
         params: {
           level: 'campaign',
           fields: 'campaign_id,campaign_name,spend,actions,purchase_roas,roas',
@@ -151,7 +202,7 @@ export default async function handler(req: Req, res: ServerResponse) {
     return sendJson(res, 200, {
       data: merged,
       meta: {
-        adAccountId,
+        adAccountId: activeAdAccountId,
         liveMetricsAvailable,
         dateRange: { startDate, endDate },
       },

@@ -159,6 +159,25 @@ const applyGoogleServiceSnapshot = (
   });
 };
 
+const stripUndefinedDeep = <T,>(value: T): T => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, fieldValue]) => {
+      if (fieldValue === undefined) return;
+      next[key] = stripUndefinedDeep(fieldValue);
+    });
+    return next as T;
+  }
+
+  return value;
+};
+
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
 
@@ -180,28 +199,34 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let unsubscribeSnapshot: (() => void) | null = null;
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      unsubscribeSnapshot?.();
+      unsubscribeSnapshot = null;
+
       if (user) {
         const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
-        const unsubscribeSnapshot = onSnapshot(connectionsRef, (docSnap) => {
+        unsubscribeSnapshot = onSnapshot(connectionsRef, (docSnap) => {
           if (docSnap.exists()) {
-            const source = docSnap.data().items || initialConnections;
+            const source = Array.isArray(docSnap.data().items) ? docSnap.data().items : initialConnections;
             setConnections(source);
             void syncGoogleServices();
           } else {
             // Initialize with clean state if not exists
-            setDoc(connectionsRef, { items: initialConnections });
+            setDoc(connectionsRef, { items: stripUndefinedDeep(initialConnections) });
             setConnections(initialConnections);
             void syncGoogleServices();
           }
         });
-        return () => unsubscribeSnapshot();
       } else {
         setConnections(initialConnections);
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeSnapshot?.();
+      unsubscribeAuth();
+    };
   }, [syncGoogleServices]);
 
   useEffect(() => {
@@ -228,7 +253,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
     const connectionsRef = doc(db, 'users', user.uid, 'settings', 'connections');
     try {
-      await setDoc(connectionsRef, { items: newConnections }, { merge: true });
+      await setDoc(connectionsRef, { items: stripUndefinedDeep(newConnections) }, { merge: true });
     } catch (err) {
       console.error('Error persisting connections:', err);
     }

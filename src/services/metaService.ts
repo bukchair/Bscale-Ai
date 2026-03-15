@@ -54,21 +54,45 @@ export async function fetchMetaCampaigns(
     search.set('end_date', dateRange.endDate);
   }
 
-  const response = await fetch(`/api/meta/campaigns?${search.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
+  const endpointCandidates = [
+    `/api/meta/campaigns?${search.toString()}`,
+    `/api/connections/meta/campaigns?${search.toString()}`,
+  ];
+
+  let data: any = null;
+  let lastErrorMessage = 'Failed to fetch Meta campaigns';
+
+  for (const endpoint of endpointCandidates) {
+    const response = await fetch(endpoint, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const message = error.message || 'Failed to fetch Meta campaigns';
+      lastErrorMessage = message;
+
+      // Try next endpoint alias when route is missing.
+      if (response.status === 404) {
+        continue;
+      }
+      throw new Error(message);
     }
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Failed to fetch Meta campaigns');
+
+    data = await response.json();
+    break;
+  }
+
+  if (!data) {
+    throw new Error(lastErrorMessage);
   }
   
-  const data = await response.json();
-  
-  // Meta API returns data in a 'data' array
-  return data.data.map((c: any) => {
+  const rows = Array.isArray(data?.data) ? data.data : [];
+
+  // Meta API returns campaigns in a "data" array.
+  return rows.map((c: any) => {
     const insights = c.insights?.data?.[0] || {};
     const spend = toNumber(insights.spend);
     const conversions = extractConversionCount(insights.actions);
