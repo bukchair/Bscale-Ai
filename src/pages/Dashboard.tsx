@@ -23,6 +23,7 @@ export function Dashboard() {
   const [ga4Error, setGa4Error] = useState<string | null>(null);
   const [gscTotals, setGscTotals] = useState<{ clicks: number; impressions: number; position: number; ctr: number } | null>(null);
   const [overviewSyncStage, setOverviewSyncStage] = useState<'idle' | 'google-meta' | 'woocommerce'>('idle');
+  const [wooLiveLoadingPercent, setWooLiveLoadingPercent] = useState(0);
 
   const connectedPlatforms = connections.filter(c => c.status === 'connected');
   const isWooConnected = connections.find(c => c.id === 'woocommerce')?.status === 'connected';
@@ -177,6 +178,34 @@ export function Dashboard() {
     };
   }, [connections, resolvedRange.endDate, resolvedRange.startDate, buildDashboardData]);
 
+  useEffect(() => {
+    if (!(isWooConnected && overviewSyncStage === 'woocommerce')) {
+      setWooLiveLoadingPercent(0);
+      return;
+    }
+
+    setWooLiveLoadingPercent(8);
+    const intervalId = window.setInterval(() => {
+      setWooLiveLoadingPercent((prev) => {
+        if (prev >= 92) return prev;
+        const step = Math.floor(Math.random() * 6) + 3;
+        return Math.min(92, prev + step);
+      });
+    }, 350);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isWooConnected, overviewSyncStage]);
+
+  const isWooLiveLoading = isWooConnected && overviewSyncStage === 'woocommerce';
+  const financeValueText = {
+    revenue: isWooLiveLoading ? '—' : `₪${totalRevenue.toLocaleString()}`,
+    spend: isWooLiveLoading ? '—' : `₪${totalSpend.toLocaleString()}`,
+    roas: isWooLiveLoading ? '—' : `${roas}x`,
+    netProfit: isWooLiveLoading ? '—' : `₪${netProfit.toLocaleString()}`,
+  };
+
   const useGa4Fallback = !ga4LiveData && !ga4Error;
   const ga4ActiveUsers = ga4LiveData?.activeUsers ?? (useGa4Fallback ? 42 : 0);
   const ga4TotalUsers = ga4LiveData?.totalUsers ?? (useGa4Fallback ? 1247 : 0);
@@ -284,15 +313,32 @@ export function Dashboard() {
           </div>
           <div className="text-end">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{t('dashboard.netProfit')}</p>
-            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">₪{netProfit.toLocaleString()}</p>
+            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{financeValueText.netProfit}</p>
           </div>
         </div>
+
+        {isWooLiveLoading && (
+          <div className="mb-5 rounded-lg border border-indigo-200 bg-indigo-50 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-bold text-indigo-700">
+                {isHebrew ? 'טוען נתונים חיים מ‑WooCommerce' : 'Loading live WooCommerce data'}
+              </p>
+              <p className="text-[11px] font-black text-indigo-800">{wooLiveLoadingPercent}%</p>
+            </div>
+            <div className="mt-1.5 h-1.5 rounded-full bg-indigo-100 overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 transition-all duration-300"
+                style={{ width: `${wooLiveLoadingPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-emerald-50 dark:bg-emerald-500/5 p-6 rounded-xl border border-emerald-100 dark:border-emerald-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Store className={cn("absolute -bottom-4 w-24 h-24 text-emerald-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-emerald-800 dark:text-emerald-400 mb-2 uppercase tracking-wider">{t('dashboard.wooCommerceRevenue')}</p>
-            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">₪{totalRevenue.toLocaleString()}</p>
+            <p className="text-4xl font-black text-emerald-900 dark:text-emerald-50">{financeValueText.revenue}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-200/50 dark:bg-emerald-500/20 px-2 py-1 rounded-md">+12% {t('dashboard.vsPreviousPeriod')}</span>
             </div>
@@ -301,7 +347,7 @@ export function Dashboard() {
           <div className="bg-red-50 dark:bg-red-500/5 p-6 rounded-xl border border-red-100 dark:border-red-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <Megaphone className={cn("absolute -bottom-4 w-24 h-24 text-red-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-red-800 dark:text-red-400 mb-2 uppercase tracking-wider">{t('dashboard.campaignSpend')}</p>
-            <p className="text-4xl font-black text-red-900 dark:text-red-50">₪{totalSpend.toLocaleString()}</p>
+            <p className="text-4xl font-black text-red-900 dark:text-red-50">{financeValueText.spend}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-red-700 dark:text-red-300 bg-red-200/50 dark:bg-red-500/20 px-2 py-1 rounded-md">-5% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-red-600 dark:text-red-400 font-medium">{t('dashboard.platformsGoogleMetaTikTok')}</span>
@@ -311,7 +357,7 @@ export function Dashboard() {
           <div className="bg-indigo-50 dark:bg-indigo-500/5 p-6 rounded-xl border border-indigo-100 dark:border-indigo-500/10 relative overflow-hidden group hover:shadow-md transition-all">
             <TrendingUp className={cn("absolute -bottom-4 w-24 h-24 text-indigo-500 opacity-10 transition-transform group-hover:scale-110", dir === 'rtl' ? "-left-4" : "-right-4")} />
             <p className="text-sm font-bold text-indigo-800 dark:text-indigo-400 mb-2 uppercase tracking-wider">{t('dashboard.roas')}</p>
-            <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">{roas}x</p>
+            <p className="text-4xl font-black text-indigo-900 dark:text-indigo-50">{financeValueText.roas}</p>
             <div className="flex items-center gap-2 mt-4">
               <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-200/50 dark:bg-indigo-500/20 px-2 py-1 rounded-md">+24% {t('dashboard.vsPreviousPeriod')}</span>
               <span className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">{t('dashboard.poasLabel', { value: '1.8x' })}</span>
@@ -417,30 +463,47 @@ export function Dashboard() {
           </div>
           
           <div className="h-72 mt-6">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1f2937', color: '#fff' }}
-                  itemStyle={{ fontWeight: 600, color: '#fff' }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }} />
-                <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={t('dashboard.revenue')} />
-                <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" name={t('dashboard.spend')} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isWooLiveLoading ? (
+              <div className="h-full rounded-xl border border-dashed border-indigo-200 bg-indigo-50/60 flex items-center justify-center">
+                <div className="text-center px-4">
+                  <p className="text-sm font-bold text-indigo-700">
+                    {isHebrew ? 'טוען נתונים חיים מ‑WooCommerce' : 'Loading live WooCommerce data'}
+                  </p>
+                  <p className="text-xs text-indigo-600 mt-1">{wooLiveLoadingPercent}%</p>
+                  <div className="mt-2 h-1.5 w-48 max-w-full rounded-full bg-indigo-100 overflow-hidden mx-auto">
+                    <div
+                      className="h-full bg-indigo-500 transition-all duration-300"
+                      style={{ width: `${wooLiveLoadingPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#9CA3AF', fontWeight: 500 }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', backgroundColor: '#1f2937', color: '#fff' }}
+                    itemStyle={{ fontWeight: 600, color: '#fff' }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '14px', fontWeight: 500 }} />
+                  <Area type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" name={t('dashboard.revenue')} />
+                  <Area type="monotone" dataKey="spend" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSpend)" name={t('dashboard.spend')} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
