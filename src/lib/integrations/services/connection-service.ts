@@ -156,14 +156,14 @@ export const connectionService = {
   async disconnect(userId: string, platform: Platform): Promise<void> {
     const connection = await this.getByUserPlatform(userId, platform);
     if (!connection) {
-      await prisma.oauthState.deleteMany({
+      await prisma.oAuthState.deleteMany({
         where: { userId, platform },
       });
       return;
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.oauthState.deleteMany({
+      await tx.oAuthState.deleteMany({
         where: { userId, platform },
       });
       await tx.connectedAccount.deleteMany({
