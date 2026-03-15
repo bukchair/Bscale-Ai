@@ -1,26 +1,13 @@
-/**
- * Vercel Serverless: POST /api/proxy/woocommerce
- * Proxies requests to WooCommerce REST API. Body: { url, key, secret, endpoint, method?, data? }
- */
+import { NextResponse } from 'next/server';
 
-async function readBody(req: { method?: string; body?: unknown; on?: (e: string, c: (chunk: Buffer) => void) => void; [key: string]: unknown }): Promise<Record<string, unknown>> {
-  if (req.body && typeof req.body === 'object') {
-    return req.body as Record<string, unknown>;
-  }
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on?.('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on?.('end', () => {
-      try {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch (e) {
-        reject(new Error('Invalid JSON body'));
-      }
-    });
-    req.on?.('error', reject);
-  });
-}
+type WooBody = {
+  url?: string;
+  key?: string;
+  secret?: string;
+  endpoint?: string;
+  method?: string;
+  data?: unknown;
+};
 
 async function tryFetch(
   targetUrl: string,
@@ -55,27 +42,17 @@ async function tryFetch(
   return fetch(urlObj.toString(), options);
 }
 
-export default async function handler(
-  req: { method?: string; on?: (e: string, c: (chunk: Buffer) => void) => void; [key: string]: unknown },
-  // Allow any JSON-serializable value (object, array, etc.)
-  res: { status: (n: number) => { json: (o: any) => void }; setHeader: (k: string, v: string) => void; json: (o: any) => void }
-) {
-  res.setHeader('Content-Type', 'application/json');
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
-  let body: { url?: string; key?: string; secret?: string; endpoint?: string; method?: string; data?: unknown };
+export async function POST(request: Request) {
+  let body: WooBody;
   try {
-    body = (await readBody(req)) as typeof body;
+    body = (await request.json()) as WooBody;
   } catch {
-    return res.status(400).json({ message: 'Invalid JSON body' });
+    return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
   }
 
   const { url, key, secret, endpoint, method = 'GET', data } = body;
   if (!url || !key || !secret) {
-    return res.status(400).json({ message: 'Missing credentials' });
+    return NextResponse.json({ message: 'Missing credentials' }, { status: 400 });
   }
 
   try {
@@ -130,7 +107,7 @@ export default async function handler(
         }
 
         if (response.ok) {
-          return res.status(200).json(parsed);
+          return NextResponse.json(parsed, { status: 200 });
         }
 
         lastPayload = parsed;
@@ -138,19 +115,25 @@ export default async function handler(
     }
 
     if (lastPayload && typeof lastPayload === 'object') {
-      return res.status(lastStatus).json(lastPayload);
+      return NextResponse.json(lastPayload, { status: lastStatus });
     }
 
-    return res.status(lastStatus).json({
-      message: `WooCommerce API Error: ${lastStatus}`,
-      code: 'woocommerce_error',
-    });
-  } catch (e: unknown) {
-    const err = e instanceof Error ? e.message : 'Unknown error';
-    return res.status(500).json({
-      message: 'Failed to connect to WooCommerce store. Please check the URL and that the store is accessible.',
-      code: 'connection_failed',
-      debug: err,
-    });
+    return NextResponse.json(
+      {
+        message: `WooCommerce API Error: ${lastStatus}`,
+        code: 'woocommerce_error',
+      },
+      { status: lastStatus }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message:
+          'Failed to connect to WooCommerce store. Please check the URL and that the store is accessible.',
+        code: 'connection_failed',
+        debug: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
   }
 }

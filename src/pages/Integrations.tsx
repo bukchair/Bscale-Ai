@@ -498,26 +498,40 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   ) => {
     await bootstrapManagedSession();
 
-    const response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-
-    const text = await response.text();
-    let payload:
+    const parsePayload = async (
+      response: Response
+    ): Promise<
       | {
           success?: boolean;
           message?: string;
           errorCode?: string;
           data?: { authorizationUrl?: string };
         }
-      | null = null;
+      | null
+    > => {
+      const text = await response.text();
+      try {
+        return text ? JSON.parse(text) : null;
+      } catch {
+        return null;
+      }
+    };
 
-    try {
-      payload = text ? JSON.parse(text) : null;
-    } catch {
-      payload = null;
+    // Start with GET to avoid method rewrite edge-cases behind domain redirects/proxies.
+    let response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
+    let payload = await parsePayload(response);
+
+    if (response.status === 405) {
+      response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      payload = await parsePayload(response);
     }
 
     if (!response.ok || !payload?.success || !payload?.data?.authorizationUrl) {
