@@ -159,13 +159,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
   };
 
   const postManagedTest = async (
-    platformSlug: 'google-ads' | 'meta' | 'tiktok'
+    platformSlug: 'google-ads' | 'meta' | 'tiktok',
+    accountId?: string
   ): Promise<{ success: boolean; message: string }> => {
     await ensureManagedApiSession();
     const response = await fetch(`/api/connections/${platformSlug}/test`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ accountId }),
     });
 
     const text = await response.text();
@@ -561,7 +562,14 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const managedPlatformSlug = managedPlatformByConnectionId[id as Connection['id']];
     if (managedPlatformSlug) {
       try {
-        const result = await postManagedTest(managedPlatformSlug);
+        const normalizedGoogleAccountId =
+          id === 'google' && connection.settings?.googleAdsId
+            ? connection.settings.googleAdsId.replace(/-/g, '').trim()
+            : undefined;
+        const result = await postManagedTest(
+          managedPlatformSlug,
+          normalizedGoogleAccountId
+        );
         if (result.success) {
           const updatedConnections = connections.map((c) =>
             c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: c.score || 100 } : c
