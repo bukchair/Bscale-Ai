@@ -10,15 +10,58 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   return data.data;
 }
 
-export async function fetchMetaCampaigns(accessToken: string, adAccountId: string) {
-  const response = await fetch(`/api/meta/campaigns?ad_account_id=${adAccountId}`, {
+export interface DateRangeParams {
+  startDate: string;
+  endDate: string;
+}
+
+const toNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const extractConversionCount = (actions: unknown): number => {
+  if (!Array.isArray(actions)) return 0;
+  const preferredActionTypes = new Set([
+    'purchase',
+    'offsite_conversion.purchase',
+    'onsite_web_purchase',
+    'lead',
+    'onsite_conversion.lead_grouped',
+  ]);
+
+  let total = 0;
+  for (const item of actions) {
+    const action = item as { action_type?: unknown; value?: unknown };
+    if (!preferredActionTypes.has(String(action?.action_type || ''))) continue;
+    total += toNumber(action?.value);
+  }
+  return total;
+};
+
+export async function fetchMetaCampaigns(
+  accessToken: string,
+  adAccountId: string,
+  dateRange?: DateRangeParams
+) {
+  const search = new URLSearchParams({ ad_account_id: adAccountId });
+  if (dateRange) {
+    search.set('start_date', dateRange.startDate);
+    search.set('end_date', dateRange.endDate);
+  }
+
+  const response = await fetch(`/api/meta/campaigns?${search.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }
   });
   
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Failed to fetch Meta campaigns');
   }
   
@@ -27,14 +70,19 @@ export async function fetchMetaCampaigns(accessToken: string, adAccountId: strin
   // Meta API returns data in a 'data' array
   return data.data.map((c: any) => {
     const insights = c.insights?.data?.[0] || {};
+    const spend = toNumber(insights.spend);
+    const conversions = extractConversionCount(insights.actions);
+    const rawRoas = toNumber(insights.purchase_roas?.[0]?.value) || toNumber(insights.roas?.[0]?.value);
+    const cpa = conversions > 0 ? spend / conversions : 0;
+
     return {
       id: c.id,
       name: c.name,
       platform: 'Meta',
       status: c.status === 'ACTIVE' ? 'Active' : 'Paused',
-      spend: `₪${parseFloat(insights.spend || 0).toFixed(0)}`,
-      roas: parseFloat(insights.roas?.[0]?.value || 0).toFixed(1),
-      cpa: `₪${(parseFloat(insights.spend || 0) / (parseFloat(c.conversions || 1) || 1)).toFixed(0)}` // Rough estimation if conversions not present
+      spend: `₪${spend.toFixed(0)}`,
+      roas: rawRoas.toFixed(1),
+      cpa: `₪${cpa.toFixed(0)}`
     };
   });
 }

@@ -236,6 +236,7 @@ async function startServer() {
   app.get("/api/tiktok/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const advertiserId = req.query.advertiser_id;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !advertiserId) {
       return res.status(400).json({ message: "Missing access token or advertiser ID" });
@@ -245,12 +246,83 @@ async function startServer() {
       const response = await axios.get(`https://business-api.tiktok.com/open_api/v1.3/campaign/get/`, {
         params: {
           advertiser_id: advertiserId,
+          page_size: 1000,
         },
         headers: {
           "Access-Token": accessToken,
         }
       });
-      res.json(response.data);
+
+      const campaigns = Array.isArray(response.data?.data?.list) ? response.data.data.list : [];
+      const toNumber = (value: unknown) => {
+        if (typeof value === "number" && Number.isFinite(value)) return value;
+        if (typeof value === "string") {
+          const parsed = Number.parseFloat(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        }
+        return 0;
+      };
+
+      const metricsByCampaignId = new Map<string, { spend: number; conversions: number; roas: number }>();
+      let liveMetricsAvailable = false;
+
+      try {
+        const reportResponse = await axios.get(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/`, {
+          params: {
+            advertiser_id: advertiserId,
+            service_type: "AUCTION",
+            report_type: "BASIC",
+            data_level: "AUCTION_CAMPAIGN",
+            dimensions: JSON.stringify(["campaign_id"]),
+            metrics: JSON.stringify(["spend", "conversion"]),
+            start_date: startDate,
+            end_date: endDate,
+            page: 1,
+            page_size: 1000,
+          },
+          headers: {
+            "Access-Token": accessToken,
+          },
+        });
+
+        const reportRows = Array.isArray(reportResponse.data?.data?.list) ? reportResponse.data.data.list : [];
+        for (const row of reportRows) {
+          const campaignId =
+            String((row as any)?.dimensions?.campaign_id || (row as any)?.campaign_id || "").trim();
+          if (!campaignId) continue;
+          const spend = toNumber((row as any)?.metrics?.spend ?? (row as any)?.spend);
+          const conversions = toNumber((row as any)?.metrics?.conversion ?? (row as any)?.conversion);
+          metricsByCampaignId.set(campaignId, {
+            spend,
+            conversions,
+            roas: 0,
+          });
+        }
+        liveMetricsAvailable = reportRows.length > 0;
+      } catch (reportError) {
+        console.warn("TikTok metrics fetch warning:", getAxiosErrorMessage(reportError, "Unknown TikTok metrics error"));
+      }
+
+      const mergedCampaigns = campaigns.map((campaign: any) => {
+        const campaignId = String(campaign?.campaign_id || campaign?.id || "").trim();
+        const liveMetrics = metricsByCampaignId.get(campaignId);
+        return {
+          ...campaign,
+          spend: liveMetrics?.spend ?? toNumber(campaign?.spend),
+          conversions: liveMetrics?.conversions ?? toNumber(campaign?.conversions ?? campaign?.conversion),
+          roas: liveMetrics?.roas ?? toNumber(campaign?.roas),
+        };
+      });
+
+      res.json({
+        ...response.data,
+        data: {
+          ...(response.data?.data || {}),
+          list: mergedCampaigns,
+          liveMetricsAvailable,
+          dateRange: { startDate, endDate },
+        },
+      });
     } catch (error: any) {
       console.error("TikTok API Error:", error.response?.data || error.message);
       res.status(500).json({ message: error.message });
@@ -339,6 +411,7 @@ async function startServer() {
   app.get("/api/meta/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const adAccountId = req.query.ad_account_id;
+    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !adAccountId) {
       return res.status(400).json({ message: "Missing access token or ad account ID" });
@@ -350,11 +423,56 @@ async function startServer() {
       const formattedAdAccountId = adAccountIdStr.startsWith('act_') ? adAccountIdStr : `act_${adAccountIdStr}`;
       const response = await axios.get(`https://graph.facebook.com/v19.0/${formattedAdAccountId}/campaigns`, {
         params: {
-          fields: 'id,name,status,objective,start_time,stop_time,spend,insights{spend,inline_link_click_ctr,roas}',
+          fields: 'id,name,status,objective,start_time,stop_time',
+          limit: 500,
           access_token: accessToken,
         }
       });
-      res.json(response.data);
+
+      const campaigns = Array.isArray(response.data?.data) ? response.data.data : [];
+      const insightsByCampaignId = new Map<string, any>();
+      let liveMetricsAvailable = false;
+
+      try {
+        const insightsResponse = await axios.get(`https://graph.facebook.com/v19.0/${formattedAdAccountId}/insights`, {
+          params: {
+            level: 'campaign',
+            fields: 'campaign_id,campaign_name,spend,actions,purchase_roas,roas',
+            time_range: JSON.stringify({ since: startDate, until: endDate }),
+            limit: 500,
+            access_token: accessToken,
+          },
+        });
+
+        const insightRows = Array.isArray(insightsResponse.data?.data) ? insightsResponse.data.data : [];
+        for (const row of insightRows) {
+          const campaignId = String((row as any)?.campaign_id || '').trim();
+          if (!campaignId) continue;
+          insightsByCampaignId.set(campaignId, row);
+        }
+        liveMetricsAvailable = insightRows.length > 0;
+      } catch (insightsError) {
+        console.warn("Meta insights fetch warning:", getAxiosErrorMessage(insightsError, "Unknown Meta insights error"));
+      }
+
+      const mergedCampaigns = campaigns.map((campaign: any) => {
+        const liveInsight = insightsByCampaignId.get(String(campaign?.id || ''));
+        return {
+          ...campaign,
+          insights: {
+            data: [liveInsight || { spend: '0', actions: [], purchase_roas: [{ value: '0' }] }],
+          },
+        };
+      });
+
+      res.json({
+        ...response.data,
+        data: mergedCampaigns,
+        meta: {
+          liveMetricsAvailable,
+          dateRange: { startDate, endDate },
+        },
+      });
     } catch (error: any) {
       console.error("Meta API Error:", error.response?.data || error.message);
       res.status(500).json({ message: error.message });

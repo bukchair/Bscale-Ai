@@ -1,30 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getOptimizationRecommendations } from '../lib/gemini';
 import { CheckCircle2, AlertCircle, Loader2, Zap, Video, Mail } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
+import { useDateRange } from '../contexts/DateRangeContext';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { fetchMetaCampaigns } from '../services/metaService';
 import { fetchGoogleCampaigns, sendGmailNotification } from '../services/googleService';
 import { auth } from '../lib/firebase';
 
-const mockCampaignData = [
-  { id: 1, name: 'Summer Sale - Shoes', platform: 'Google', status: 'Active', spend: '₪1,200', roas: '2.5', cpa: '₪45' },
-  { id: 2, name: 'Retargeting - Abandoned Cart', platform: 'Meta', status: 'Active', spend: '₪800', roas: '4.2', cpa: '₪22' },
-  { id: 3, name: 'New Collection - Video', platform: 'TikTok', status: 'Paused', spend: '₪400', roas: '1.1', cpa: '₪85' },
-  { id: 4, name: 'Brand Search', platform: 'Google', status: 'Active', spend: '₪300', roas: '8.5', cpa: '₪12' },
-];
+type LiveCampaign = {
+  id: string | number;
+  name: string;
+  platform: 'Google' | 'Meta' | 'TikTok';
+  status: string;
+  spend: string;
+  roas: string;
+  cpa: string;
+};
 
 export function Campaigns() {
   const { t, dir } = useLanguage();
+  const isHebrew = dir === 'rtl';
   const { connections } = useConnections();
+  const { resolvedRange } = useDateRange();
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedRecs, setAppliedRecs] = useState<number[]>([]);
-  const [realCampaigns, setRealCampaigns] = useState<any[]>([]);
+  const [realCampaigns, setRealCampaigns] = useState<LiveCampaign[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncErrors, setSyncErrors] = useState<{ google: string | null; meta: string | null; tiktok: string | null }>({
+    google: null,
+    meta: null,
+    tiktok: null,
+  });
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const syncInFlightRef = useRef(false);
 
   // Filtering and Sorting State
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,97 +46,156 @@ export function Campaigns() {
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const fetchRecommendations = async () => {
+  const normalizeCampaign = (campaign: any, platform: LiveCampaign['platform']): LiveCampaign => {
+    const toNumber = (value: unknown): number => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const cleaned = value.replace(/[^\d.-]/g, '');
+        const parsed = Number.parseFloat(cleaned);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      return 0;
+    };
+
+    const spend = toNumber(campaign?.spend);
+    const roas = toNumber(campaign?.roas);
+    const cpa = toNumber(campaign?.cpa);
+
+    return {
+      id: campaign?.id ?? `${platform}-${String(campaign?.name || 'campaign')}`,
+      name: String(campaign?.name || `${platform} Campaign`),
+      platform,
+      status: String(campaign?.status || 'Paused'),
+      spend: `₪${spend.toFixed(0)}`,
+      roas: roas.toFixed(1),
+      cpa: `₪${cpa.toFixed(0)}`,
+    };
+  };
+
+  const fetchRecommendations = useCallback(async () => {
     setLoading(true);
     try {
-      const dataToAnalyze = realCampaigns.length > 0 ? realCampaigns : mockCampaignData;
+      if (realCampaigns.length === 0) {
+        setRecommendations([]);
+        return;
+      }
+      const dataToAnalyze = realCampaigns;
       const dataStr = JSON.stringify(dataToAnalyze);
       const res = await getOptimizationRecommendations(dataStr);
       if (res.recommendations) {
         setRecommendations(res.recommendations);
+      } else {
+        setRecommendations([]);
       }
     } catch (error) {
       console.error("Failed to fetch recommendations", error);
+      setRecommendations([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
-
-  const syncTikTokData = async () => {
-    const tiktokConn = connections.find(c => c.id === 'tiktok');
-    if (tiktokConn?.status === 'connected' && tiktokConn.settings?.tiktokToken && tiktokConn.settings?.tiktokAdvertiserId) {
-      setIsSyncing(true);
-      try {
-        const campaigns = await fetchTikTokCampaigns(
-          tiktokConn.settings.tiktokToken,
-          tiktokConn.settings.tiktokAdvertiserId
-        );
-        
-        const formattedCampaigns = campaigns.map((c: any) => ({
-          id: c.campaign_id,
-          name: c.campaign_name,
-          platform: 'TikTok',
-          status: c.operation_status === 'ENABLE' ? 'Active' : 'Paused',
-          spend: `₪${(Math.random() * 1000).toFixed(0)}`, // TikTok API might need more calls for spend, simulating for now
-          roas: (Math.random() * 5 + 1).toFixed(1),
-          cpa: `₪${(Math.random() * 100 + 10).toFixed(0)}`
-        }));
-        
-        setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'TikTok'), ...formattedCampaigns]);
-      } catch (err) {
-        console.error("Failed to sync TikTok data:", err);
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const syncMetaData = async () => {
-    const metaConn = connections.find(c => c.id === 'meta');
-    if (metaConn?.status === 'connected' && metaConn.settings?.metaToken && metaConn.settings?.metaAdsId) {
-      setIsSyncing(true);
-      try {
-        const campaigns = await fetchMetaCampaigns(
-          metaConn.settings.metaToken,
-          metaConn.settings.metaAdsId
-        );
-        
-        setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Meta'), ...campaigns]);
-      } catch (err) {
-        console.error("Failed to sync Meta data:", err);
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  const syncGoogleData = async () => {
-    const googleConn = connections.find(c => c.id === 'google');
-    if (googleConn?.status === 'connected' && googleConn.settings?.googleAccessToken && googleConn.settings?.googleAdsId) {
-      setIsSyncing(true);
-      try {
-        const campaigns = await fetchGoogleCampaigns(
-          googleConn.settings.googleAccessToken,
-          googleConn.settings.googleAdsId
-        );
-        
-        setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Google'), ...campaigns]);
-      } catch (err) {
-        console.error("Failed to sync Google data:", err);
-      } finally {
-        setIsSyncing(false);
-      }
-    }
-  };
-
-  useEffect(() => {
-    syncTikTokData();
-    syncMetaData();
-    syncGoogleData();
-  }, [connections]);
-
-  useEffect(() => {
-    fetchRecommendations();
   }, [realCampaigns]);
+
+  const syncAllCampaigns = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    setIsSyncing(true);
+
+    const nextErrors: { google: string | null; meta: string | null; tiktok: string | null } = {
+      google: null,
+      meta: null,
+      tiktok: null,
+    };
+    const collected: LiveCampaign[] = [];
+
+    try {
+      const googleConn = connections.find(c => c.id === 'google');
+      if (googleConn?.status === 'connected') {
+        const googleToken = googleConn.settings?.googleAccessToken || '';
+        const googleAdsId = googleConn.settings?.googleAdsId || '';
+        if (!googleToken || !googleAdsId) {
+          nextErrors.google = isHebrew
+            ? 'Google מחובר אבל חסר Access Token או Google Ads ID.'
+            : 'Google connected but missing Access Token or Google Ads ID.';
+        } else {
+          try {
+            const googleCampaigns = await fetchGoogleCampaigns(googleToken, googleAdsId, undefined, resolvedRange);
+            collected.push(...googleCampaigns.map((campaign: any) => normalizeCampaign(campaign, 'Google')));
+          } catch (error) {
+            nextErrors.google = error instanceof Error ? error.message : (isHebrew ? 'סנכרון Google נכשל.' : 'Google sync failed.');
+          }
+        }
+      }
+
+      const metaConn = connections.find(c => c.id === 'meta');
+      if (metaConn?.status === 'connected') {
+        const metaToken = metaConn.settings?.metaToken || '';
+        const metaAdsId =
+          metaConn.settings?.metaAdsId ||
+          metaConn.settings?.adAccountId ||
+          metaConn.settings?.metaAdAccountId ||
+          '';
+        if (!metaToken || !metaAdsId) {
+          nextErrors.meta = isHebrew
+            ? 'Meta מחובר אבל חסר Access Token או Ads Account ID.'
+            : 'Meta connected but missing Access Token or Ads Account ID.';
+        } else {
+          try {
+            const metaCampaigns = await fetchMetaCampaigns(metaToken, metaAdsId, resolvedRange);
+            collected.push(...metaCampaigns.map((campaign: any) => normalizeCampaign(campaign, 'Meta')));
+          } catch (error) {
+            nextErrors.meta = error instanceof Error ? error.message : (isHebrew ? 'סנכרון Meta נכשל.' : 'Meta sync failed.');
+          }
+        }
+      }
+
+      const tiktokConn = connections.find(c => c.id === 'tiktok');
+      if (tiktokConn?.status === 'connected') {
+        const tiktokToken = tiktokConn.settings?.tiktokToken || '';
+        const tiktokAdvertiserId = tiktokConn.settings?.tiktokAdvertiserId || '';
+        if (!tiktokToken || !tiktokAdvertiserId) {
+          nextErrors.tiktok = isHebrew
+            ? 'TikTok מחובר אבל חסר Access Token או Advertiser ID.'
+            : 'TikTok connected but missing Access Token or Advertiser ID.';
+        } else {
+          try {
+            const tiktokCampaigns = await fetchTikTokCampaigns(tiktokToken, tiktokAdvertiserId, resolvedRange);
+            collected.push(...tiktokCampaigns.map((campaign: any) => normalizeCampaign(campaign, 'TikTok')));
+          } catch (error) {
+            nextErrors.tiktok = error instanceof Error ? error.message : (isHebrew ? 'סנכרון TikTok נכשל.' : 'TikTok sync failed.');
+          }
+        }
+      }
+
+      setRealCampaigns(collected);
+      setSyncErrors(nextErrors);
+      setLastSyncAt(new Date().toISOString());
+    } finally {
+      syncInFlightRef.current = false;
+      setIsSyncing(false);
+    }
+  }, [connections, isHebrew, resolvedRange.endDate, resolvedRange.startDate]);
+
+  useEffect(() => {
+    void syncAllCampaigns();
+
+    const intervalId = window.setInterval(() => {
+      void syncAllCampaigns();
+    }, 45_000);
+
+    const handleFocus = () => {
+      void syncAllCampaigns();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [syncAllCampaigns]);
+
+  useEffect(() => {
+    void fetchRecommendations();
+  }, [fetchRecommendations]);
 
   const handleApply = (index: number) => {
     setAppliedRecs([...appliedRecs, index]);
@@ -176,9 +248,20 @@ export function Campaigns() {
     }
   };
 
-  const allCampaigns = realCampaigns.length > 0 
-    ? [...realCampaigns, ...mockCampaignData.filter(mc => !realCampaigns.some(rc => rc.platform === mc.platform))]
-    : mockCampaignData;
+  const hasConnectedAdPlatform = useMemo(
+    () =>
+      connections.some(
+        (conn) => (conn.id === 'google' || conn.id === 'meta' || conn.id === 'tiktok') && conn.status === 'connected'
+      ),
+    [connections]
+  );
+
+  const syncIssues = useMemo(
+    () => Object.entries(syncErrors).filter(([, value]) => Boolean(value)) as Array<[string, string]>,
+    [syncErrors]
+  );
+
+  const allCampaigns = realCampaigns;
 
   const filteredAndSortedCampaigns = allCampaigns
     .filter(campaign => {
@@ -192,12 +275,12 @@ export function Campaigns() {
       let valB: any = b[sortField as keyof typeof b];
 
       // Handle numeric values (spend, cpa)
-      if (typeof valA === 'string' && valA.startsWith('₪')) {
+      if (typeof valA === 'string' && String(valA).startsWith('₪')) {
         valA = parseFloat(valA.replace('₪', '').replace(',', ''));
         valB = parseFloat((valB as string).replace('₪', '').replace(',', ''));
       } else if (sortField === 'roas') {
-        valA = parseFloat(valA as string);
-        valB = parseFloat(valB as string);
+        valA = parseFloat(String(valA || '0'));
+        valB = parseFloat(String(valB || '0'));
       }
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -227,13 +310,36 @@ export function Campaigns() {
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h3 className="text-lg leading-6 font-medium text-gray-900">{t('campaigns.activeCampaigns')}</h3>
-              {isSyncing && (
-                <span className="flex items-center text-xs text-indigo-600 font-bold animate-pulse">
-                  <Loader2 className="w-3 h-3 animate-spin ml-1" />
-                  Syncing real-time data...
-                </span>
-              )}
+              <div className="flex flex-col items-end">
+                {isSyncing && (
+                  <span className="flex items-center text-xs text-indigo-600 font-bold animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin ml-1" />
+                    {isHebrew ? 'מסנכרן נתונים חיים...' : 'Syncing live data...'}
+                  </span>
+                )}
+                {lastSyncAt && (
+                  <span className="text-[11px] text-gray-500">
+                    {isHebrew ? 'סנכרון אחרון:' : 'Last sync:'}{' '}
+                    {new Date(lastSyncAt).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
             </div>
+
+            {syncIssues.length > 0 && (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-xs font-bold text-amber-800">
+                  {isHebrew ? 'התראות סנכרון (בדוק חיבורים):' : 'Sync alerts (check connections):'}
+                </p>
+                <ul className="mt-1 space-y-1 text-xs text-amber-800">
+                  {syncIssues.map(([platform, message]) => (
+                    <li key={platform}>
+                      <span className="font-bold uppercase">{platform}</span>: {message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             
             {/* Filters and Search */}
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -336,7 +442,9 @@ export function Campaigns() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
-                      {t('campaigns.noCampaigns')}
+                      {hasConnectedAdPlatform
+                        ? (isHebrew ? 'אין כרגע קמפיינים חיים לטווח הזמן שנבחר.' : 'No live campaigns for the selected date range yet.')
+                        : t('campaigns.noCampaigns')}
                     </td>
                   </tr>
                 )}

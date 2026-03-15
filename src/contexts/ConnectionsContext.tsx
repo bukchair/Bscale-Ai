@@ -4,6 +4,7 @@ import { auth, db } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
 import { fetchGoogleDiscovery, refreshGoogleAccessToken, validateGoogleAccessToken } from '../services/googleService';
+import { fetchTikTokCampaigns } from '../services/tiktokService';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
 
@@ -260,6 +261,33 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         return { success: true, message: 'החיבור ל-Meta אומת בהצלחה.' };
       } catch (err) {
         return { success: false, message: 'נכשל אימות החיבור ל-Meta.' };
+      }
+    }
+
+    // Special logic for TikTok real verification
+    if (id === 'tiktok') {
+      const accessToken = connection.settings?.tiktokToken || '';
+      const advertiserId = connection.settings?.tiktokAdvertiserId || '';
+      if (!accessToken || !advertiserId) {
+        return {
+          success: false,
+          message: 'חסר TikTok access token או advertiser ID. יש להשלים את שניהם לפני בדיקה.',
+        };
+      }
+
+      try {
+        await fetchTikTokCampaigns(accessToken, advertiserId);
+        const updatedConnections = connections.map(c =>
+          c.id === id ? { ...c, status: 'connected' as ConnectionStatus, score: 100 } : c
+        );
+        setConnections(updatedConnections);
+        await persistConnections(updatedConnections);
+        return { success: true, message: 'החיבור ל-TikTok אומת בהצלחה.' };
+      } catch (err) {
+        return {
+          success: false,
+          message: `נכשל אימות החיבור ל-TikTok: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`,
+        };
       }
     }
 
