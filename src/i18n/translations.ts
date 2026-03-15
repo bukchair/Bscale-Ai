@@ -209,7 +209,7 @@ export const translations = {
       businessId: "Business ID",
       pixelId: "Pixel ID",
       adsAccountId: "Ads Account ID",
-      ga4MeasurementId: "GA4 Measurement ID",
+      ga4MeasurementId: "GA4 Property ID",
       advertiserId: "Advertiser ID",
       adminAccessToken: "Admin API Access Token",
       connected: "Connected",
@@ -270,7 +270,7 @@ export const translations = {
       },
       google: {
         step1: "Ads ID (10 digits)",
-        step2: "Measurement ID from GA4",
+        step2: "Property ID from GA4",
         step3: "Click Save to finish"
       },
       meta: {
@@ -793,7 +793,7 @@ export const translations = {
       businessId: "Business ID",
       pixelId: "Pixel ID",
       adsAccountId: "Ads Account ID",
-      ga4MeasurementId: "GA4 Measurement ID",
+      ga4MeasurementId: "GA4 Property ID",
       advertiserId: "Advertiser ID",
       adminAccessToken: "Admin API Access Token",
       connected: "מחובר",
@@ -854,7 +854,7 @@ export const translations = {
       },
       google: {
         step1: "מזהה Ads (10 ספרות)",
-        step2: "Measurement ID מ-GA4",
+        step2: "Property ID מ-GA4",
         step3: "לחץ שמור לסיום"
       },
       meta: {
