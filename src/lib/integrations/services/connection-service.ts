@@ -1,6 +1,7 @@
 import { prisma } from '@/src/lib/db/prisma';
 import type { Platform } from '@/src/lib/integrations/core/types';
 import { IntegrationError } from '@/src/lib/integrations/core/errors';
+import { toPrismaJson } from '@/src/lib/integrations/utils/prisma-json';
 
 export const connectionService = {
   async listForUser(userId: string) {
