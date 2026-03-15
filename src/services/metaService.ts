@@ -14,6 +14,31 @@ const API_BASE = (() => {
 })();
 
 export async function fetchMetaAdAccounts(accessToken: string) {
+  if (accessToken === 'server-managed') {
+    const managedResponse = await fetch(`${API_BASE}/api/connections/meta/accounts`, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+      },
+    });
+
+    const managedPayload = await managedResponse.json().catch(() => null);
+    if (!managedResponse.ok || !managedPayload?.success) {
+      throw new Error(managedPayload?.message || 'Failed to fetch managed Meta ad accounts');
+    }
+
+    const accounts = Array.isArray(managedPayload?.data?.accounts) ? managedPayload.data.accounts : [];
+    return accounts.map((account: any) => ({
+      id: account.externalAccountId,
+      account_id: account.externalAccountId,
+      name: account.name || account.externalAccountId,
+      currency: account.currency || undefined,
+      timezone_name: account.timezone || undefined,
+      status: account.status,
+      isSelected: Boolean(account.isSelected),
+    }));
+  }
+
   const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${accessToken}`);
   
   if (!response.ok) {

@@ -283,14 +283,16 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       if (connection.id === 'meta' && meta) {
         const selected =
           meta.accounts?.find((account) => account.isSelected) || meta.accounts?.[0] || null;
+        const mappedMetaStatus = mapManagedStatusToLocal(meta.status);
         return {
           ...connection,
-          status: mapManagedStatusToLocal(meta.status),
-          score: mapManagedStatusToLocal(meta.status) === 'connected' ? Math.max(connection.score || 0, 95) : connection.score,
+          status: mappedMetaStatus,
+          score: mappedMetaStatus === 'connected' ? Math.max(connection.score || 0, 95) : connection.score,
           settings: {
             ...(connection.settings || {}),
             metaAdsId: selected?.externalAccountId || connection.settings?.metaAdsId || '',
-            metaToken: connection.settings?.metaToken || (selected ? 'server-managed' : ''),
+            metaToken:
+              connection.settings?.metaToken || (mappedMetaStatus === 'connected' ? 'server-managed' : ''),
           },
         };
       }
