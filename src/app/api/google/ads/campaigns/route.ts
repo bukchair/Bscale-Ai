@@ -5,6 +5,11 @@ import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legac
 
 const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
 const normalizeCustomerId = (value: string) => value.replace(/\D/g, '');
+const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const normalizeDateParam = (value: string | null) => {
+  const trimmed = (value || '').trim();
+  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
+};
 
 const toErrorMessage = (status: number, raw: string, parsed: unknown) => {
   if (parsed && typeof parsed === 'object') {
@@ -40,6 +45,10 @@ export async function GET(request: Request) {
     const queryLoginCustomerId = normalizeCustomerId(url.searchParams.get('login_customer_id') || '');
     const loginCustomerId =
       queryLoginCustomerId || googleLegacyBridge.getLoginCustomerId(connection.metadata) || undefined;
+    const startDate = normalizeDateParam(url.searchParams.get('start_date'));
+    const endDate = normalizeDateParam(url.searchParams.get('end_date'));
+    const dateFilter =
+      startDate && endDate ? `\n              AND segments.date BETWEEN '${startDate}' AND '${endDate}'` : '';
 
     const headers: Record<string, string> = {
       authorization: `Bearer ${accessToken}`,
@@ -64,7 +73,7 @@ export async function GET(request: Request) {
               metrics.conversions_value,
               metrics.absolute_top_impression_percentage
             FROM campaign
-            WHERE campaign.status != 'REMOVED'
+            WHERE campaign.status != 'REMOVED'${dateFilter}
             LIMIT 200
           `,
         }),

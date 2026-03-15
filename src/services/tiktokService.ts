@@ -13,8 +13,18 @@ const API_BASE = (() => {
   }
 })();
 
-export async function fetchTikTokCampaigns(accessToken: string, advertiserId: string) {
-  const response = await fetch(`${API_BASE}/api/tiktok/campaigns?advertiser_id=${advertiserId}`, {
+export async function fetchTikTokCampaigns(
+  accessToken: string,
+  advertiserId: string,
+  startDate?: string,
+  endDate?: string
+) {
+  const query = new URLSearchParams();
+  query.set('advertiser_id', advertiserId);
+  if (startDate) query.set('start_date', startDate);
+  if (endDate) query.set('end_date', endDate);
+
+  const response = await fetch(`${API_BASE}/api/tiktok/campaigns?${query.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

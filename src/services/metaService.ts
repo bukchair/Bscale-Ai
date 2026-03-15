@@ -50,9 +50,18 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   return data.data;
 }
 
-export async function fetchMetaCampaigns(accessToken: string, adAccountId?: string) {
-  const query = adAccountId ? `?ad_account_id=${encodeURIComponent(adAccountId)}` : '';
-  const response = await fetch(`${API_BASE}/api/connections/meta/campaigns${query}`, {
+export async function fetchMetaCampaigns(
+  accessToken: string,
+  adAccountId?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  const query = new URLSearchParams();
+  if (adAccountId) query.set('ad_account_id', adAccountId);
+  if (startDate) query.set('start_date', startDate);
+  if (endDate) query.set('end_date', endDate);
+
+  const response = await fetch(`${API_BASE}/api/connections/meta/campaigns?${query.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

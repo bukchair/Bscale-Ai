@@ -30,8 +30,20 @@ export async function fetchGoogleAdAccounts(accessToken: string) {
   return data.resourceNames || [];
 }
 
-export async function fetchGoogleCampaigns(accessToken: string, customerId: string, loginCustomerId?: string) {
-  const response = await fetch(`${API_BASE}/api/google/ads/campaigns?customer_id=${customerId}${loginCustomerId ? `&login_customer_id=${loginCustomerId}` : ''}`, {
+export async function fetchGoogleCampaigns(
+  accessToken: string,
+  customerId: string,
+  loginCustomerId?: string,
+  startDate?: string,
+  endDate?: string
+) {
+  const query = new URLSearchParams();
+  query.set('customer_id', customerId);
+  if (loginCustomerId) query.set('login_customer_id', loginCustomerId);
+  if (startDate) query.set('start_date', startDate);
+  if (endDate) query.set('end_date', endDate);
+
+  const response = await fetch(`${API_BASE}/api/google/ads/campaigns?${query.toString()}`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

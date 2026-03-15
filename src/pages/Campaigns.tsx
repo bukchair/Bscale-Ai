@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, Loader2, Zap, Video, Mail, Target, ImagePlus
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { useDateRange } from '../contexts/DateRangeContext';
+import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { fetchMetaCampaigns } from '../services/metaService';
@@ -114,6 +114,7 @@ export function Campaigns() {
   const { format: formatCurrency } = useCurrency();
   const { connections } = useConnections();
   const { dateRange } = useDateRange();
+  const bounds = useDateRangeBounds();
   const isHebrew = language === 'he';
 
   const text = {
@@ -153,6 +154,8 @@ export function Campaigns() {
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
+  const startDateIso = useMemo(() => bounds.startDate.toISOString().slice(0, 10), [bounds.startDate]);
+  const endDateIso = useMemo(() => bounds.endDate.toISOString().slice(0, 10), [bounds.endDate]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedRecs, setAppliedRecs] = useState<number[]>([]);
@@ -308,18 +311,17 @@ export function Campaigns() {
     const token = tiktokConn?.settings?.tiktokToken || tiktokConn?.settings?.tiktokAccessToken;
     const advertiserId = tiktokConn?.settings?.tiktokAdvertiserId || tiktokConn?.settings?.advertiserId;
     if (tiktokConn?.status === 'connected' && token && advertiserId) {
-      setIsSyncing(true);
       try {
         const campaigns = await fetchTikTokCampaigns(
           token,
-          advertiserId
+          advertiserId,
+          startDateIso,
+          endDateIso
         );
 
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'TikTok'), ...campaigns]);
       } catch (err) {
         console.error("Failed to sync TikTok data:", err);
-      } finally {
-        setIsSyncing(false);
       }
     }
   };
@@ -332,18 +334,17 @@ export function Campaigns() {
       metaConn?.settings?.adAccountId ||
       metaConn?.settings?.metaAdAccountId;
     if (metaConn?.status === 'connected' && token) {
-      setIsSyncing(true);
       try {
         const campaigns = await fetchMetaCampaigns(
           token,
-          adAccountId || undefined
+          adAccountId || undefined,
+          startDateIso,
+          endDateIso
         );
         
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Meta'), ...campaigns]);
       } catch (err) {
         console.error("Failed to sync Meta data:", err);
-      } finally {
-        setIsSyncing(false);
       }
     }
   };
@@ -357,28 +358,39 @@ export function Campaigns() {
       googleConn?.settings?.googleCustomerId;
     const loginCustomerId = googleConn?.settings?.loginCustomerId;
     if (googleConn?.status === 'connected' && token && customerId) {
-      setIsSyncing(true);
       try {
         const campaigns = await fetchGoogleCampaigns(
           token,
           customerId,
-          loginCustomerId
+          loginCustomerId,
+          startDateIso,
+          endDateIso
         );
         
         setRealCampaigns(prev => [...prev.filter(c => c.platform !== 'Google'), ...campaigns]);
       } catch (err) {
         console.error("Failed to sync Google data:", err);
-      } finally {
-        setIsSyncing(false);
       }
     }
   };
 
   useEffect(() => {
-    syncTikTokData();
-    syncMetaData();
-    syncGoogleData();
-  }, [connections]);
+    let cancelled = false;
+    const syncAll = async () => {
+      setIsSyncing(true);
+      try {
+        await Promise.all([syncTikTokData(), syncMetaData(), syncGoogleData()]);
+      } finally {
+        if (!cancelled) {
+          setIsSyncing(false);
+        }
+      }
+    };
+    void syncAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [connections, startDateIso, endDateIso]);
 
   useEffect(() => {
     fetchRecommendations();

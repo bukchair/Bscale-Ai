@@ -5,6 +5,11 @@ import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 
 const META_GRAPH_VERSION = 'v21.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
+const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const normalizeDateParam = (value: string | null) => {
+  const trimmed = (value || '').trim();
+  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
+};
 
 const toAccountResource = (value: string) => {
   const trimmed = value.trim();
@@ -29,6 +34,8 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const requestedAccountId = (url.searchParams.get('ad_account_id') || '').trim();
+    const startDate = normalizeDateParam(url.searchParams.get('start_date'));
+    const endDate = normalizeDateParam(url.searchParams.get('end_date'));
 
     let accessToken = getBearerToken(request);
     let resolvedAccountId = requestedAccountId;
@@ -56,6 +63,15 @@ export async function GET(request: Request) {
       'fields',
       'id,name,status,objective,start_time,stop_time,insights{spend,inline_link_click_ctr,purchase_roas,roas,actions,action_values}'
     );
+    if (startDate && endDate) {
+      graphUrl.searchParams.set(
+        'time_range',
+        JSON.stringify({
+          since: startDate,
+          until: endDate,
+        })
+      );
+    }
     graphUrl.searchParams.set('access_token', accessToken);
 
     const response = await fetch(graphUrl.toString());

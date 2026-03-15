@@ -5,11 +5,18 @@ const getBearerToken = (request: Request): string => {
   if (!auth.toLowerCase().startsWith('bearer ')) return '';
   return auth.slice(7).trim();
 };
+const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const normalizeDateParam = (value: string | null) => {
+  const trimmed = (value || '').trim();
+  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
+};
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const advertiserId = (url.searchParams.get('advertiser_id') || '').trim();
+    const startDateParam = normalizeDateParam(url.searchParams.get('start_date'));
+    const endDateParam = normalizeDateParam(url.searchParams.get('end_date'));
     const accessToken = getBearerToken(request);
 
     if (!accessToken || !advertiserId) {
@@ -48,8 +55,10 @@ export async function GET(request: Request) {
       return NextResponse.json(campaignsData, { status: 200 });
     }
 
-    const endDate = new Date();
-    const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const endDate = endDateParam ? new Date(`${endDateParam}T23:59:59.999Z`) : new Date();
+    const startDate = startDateParam
+      ? new Date(`${startDateParam}T00:00:00.000Z`)
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const asDate = (value: Date) => value.toISOString().slice(0, 10);
 
     const reportPayload = {
