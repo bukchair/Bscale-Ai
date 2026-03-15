@@ -23,8 +23,9 @@ import { Auth } from './pages/Auth';
 import { WooCommerce } from './pages/WooCommerce';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { useLanguage } from './contexts/LanguageContext';
-import { auth, onAuthStateChanged, syncUserProfile } from './lib/firebase';
+import { auth, db, onAuthStateChanged, syncUserProfile } from './lib/firebase';
 import { AppNavigationProvider } from './contexts/AppNavigationContext';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 
 const TAB_IDS = [
   'dashboard',
@@ -69,6 +70,10 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const hasExplicitTabInUrl = () => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).has('tab');
+  };
 
   const navigateToTab = (tab: string, replace = false) => {
     const normalizedTab = TAB_SET.has(tab) ? tab : 'dashboard';
@@ -82,7 +87,28 @@ export default function App() {
       if (user) {
         const profile = await syncUserProfile(user);
         setUserProfile(profile);
-        navigateToTab(getTabFromUrl(), true);
+
+        let hasUnreadSystemNotifications = false;
+        try {
+          const unreadQuery = query(
+            collection(db, 'users', user.uid, 'notifications'),
+            where('read', '==', false),
+            limit(1)
+          );
+          const unreadSnapshot = await getDocs(unreadQuery);
+          hasUnreadSystemNotifications = !unreadSnapshot.empty;
+        } catch (error) {
+          console.warn('Failed to check unread system notifications:', error);
+        }
+
+        const tabFromUrl = getTabFromUrl();
+        const hasExplicitTab = hasExplicitTabInUrl();
+        if (hasUnreadSystemNotifications) {
+          sessionStorage.setItem('bscale-open-notifications', '1');
+          navigateToTab(hasExplicitTab ? tabFromUrl : 'approvals-automations', true);
+        } else {
+          navigateToTab(tabFromUrl, true);
+        }
         setView('app');
       } else {
         setUserProfile(null);

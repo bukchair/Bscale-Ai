@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Menu, Bell, Search, User, ChevronDown, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Menu, Bell, ChevronDown, CheckCircle, AlertTriangle, Calendar } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, DateRangeType } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -7,13 +7,25 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
 import { useAppNavigation } from '../contexts/AppNavigationContext';
+import { auth, db, onAuthStateChanged } from '../lib/firebase';
+import { collection, doc, limit, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
+interface SystemNotification {
+  id: string;
+  title: string;
+  message: string;
+  type?: string;
+  read?: boolean;
+  createdAt?: string;
+}
+
 export function Header({ onMenuClick }: HeaderProps) {
   const { t, dir } = useLanguage();
+  const isHebrew = dir === 'rtl';
   const { navigateTo } = useAppNavigation();
   const { dateRange, setDateRange, customRange, setCustomRange } = useDateRange();
   const { connections, overallQualityScore, connectedCount, totalCount } = useConnections();
@@ -22,7 +34,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [isMobileDateMenuOpen, setIsMobileDateMenuOpen] = useState(false);
   const [isMobileConnectionsOpen, setIsMobileConnectionsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<number[]>([]);
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
+  const [activeUid, setActiveUid] = useState<string | null>(auth.currentUser?.uid || null);
+  const [showNotificationsHint, setShowNotificationsHint] = useState(false);
+  const prevUnreadRef = useRef(0);
   const toInputDate = (value: Date | null) => {
     if (!value) return '';
     const year = value.getFullYear();
@@ -31,19 +46,102 @@ export function Header({ onMenuClick }: HeaderProps) {
     return `${year}-${month}-${day}`;
   };
 
-  const notifications = [
-    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: t('notifications.time.hoursAgo', { count: 2 }), icon: CheckCircle, color: 'text-emerald-500' },
-    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: t('notifications.time.hoursAgo', { count: 5 }), icon: AlertTriangle, color: 'text-amber-500' },
-    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: t('notifications.time.daysAgo', { count: 1 }), icon: Search, color: 'text-indigo-500' },
-    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: t('notifications.time.daysAgo', { count: 2 }), icon: AlertTriangle, color: 'text-red-500' },
-  ].filter((n) => !dismissedNotificationIds.includes(n.id));
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setActiveUid(user?.uid || null);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const handleNotificationClick = (type: string) => {
-    if (type === 'ai') navigateTo('ai-recommendations');
-    if (type === 'budget') navigateTo('budget');
-    if (type === 'feature') navigateTo('seo');
-    if (type === 'error') navigateTo('connections');
+  useEffect(() => {
+    if (!activeUid) {
+      setSystemNotifications([]);
+      prevUnreadRef.current = 0;
+      return;
+    }
+
+    const notificationsQuery = query(
+      collection(db, 'users', activeUid, 'notifications'),
+      orderBy('createdAt', 'desc'),
+      limit(30)
+    );
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const next = snapshot.docs.map((item) => {
+        const data = item.data() as Omit<SystemNotification, 'id'>;
+        return {
+          id: item.id,
+          ...data,
+        };
+      });
+      setSystemNotifications(next);
+    });
+
+    return () => unsubscribe();
+  }, [activeUid]);
+
+  useEffect(() => {
+    const shouldOpen = sessionStorage.getItem('bscale-open-notifications') === '1';
+    if (shouldOpen) {
+      sessionStorage.removeItem('bscale-open-notifications');
+      setIsNotificationsOpen(true);
+      setShowNotificationsHint(true);
+    }
+  }, []);
+
+  const unreadCount = useMemo(
+    () => systemNotifications.filter((item) => !item.read).length,
+    [systemNotifications]
+  );
+
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      setShowNotificationsHint(true);
+      setIsNotificationsOpen(true);
+    }
+    if (unreadCount === 0) {
+      setShowNotificationsHint(false);
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
+
+  const formatNotificationTime = (createdAt?: string) => {
+    if (!createdAt) return isHebrew ? 'עכשיו' : 'Now';
+    const ts = new Date(createdAt).getTime();
+    if (!Number.isFinite(ts)) return isHebrew ? 'עכשיו' : 'Now';
+    const diffMs = Math.max(0, Date.now() - ts);
+    const diffMinutes = Math.floor(diffMs / (60 * 1000));
+    if (diffMinutes < 1) return isHebrew ? 'עכשיו' : 'Now';
+    if (diffMinutes < 60) return isHebrew ? `לפני ${diffMinutes} דק׳` : `${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return isHebrew ? `לפני ${diffHours} שעות` : `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return isHebrew ? `לפני ${diffDays} ימים` : `${diffDays}d ago`;
+  };
+
+  const markNotificationRead = async (notificationId: string) => {
+    if (!activeUid) return;
+    try {
+      await updateDoc(doc(db, 'users', activeUid, 'notifications', notificationId), {
+        read: true,
+        readAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (!activeUid) return;
+    const unread = systemNotifications.filter((item) => !item.read);
+    await Promise.all(unread.map((item) => markNotificationRead(item.id)));
+  };
+
+  const handleNotificationClick = async (notificationId: string) => {
+    await markNotificationRead(notificationId);
+    navigateTo('approvals-automations');
     setIsNotificationsOpen(false);
+    setShowNotificationsHint(false);
   };
 
   const handleDateClick = (range: DateRangeType) => {
@@ -220,15 +318,34 @@ export function Header({ onMenuClick }: HeaderProps) {
         
         <div className="relative">
           <button 
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            onClick={() => {
+              setIsNotificationsOpen((prev) => !prev);
+              setShowNotificationsHint(false);
+            }}
             className={cn(
               "p-2 rounded-lg transition-colors relative",
               isNotificationsOpen ? "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white" : "text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
             )}
           >
             <Bell className="w-6 h-6" />
-            <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
+            {unreadCount > 0 && (
+              <>
+                <span className="absolute top-1.5 end-1.5 block w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111]" />
+                <span className="absolute -top-1 -end-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              </>
+            )}
           </button>
+
+          {showNotificationsHint && unreadCount > 0 && (
+            <div className={cn(
+              "absolute top-full mt-2 z-50 px-3 py-2 rounded-lg bg-indigo-600 text-white text-[11px] font-bold shadow-lg",
+              dir === 'rtl' ? "left-0" : "right-0"
+            )}>
+              {isHebrew ? 'יש לך הודעת מערכת חדשה בהתראות' : 'You have a new system alert'}
+            </div>
+          )}
 
           {isNotificationsOpen && (
             <div className={cn(
@@ -238,10 +355,16 @@ export function Header({ onMenuClick }: HeaderProps) {
               <div className="p-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between bg-gray-50/50 dark:bg-white/5">
                 <div>
                   <h4 className="text-sm font-bold text-gray-900 dark:text-white">{t('notifications.title')}</h4>
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{t('notifications.subtitle')}</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                    {isHebrew
+                      ? `הודעות מערכת פעילות: ${systemNotifications.length}`
+                      : `Active system alerts: ${systemNotifications.length}`}
+                  </p>
                 </div>
                 <button
-                  onClick={() => setDismissedNotificationIds((prev) => [...prev, ...notifications.map((n) => n.id)])}
+                  onClick={() => {
+                    void markAllNotificationsRead();
+                  }}
                   className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
                   {t('notifications.clearAll')}
@@ -249,24 +372,39 @@ export function Header({ onMenuClick }: HeaderProps) {
               </div>
 
               <div className="max-h-[400px] overflow-y-auto">
-                {notifications.length > 0 ? (
+                {systemNotifications.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-white/5">
-                    {notifications.map((notif) => (
+                    {systemNotifications.map((notif) => (
                       <button 
                         key={notif.id}
-                        onClick={() => handleNotificationClick(notif.type)}
+                        onClick={() => {
+                          void handleNotificationClick(notif.id);
+                        }}
                         className="w-full p-4 flex gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors text-start"
                       >
-                        <div className={cn("p-2 rounded-lg bg-gray-100 dark:bg-white/5 shrink-0", notif.color)}>
-                          <notif.icon className="w-4 h-4" />
+                        <div
+                          className={cn(
+                            "p-2 rounded-lg bg-gray-100 dark:bg-white/5 shrink-0",
+                            notif.read ? "text-gray-400" : "text-indigo-600"
+                          )}
+                        >
+                          {notif.type === 'system' ? (
+                            <AlertTriangle className="w-4 h-4" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{notif.title}</p>
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">{notif.time}</span>
+                            <p className={cn("text-xs font-bold truncate", notif.read ? "text-gray-600 dark:text-gray-300" : "text-gray-900 dark:text-white")}>
+                              {notif.title || (isHebrew ? 'הודעת מערכת' : 'System message')}
+                            </p>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">
+                              {formatNotificationTime(notif.createdAt)}
+                            </span>
                           </div>
                           <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-relaxed line-clamp-2">
-                            {notif.desc}
+                            {notif.message}
                           </p>
                         </div>
                       </button>

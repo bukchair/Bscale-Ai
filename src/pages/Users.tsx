@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Users as UsersIcon, Shield, UserPlus, MoreVertical, Search, Edit2, Trash2, Building, Mail, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { db, auth } from '../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
 
 interface UserProfile {
   uid: string;
@@ -25,6 +25,7 @@ const roleLabels: Record<UserProfile['role'], { labelKey: string, icon: React.El
 
 export function Users() {
   const { t, dir } = useLanguage();
+  const isHebrew = dir === 'rtl';
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +34,13 @@ export function Users() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserProfile['role']>('viewer');
+  const [systemTarget, setSystemTarget] = useState<'all' | 'single'>('all');
+  const [systemSelectedUserId, setSystemSelectedUserId] = useState('');
+  const [systemTitle, setSystemTitle] = useState('');
+  const [systemMessage, setSystemMessage] = useState('');
+  const [systemSending, setSystemSending] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const q = query(collection(db, 'users'));
@@ -87,6 +95,97 @@ export function Users() {
       setNewUserRole('viewer');
     } catch (error) {
       console.error('Error creating user:', error);
+    }
+  };
+
+  const handleOpenSingleUserComposer = (userId: string) => {
+    setSystemTarget('single');
+    setSystemSelectedUserId(userId);
+    composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const recipientUsers = useMemo(() => {
+    if (systemTarget === 'all') return users;
+    return users.filter((user) => user.uid === systemSelectedUserId);
+  }, [systemSelectedUserId, systemTarget, users]);
+
+  const handleSendSystemMessage = async () => {
+    const title = systemTitle.trim();
+    const message = systemMessage.trim();
+    if (!title || !message) {
+      setSystemStatus({
+        type: 'error',
+        message: isHebrew ? 'יש למלא כותרת ותוכן הודעה.' : 'Please provide both title and message.',
+      });
+      return;
+    }
+
+    if (recipientUsers.length === 0) {
+      setSystemStatus({
+        type: 'error',
+        message: isHebrew ? 'לא נבחרו נמענים לשליחה.' : 'No recipients selected.',
+      });
+      return;
+    }
+
+    const adminUser = auth.currentUser;
+    if (!adminUser) {
+      setSystemStatus({
+        type: 'error',
+        message: isHebrew ? 'נדרש אימות אדמין לפני שליחה.' : 'Admin authentication is required before sending.',
+      });
+      return;
+    }
+
+    setSystemSending(true);
+    setSystemStatus(null);
+    try {
+      // Firestore batch limit is 500 operations; commit in chunks for safety.
+      const chunkSize = 400;
+      for (let i = 0; i < recipientUsers.length; i += chunkSize) {
+        const chunk = recipientUsers.slice(i, i + chunkSize);
+        const batch = writeBatch(db);
+        const createdAt = new Date().toISOString();
+
+        for (const user of chunk) {
+          const notificationRef = doc(collection(db, 'users', user.uid, 'notifications'));
+          batch.set(notificationRef, {
+            type: 'system',
+            title,
+            message,
+            read: false,
+            createdAt,
+            createdByUid: adminUser.uid,
+            createdByName: adminUser.displayName || adminUser.email || 'Admin',
+            targetScope: systemTarget,
+            targetUserId: systemTarget === 'single' ? user.uid : null,
+          });
+        }
+
+        await batch.commit();
+      }
+
+      setSystemStatus({
+        type: 'success',
+        message:
+          systemTarget === 'all'
+            ? isHebrew
+              ? `הודעת מערכת נשלחה ל-${recipientUsers.length} משתמשים.`
+              : `System message sent to ${recipientUsers.length} users.`
+            : isHebrew
+            ? 'הודעת מערכת נשלחה למשתמש בהצלחה.'
+            : 'System message sent successfully.',
+      });
+      setSystemTitle('');
+      setSystemMessage('');
+    } catch (error) {
+      console.error('Error sending system message:', error);
+      setSystemStatus({
+        type: 'error',
+        message: isHebrew ? 'שליחת הודעת המערכת נכשלה.' : 'Failed to send system message.',
+      });
+    } finally {
+      setSystemSending(false);
     }
   };
 
@@ -279,6 +378,13 @@ export function Users() {
                     </td>
                     <td className="px-6 py-4 text-left">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => handleOpenSingleUserComposer(user.uid)}
+                          className="text-gray-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
+                          title={isHebrew ? 'שלח הודעת מערכת למשתמש' : 'Send system message to user'}
+                        >
+                          <Mail className="w-4 h-4" />
+                        </button>
                         <button 
                           onClick={() => setDeleteConfirmId(user.uid)}
                           disabled={user.email === 'asher205@gmail.com'}
@@ -303,6 +409,101 @@ export function Users() {
               <p className="text-gray-500 text-sm">{t('users.noResultsDesc')}</p>
             </div>
           )}
+        </div>
+      </div>
+
+      <div ref={composerRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-gray-900">
+              {isHebrew ? 'שליחת הודעת מערכת למשתמשים' : 'Send system message to users'}
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              {isHebrew
+                ? 'רק אדמין יכול לשלוח הודעה למשתמש ספציפי או לכל המשתמשים.'
+                : 'Only admins can send a message to a specific user or to all users.'}
+            </p>
+          </div>
+          <div className="text-[11px] font-bold px-2 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+            Admin only
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            onClick={() => setSystemTarget('all')}
+            className={cn(
+              'px-3 py-2 rounded-lg text-xs font-bold border transition-colors',
+              systemTarget === 'all'
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            )}
+          >
+            {isHebrew ? 'לכל המשתמשים' : 'All users'}
+          </button>
+          <button
+            onClick={() => setSystemTarget('single')}
+            className={cn(
+              'px-3 py-2 rounded-lg text-xs font-bold border transition-colors',
+              systemTarget === 'single'
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            )}
+          >
+            {isHebrew ? 'למשתמש ספציפי' : 'Specific user'}
+          </button>
+          <select
+            value={systemSelectedUserId}
+            onChange={(e) => setSystemSelectedUserId(e.target.value)}
+            disabled={systemTarget !== 'single'}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs disabled:bg-gray-50 disabled:text-gray-400"
+          >
+            <option value="">{isHebrew ? 'בחר משתמש' : 'Select user'}</option>
+            {users.map((user) => (
+              <option key={`system-recipient-${user.uid}`} value={user.uid}>
+                {user.name} ({user.email})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <input
+            value={systemTitle}
+            onChange={(e) => setSystemTitle(e.target.value)}
+            placeholder={isHebrew ? 'כותרת הודעת מערכת' : 'System message title'}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+          />
+          <textarea
+            value={systemMessage}
+            onChange={(e) => setSystemMessage(e.target.value)}
+            placeholder={isHebrew ? 'כתוב כאן את תוכן ההודעה...' : 'Write the message content here...'}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-28 resize-y"
+          />
+        </div>
+
+        {systemStatus && (
+          <div
+            className={cn(
+              'rounded-lg px-3 py-2 text-xs font-bold border',
+              systemStatus.type === 'success'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-red-50 text-red-700 border-red-200'
+            )}
+          >
+            {systemStatus.message}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end">
+          <button
+            onClick={handleSendSystemMessage}
+            disabled={systemSending || (systemTarget === 'single' && !systemSelectedUserId)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {systemSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+            {isHebrew ? 'שלח הודעת מערכת' : 'Send system message'}
+          </button>
         </div>
       </div>
       {/* Delete Confirmation Modal */}

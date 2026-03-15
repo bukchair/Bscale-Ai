@@ -13,9 +13,15 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    function hasAdminRole() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     function isAdmin() {
       return isAuthenticated() && 
-        (request.auth.token.email == "asher205@gmail.com" && request.auth.token.email_verified == true);
+        ((request.auth.token.email == "asher205@gmail.com" && request.auth.token.email_verified == true) || hasAdminRole());
     }
     
     function isAgency() {
@@ -66,6 +72,17 @@ service cloud.firestore {
 
       match /settings/{settingId} {
         allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isAdmin();
+        allow update: if isAdmin() || (
+          isOwner(userId) &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly(['read', 'readAt']) &&
+          request.resource.data.read is bool
+        );
+        allow delete: if isAdmin();
       }
     }
     
