@@ -10,7 +10,7 @@ type BridgePlatform = 'GOOGLE_ADS' | 'GA4' | 'SEARCH_CONSOLE' | 'GMAIL';
 type BridgeConnection = {
   id: string;
   metadata: unknown;
-  connectedAccounts: Array<{ externalAccountId: string; isSelected: boolean }>;
+  connectedAccounts: Array<{ externalAccountId: string; isSelected: boolean; status?: string }>;
 };
 
 const providers = {
@@ -72,8 +72,10 @@ export const googleLegacyBridge = {
 
   pickSelectedAccountId(connection: BridgeConnection): string | null {
     const selected =
-      connection.connectedAccounts.find((account) => account.isSelected)?.externalAccountId ||
-      connection.connectedAccounts[0]?.externalAccountId;
+      connection.connectedAccounts.find(
+        (account) => account.isSelected && account.status !== 'ARCHIVED'
+      )?.externalAccountId ||
+      connection.connectedAccounts.find((account) => account.status !== 'ARCHIVED')?.externalAccountId;
     return selected ? normalizeCustomerId(selected) : null;
   },
 };

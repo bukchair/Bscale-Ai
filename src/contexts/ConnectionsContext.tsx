@@ -257,25 +257,16 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
         if (selectedAdsAccount?.externalAccountId) {
           nextSettings.googleAdsId = formatGoogleAdsAccountId(selectedAdsAccount.externalAccountId);
-        } else {
-          delete nextSettings.googleAdsId;
         }
         if (selectedGa4?.externalAccountId) {
           nextSettings.ga4Id = selectedGa4.externalAccountId;
-        } else {
-          delete nextSettings.ga4Id;
         }
         if (selectedGsc?.externalAccountId) {
           nextSettings.gscSiteUrl = selectedGsc.externalAccountId;
           nextSettings.siteUrl = selectedGsc.externalAccountId;
-        } else {
-          delete nextSettings.gscSiteUrl;
-          delete nextSettings.siteUrl;
         }
         if (selectedGmail?.name) {
           nextSettings.gmailAccount = selectedGmail.name;
-        } else {
-          delete nextSettings.gmailAccount;
         }
         if (adsAccounts.length) {
           nextSettings.googleAdsAccounts = JSON.stringify(
@@ -288,8 +279,6 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
               timezone: account.timezone ?? null,
             }))
           );
-        } else {
-          delete nextSettings.googleAdsAccounts;
         }
         if (googleManagedStatuses.some((status) => status === 'CONNECTED' || status === 'PENDING')) {
           nextSettings.googleAccessToken = 'server-managed';
@@ -298,7 +287,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         }
 
         const fallbackStatus = (() => {
-          if (!googleManagedStatuses.length) return connection.status;
+          if (!googleManagedStatuses.length) return 'disconnected' as ConnectionStatus;
           if (googleManagedStatuses.includes('CONNECTED')) return 'connected' as ConnectionStatus;
           if (googleManagedStatuses.includes('PENDING')) return 'connecting' as ConnectionStatus;
           if (googleManagedStatuses.includes('ERROR') || googleManagedStatuses.includes('EXPIRED')) {
@@ -336,6 +325,18 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
               mappedMetaStatus === 'connected' || mappedMetaStatus === 'connecting'
                 ? 'server-managed'
                 : '',
+          },
+        };
+      }
+      if (connection.id === 'meta' && !meta) {
+        return {
+          ...connection,
+          status: 'disconnected',
+          score: undefined,
+          settings: {
+            ...(connection.settings || {}),
+            metaAdsId: '',
+            metaToken: '',
           },
         };
       }

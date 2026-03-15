@@ -40,8 +40,13 @@ export async function GET(request: Request) {
     const endDate = normalizeDateParam(url.searchParams.get('end_date'));
     const fallbackPropertyId =
       resolvedPlatform === 'GA4'
-        ? connection.connectedAccounts.find((account) => account.isSelected)?.externalAccountId ||
-          connection.connectedAccounts[0]?.externalAccountId ||
+        ? connection.connectedAccounts.find(
+            (account: { isSelected?: boolean; status?: string }) =>
+              account.isSelected && account.status !== 'ARCHIVED'
+          )?.externalAccountId ||
+          connection.connectedAccounts.find(
+            (account: { status?: string }) => account.status !== 'ARCHIVED'
+          )?.externalAccountId ||
           ''
         : '';
     let propertyId = normalizePropertyId(queryPropertyId || fallbackPropertyId);

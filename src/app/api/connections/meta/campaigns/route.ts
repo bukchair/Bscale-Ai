@@ -20,8 +20,10 @@ const toAccountResource = (value: string) => {
 const pickSelectedAccountId = (
   connection: Awaited<ReturnType<typeof connectionService.getByUserPlatform>>
 ) =>
-  connection?.connectedAccounts.find((account) => account.isSelected)?.externalAccountId ||
-  connection?.connectedAccounts[0]?.externalAccountId ||
+  connection?.connectedAccounts.find(
+    (account) => account.isSelected && account.status !== 'ARCHIVED'
+  )?.externalAccountId ||
+  connection?.connectedAccounts.find((account) => account.status !== 'ARCHIVED')?.externalAccountId ||
   '';
 
 const getBearerToken = (request: Request): string => {
