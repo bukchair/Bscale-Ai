@@ -68,7 +68,8 @@ export async function POST(request: Request) {
       `${baseUrl}/index.php/wp-json/wc/v3/${endpointPath}`,
       `${baseUrl}/wc-api/v3/${endpointPath}`,
     ];
-    const authModes: Array<'query' | 'header' | 'both'> = ['query', 'header', 'both'];
+    // Try header auth first to avoid exposing credentials in URL logs/history.
+    const authModes: Array<'header' | 'query' | 'both'> = ['header', 'query', 'both'];
 
     let lastStatus = 500;
     let lastPayload: unknown = null;
@@ -125,13 +126,12 @@ export async function POST(request: Request) {
       },
       { status: lastStatus }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       {
         message:
           'Failed to connect to WooCommerce store. Please check the URL and that the store is accessible.',
         code: 'connection_failed',
-        debug: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

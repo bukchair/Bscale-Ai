@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
@@ -8,16 +9,17 @@ import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
 import { GOOGLE_ADS_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 
+const updateCampaignSchema = z.object({
+  platform: z.enum(['Google', 'Meta', 'TikTok']),
+  campaignId: z.string().min(1),
+  name: z.string().min(1).max(120),
+  status: z.enum(['Active', 'Paused']),
+  dailyBudget: z.number().finite().nonnegative().nullable().optional(),
+});
+
 type PlatformName = 'Google' | 'Meta' | 'TikTok';
 type UiStatus = 'Active' | 'Paused';
-
-type UpdateCampaignBody = {
-  platform?: PlatformName;
-  campaignId?: string;
-  name?: string;
-  status?: UiStatus;
-  dailyBudget?: number | null;
-};
+type UpdateCampaignBody = z.infer<typeof updateCampaignSchema>;
 
 const toGoogleStatus = (status: UiStatus) => (status === 'Active' ? 'ENABLED' : 'PAUSED');
 const toMetaStatus = (status: UiStatus) => (status === 'Active' ? 'ACTIVE' : 'PAUSED');
@@ -37,7 +39,7 @@ const extractErrorMessage = async (response: Response) => {
   const raw = await response.text();
   if (!raw) return `Request failed with status ${response.status}`;
   try {
-    const parsed = JSON.parse(raw) as Record<string, any>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     return (
       parsed?.error?.message ||
       parsed?.error?.details?.[0]?.message ||
@@ -206,7 +208,7 @@ const updateTikTokCampaign = async (
     },
     body: JSON.stringify(payload),
   });
-  const parsed = (await response.json().catch(() => null)) as Record<string, any> | null;
+  const parsed = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   if (!response.ok || Number(parsed?.code) !== 0) {
     throw new Error(String(parsed?.message || `TikTok update failed (${response.status}).`));
   }
@@ -222,35 +224,16 @@ const updateTikTokCampaign = async (
 export async function POST(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
-    const body = (await request.json().catch(() => null)) as UpdateCampaignBody | null;
-    if (!body?.platform || !body?.campaignId || !body?.name || !body?.status) {
+    const rawBody = await request.json().catch(() => null);
+    const parseResult = updateCampaignSchema.safeParse(rawBody);
+    if (!parseResult.success) {
       return NextResponse.json(
-        {
-          success: false,
-          message: 'platform, campaignId, name, and status are required.',
-        },
-        { status: 400 }
-      );
-    }
-    if (!['Google', 'Meta', 'TikTok'].includes(body.platform)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Unsupported platform for campaign update.',
-        },
-        { status: 400 }
-      );
-    }
-    if (!['Active', 'Paused'].includes(body.status)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'status must be Active or Paused.',
-        },
+        { success: false, message: parseResult.error.issues[0]?.message ?? 'Invalid request body.' },
         { status: 400 }
       );
     }
 
+    const body: UpdateCampaignBody = parseResult.data;
     const payload = {
       campaignId: body.campaignId,
       name: body.name,

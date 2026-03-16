@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
-
-const GA4_DATA_API = 'https://analyticsdata.googleapis.com/v1beta';
-const GA4_ADMIN_API = 'https://analyticsadmin.googleapis.com/v1beta';
+import { GA4_DATA_API, GA4_ADMIN_API, GA4_MAX_PROPERTY_DISCOVERY_CANDIDATES } from '@/src/lib/constants/api-urls';
 const normalizePropertyId = (value: string) => value.replace(/^properties\//, '').trim();
 const normalizeMeasurementId = (value: string) => String(value || '').trim().toUpperCase();
 const isNumericPropertyId = (value: string) => /^\d+$/.test(value);
@@ -106,7 +104,7 @@ export async function GET(request: Request) {
     // Accept Measurement ID (G-XXXX) input by resolving it to a GA4 numeric property ID.
     if (!isNumericPropertyId(propertyId) && isMeasurementId(queryMeasurementId)) {
       const discovered = await getDiscoverablePropertyIds();
-      const candidates = discovered.propertyIds.slice(0, 80);
+      const candidates = discovered.propertyIds.slice(0, GA4_MAX_PROPERTY_DISCOVERY_CANDIDATES);
       for (const candidatePropertyId of candidates) {
         const streamsResponse = await fetch(
           `${GA4_ADMIN_API}/properties/${candidatePropertyId}/dataStreams?pageSize=200`,

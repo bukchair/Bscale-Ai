@@ -56,7 +56,7 @@ async function startServer() {
           headers['Content-Type'] = 'application/json';
         }
 
-        console.log(`Attempting WooCommerce ${method} request to: ${urlObj.origin}${urlObj.pathname}`);
+        // debug: WooCommerce ${method} → ${urlObj.origin}${urlObj.pathname}
         
         const options: RequestInit = {
           method,
@@ -77,19 +77,18 @@ async function startServer() {
 
       // Try 2: If 405 or 404, try with index.php
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 1 failed (${response.status}), trying with index.php...`);
+        // Attempt 1 failed (${response.status}), trying with index.php...
         apiUrl = `${baseUrl}/index.php/wp-json/wc/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
       // Try 3: Legacy API if still failing
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 2 failed (${response.status}), trying legacy API path...`);
+        // Attempt 2 failed (${response.status}), trying legacy API path...
         apiUrl = `${baseUrl}/wc-api/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
-      console.log(`Final WooCommerce response status: ${response.status}`);
       const text = await response.text();
       
       let data;
@@ -591,7 +590,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    console.info(`Server running on port ${PORT}`);
   });
 }
 

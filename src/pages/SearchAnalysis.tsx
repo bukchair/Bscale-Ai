@@ -150,7 +150,7 @@ export function SearchAnalysis() {
   );
 
   const gscSignalsByTerm = (
-    rows: any[]
+    rows: Record<string, unknown>[]
   ): Map<string, { clicks: number; impressions: number; position: number; ctr: number }> => {
     const map = new Map<string, { clicks: number; impressions: number; position: number; ctr: number }>();
     rows.forEach((row) => {
@@ -210,7 +210,7 @@ export function SearchAnalysis() {
 
       if (adsResult.status === 'fulfilled') {
         const adsRows = Array.isArray(adsResult.value) ? adsResult.value : [];
-        adsRows.forEach((row: any) => {
+        adsRows.forEach((row: Record<string, unknown>) => {
           const term = String(row?.term || '').trim();
           if (!term) return;
           const normalized = term.toLowerCase();
@@ -271,7 +271,7 @@ export function SearchAnalysis() {
       }
 
       if (gscResult.status === 'fulfilled') {
-        gscRows.forEach((row: any) => {
+        gscRows.forEach((row: Record<string, unknown>) => {
           const term = String(row?.keys?.[0] || '').trim();
           if (!term) return;
           const impressions = Number(row?.impressions || 0);
@@ -407,8 +407,9 @@ export function SearchAnalysis() {
       const appliedRows = Array.isArray(payload?.applied) ? payload.applied : [];
       const failedRows = Array.isArray(payload?.failed) ? payload.failed : [];
 
+      type NegativeKeywordRow = Record<string, unknown>;
       setNegativeKeywords((prev) => [
-        ...appliedRows.map((item: any) => ({
+        ...appliedRows.map((item: NegativeKeywordRow) => ({
           id: `${item.campaignId}-${item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
@@ -416,7 +417,7 @@ export function SearchAnalysis() {
           addedDate: nowDate,
           result: 'applied' as const,
         })),
-        ...failedRows.map((item: any) => ({
+        ...failedRows.map((item: NegativeKeywordRow) => ({
           id: `${item.campaignId}-${item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
@@ -429,7 +430,7 @@ export function SearchAnalysis() {
       ]);
 
       const appliedSet = new Set(
-        appliedRows.map((item: any) => `${String(item.campaignId || '')}:${String(item.term || '').toLowerCase()}`)
+        appliedRows.map((item: NegativeKeywordRow) => `${String(item.campaignId || '')}:${String(item.term || '').toLowerCase()}`)
       );
       setSearchTerms((prev) =>
         prev.map((row) => {

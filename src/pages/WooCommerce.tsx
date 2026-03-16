@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, Package, DollarSign, Tag, Loader2, AlertCircle, RefreshCw, Sparkles, Image as ImageIcon, CheckCircle2, Search, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -8,6 +8,15 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { getAIKeysFromConnections } from '../lib/gemini';
 import { requestJSON, type AIKeys } from '../lib/multiAI';
+
+/** Strip HTML tags and return plain text, preventing XSS from external product data. */
+const stripHtml = (html: string): string => {
+  if (!html) return '';
+  if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const div = document.createElement('div');
+  div.textContent = html;
+  return (div.textContent || '').replace(/\s+/g, ' ').trim();
+};
 
 interface Product {
   id: number;
@@ -536,12 +545,12 @@ export function WooCommerce() {
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('woocommerce.shortDescription')}</label>
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-sm text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedProduct.short_description }} />
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-sm text-gray-700 leading-relaxed">{stripHtml(selectedProduct.short_description)}</div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t('woocommerce.fullDescription')}</label>
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: selectedProduct.description }} />
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{stripHtml(selectedProduct.description)}</div>
                 </div>
               </div>
             </>

@@ -11,42 +11,62 @@ import { IntegrationError, OAuthStateMismatchError } from '@/src/lib/integration
 export const integrationOrchestrator = {
   async listConnections(userId: string) {
     const connections = await connectionService.listForUser(userId);
-    const mapped = await Promise.all(
-      connections.map(async (connection) => {
-        const history = await syncService.historyForConnection(connection.id, 5);
-        return {
-          id: connection.id,
-          platform: connection.platform,
-          status: connection.status,
-          lastSyncAt: connection.lastSyncAt,
-          lastError: connection.lastError,
-          updatedAt: connection.updatedAt,
-          connectedAccountCount: connection.connectedAccounts.length,
-          selectedAccountCount: connection.connectedAccounts.filter((account) => account.isSelected).length,
-          accounts: connection.connectedAccounts.map((account) => ({
-            id: account.id,
-            externalAccountId: account.externalAccountId,
-            name: account.name,
-            status: account.status,
-            isSelected: account.isSelected,
-            currency: account.currency,
-            timezone: account.timezone,
-            metadata: account.metadata,
-          })),
-          history: history.map((run) => ({
-            id: run.id,
-            status: run.status,
-            startedAt: run.startedAt,
-            completedAt: run.completedAt,
-            errorMessage: run.errorMessage,
-            resultSummary: run.resultSummary,
-            jobType: run.syncJob.type,
-          })),
-        };
-      })
-    );
+    if (connections.length === 0) return [];
 
-    return mapped;
+    const connectionIds = connections.map((c) => c.id);
+
+    // Batch-fetch the last 5 sync runs for all connections in a single query (avoids N+1).
+    const allRuns = await prisma.syncRun.findMany({
+      where: { syncJob: { connectionId: { in: connectionIds } } },
+      include: {
+        syncJob: {
+          select: { id: true, platform: true, type: true, requestedBy: true, connectionId: true },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    // Group runs by connectionId and keep at most 5 per connection.
+    const runsByConnection = new Map<string, typeof allRuns>();
+    for (const run of allRuns) {
+      const cid = run.syncJob.connectionId;
+      if (!runsByConnection.has(cid)) runsByConnection.set(cid, []);
+      const bucket = runsByConnection.get(cid)!;
+      if (bucket.length < 5) bucket.push(run);
+    }
+
+    return connections.map((connection) => {
+      const history = runsByConnection.get(connection.id) ?? [];
+      return {
+        id: connection.id,
+        platform: connection.platform,
+        status: connection.status,
+        lastSyncAt: connection.lastSyncAt,
+        lastError: connection.lastError,
+        updatedAt: connection.updatedAt,
+        connectedAccountCount: connection.connectedAccounts.length,
+        selectedAccountCount: connection.connectedAccounts.filter((account) => account.isSelected).length,
+        accounts: connection.connectedAccounts.map((account) => ({
+          id: account.id,
+          externalAccountId: account.externalAccountId,
+          name: account.name,
+          status: account.status,
+          isSelected: account.isSelected,
+          currency: account.currency,
+          timezone: account.timezone,
+          metadata: account.metadata,
+        })),
+        history: history.map((run) => ({
+          id: run.id,
+          status: run.status,
+          startedAt: run.startedAt,
+          completedAt: run.completedAt,
+          errorMessage: run.errorMessage,
+          resultSummary: run.resultSummary,
+          jobType: run.syncJob.type,
+        })),
+      };
+    });
   },
 
   async startConnection(userId: string, platform: Platform) {

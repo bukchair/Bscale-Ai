@@ -12,7 +12,7 @@ import {
   syncSchema,
   testConnectionSchema,
 } from '@/src/lib/integrations/core/dtos';
-import { GMAIL_API_BASE, META_GRAPH_BASE } from '@/src/lib/constants/api-urls';
+import { GMAIL_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 import { normalizeMetaAccountId, toMetaAccountResource } from '@/src/lib/integrations/utils/meta-utils';
 
 type RouteContext = {
@@ -51,8 +51,10 @@ const pushUniqueAccount = (
   });
 };
 
-const fetchMetaGraph = async <T>(path: string) => {
-  const response = await fetch(`${META_GRAPH_BASE}${path}`);
+const fetchMetaGraph = async <T>(path: string, accessToken: string) => {
+  const response = await fetch(`${META_GRAPH_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   const parsed = (await response.json().catch(() => null)) as
     | (T & { error?: { message?: string } })
     | null;
@@ -103,7 +105,8 @@ const handleMetaAssets = async (userId: string) => {
   }
 
   const businessResponse = await fetchMetaGraph<{ data?: Array<{ id?: string; name?: string }> }>(
-    `/me/businesses?fields=id,name&limit=200&access_token=${encodeURIComponent(accessToken)}`
+    '/me/businesses?fields=id,name&limit=200',
+    accessToken
   );
   const businesses = (businessResponse.data?.data || [])
     .filter((item) => item?.id)
@@ -120,7 +123,8 @@ const handleMetaAssets = async (userId: string) => {
 
   const messageAccountsMap = new Map<string, { id: string; name: string }>();
   const messageResponse = await fetchMetaGraph<{ data?: Array<{ id?: string; name?: string }> }>(
-    `/me/accounts?fields=id,name&limit=200&access_token=${encodeURIComponent(accessToken)}`
+    '/me/accounts?fields=id,name&limit=200',
+    accessToken
   );
   for (const account of messageResponse.data?.data || []) {
     pushUniqueAccount(messageAccountsMap, account, 'Page');
@@ -134,9 +138,8 @@ const handleMetaAssets = async (userId: string) => {
 
   for (const business of businesses) {
     const businessPages = await fetchMetaGraph<{ data?: Array<{ id?: string; name?: string }> }>(
-      `/${encodeURIComponent(business.id)}/owned_pages?fields=id,name&limit=200&access_token=${encodeURIComponent(
-        accessToken
-      )}`
+      `/${encodeURIComponent(business.id)}/owned_pages?fields=id,name&limit=200`,
+      accessToken
     );
     if (businessPages.ok) {
       for (const page of businessPages.data?.data || []) {
@@ -153,7 +156,8 @@ const handleMetaAssets = async (userId: string) => {
     const accountResource = toMetaAccountResource(accountId);
     if (!accountResource) continue;
     const pixelResponse = await fetchMetaGraph<{ data?: Array<{ id?: string; name?: string }> }>(
-      `/${accountResource}/adspixels?fields=id,name&limit=200&access_token=${encodeURIComponent(accessToken)}`
+      `/${accountResource}/adspixels?fields=id,name&limit=200`,
+      accessToken
     );
     if (!pixelResponse.ok) continue;
     for (const pixel of pixelResponse.data?.data || []) {
@@ -240,8 +244,8 @@ const handleTikTokCampaigns = async (request: Request) => {
   };
   const statsByCampaignId: Record<string, { spend: number; conversions: number; conversionValue: number }> = {};
   const reportEndpoints = [
-    'https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/',
-    'https://business-api.tiktok.com/open_api/v1.3/reports/integrated/get/',
+    `${TIKTOK_API_BASE}/report/integrated/get/`,
+    `${TIKTOK_API_BASE}/reports/integrated/get/`,
   ];
   for (const endpoint of reportEndpoints) {
     try {
@@ -277,7 +281,8 @@ const handleTikTokCampaigns = async (request: Request) => {
         };
       });
       break;
-    } catch {
+    } catch (endpointError) {
+      console.warn(`[TikTok] Report endpoint ${endpoint} failed:`, endpointError instanceof Error ? endpointError.message : String(endpointError));
       continue;
     }
   }
