@@ -586,7 +586,6 @@ export function Dashboard() {
   const [gscStats, setGscStats] = useState(DEMO_GSC_STATS);
   const [recentOrders, setRecentOrders] = useState<WooCommerceOrder[]>(DEMO_RECENT_ORDERS);
   const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>(DEMO_CAMPAIGN_SUMMARY);
-  const [ga4TopPages, setGa4TopPages] = useState<Ga4TopPage[]>([]);
   const [platformRevenue, setPlatformRevenue] = useState<PlatformRevenueSummary>({
     meta: { spend: 0, attributedRevenue: 0 },
     google: { spend: 0, attributedRevenue: 0 },
