@@ -16,9 +16,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { fetchGoogleCampaigns } from '../services/googleService';
-import { fetchMetaCampaigns } from '../services/metaService';
-import { fetchTikTokCampaigns } from '../services/tiktokService';
+import { loadUnifiedCampaignLayerFromConnections } from '../lib/unified-data/loaders';
 import {
   auth,
   getBudgetAutomationSettings,
@@ -137,93 +135,45 @@ export function Budget() {
     const startIso = bounds.startDate.toISOString().slice(0, 10);
     const endIso = bounds.endDate.toISOString().slice(0, 10);
 
-    const googleConnection = connections.find((c) => c.id === 'google' && c.status === 'connected');
-    const metaConnection = connections.find((c) => c.id === 'meta' && c.status === 'connected');
-    const tiktokConnection = connections.find((c) => c.id === 'tiktok' && c.status === 'connected');
-
     let cancelled = false;
     const loadLive = async () => {
       setLoading(true);
       setLoadError(null);
       try {
-        const tasks: Array<Promise<CampaignBudgetRow[]>> = [];
+        const { campaignRows: unifiedCampaignRows, errors } =
+          await loadUnifiedCampaignLayerFromConnections({
+            connections,
+            startDate: startIso,
+            endDate: endIso,
+          });
 
-        const googleToken = String(googleConnection?.settings?.accessToken || '').trim();
-        const googleCustomerId = String(googleConnection?.settings?.adsAccountId || '').trim();
-        const googleLoginCustomerId = String(googleConnection?.settings?.loginCustomerId || '').trim();
-        if (googleToken) {
-          tasks.push(
-            fetchGoogleCampaigns(
-              googleToken,
-              googleCustomerId || undefined,
-              googleLoginCustomerId || undefined,
-              startIso,
-              endIso
-            )
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || row.campaignId || `google-${row.name || ''}`),
-                  name: String(row.name || 'Google campaign'),
-                  platform: 'google' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                  budget: toAmount(row.budget),
-                }))
-              )
-              .catch(() => [])
-          );
-        }
-
-        const metaToken = String(metaConnection?.settings?.accessToken || '').trim();
-        const metaAdsId = String(
-          metaConnection?.settings?.adAccountId ||
-            metaConnection?.settings?.adsAccountId ||
-            metaConnection?.settings?.selectedAdAccountId ||
-            ''
-        ).trim();
-        if (metaToken) {
-          tasks.push(
-            fetchMetaCampaigns(metaToken, metaAdsId || undefined, startIso, endIso)
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || `meta-${row.name || ''}`),
-                  name: String(row.name || 'Meta campaign'),
-                  platform: 'meta' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                  budget: toAmount(row.dailyBudget) || toAmount(row.lifetimeBudget),
-                }))
-              )
-              .catch(() => [])
-          );
-        }
-
-        const tiktokToken = String(tiktokConnection?.settings?.accessToken || '').trim();
-        const tiktokAdvertiserId = String(tiktokConnection?.settings?.advertiserId || '').trim();
-        if (tiktokToken && tiktokAdvertiserId) {
-          tasks.push(
-            fetchTikTokCampaigns(tiktokToken, tiktokAdvertiserId, startIso, endIso)
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || `tiktok-${row.name || ''}`),
-                  name: String(row.name || 'TikTok campaign'),
-                  platform: 'tiktok' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                  budget: 0,
-                }))
-              )
-              .catch(() => [])
-          );
-        }
-
-        const allRows = (await Promise.all(tasks)).flat();
+        const allRows: CampaignBudgetRow[] = unifiedCampaignRows
+          .map((row: any) => {
+            const platformRaw = String(row?.platform || '').toLowerCase();
+            const platform: PlatformId | null =
+              platformRaw === 'google'
+                ? 'google'
+                : platformRaw === 'meta'
+                ? 'meta'
+                : platformRaw === 'tiktok'
+                ? 'tiktok'
+                : null;
+            if (!platform) return null;
+            return {
+              id: String(row?.campaignId || row?.id || `${platform}-${row?.name || ''}`),
+              name: String(row?.name || `${platform} campaign`),
+              platform,
+              status: String(row?.status || 'Unknown'),
+              spend: toAmount(row?.spend),
+              conversionValue: toAmount(row?.conversionValue),
+              roas: toAmount(row?.roas),
+              budget:
+                toAmount(row?.dailyBudget) ||
+                toAmount(row?.budget) ||
+                toAmount(row?.lifetimeBudget),
+            };
+          })
+          .filter((row): row is CampaignBudgetRow => Boolean(row));
         const filtered = allRows.filter(
           (row) =>
             row.spend > 0 ||
@@ -234,6 +184,11 @@ export function Budget() {
 
         if (!cancelled) {
           setCampaignRows(filtered);
+
+          const errorsList = Object.values(errors).filter(Boolean);
+          if (filtered.length === 0 && errorsList.length > 0) {
+            setLoadError(errorsList[0] || null);
+          }
 
           const derivedAllocated = {
             google: sumBy(filtered.filter((r) => r.platform === 'google'), (r) => r.budget || r.spend * 1.2),

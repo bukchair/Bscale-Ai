@@ -6,10 +6,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { fetchWooCommerceSalesByRange, WooCommerceSalesPoint } from '../services/woocommerceService';
-import { fetchGoogleCampaigns } from '../services/googleService';
-import { fetchMetaCampaigns } from '../services/metaService';
-import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { useCurrency } from '../contexts/CurrencyContext';
+import { loadUnifiedCampaignLayerFromConnections } from '../lib/unified-data/loaders';
 
 type CampaignSpendRow = {
   id: string;
@@ -52,9 +50,6 @@ export function Profitability() {
       : periodLabel;
 
   useEffect(() => {
-    const googleConnection = connections.find((c) => c.id === 'google' && c.status === 'connected');
-    const metaConnection = connections.find((c) => c.id === 'meta' && c.status === 'connected');
-    const tiktokConnection = connections.find((c) => c.id === 'tiktok' && c.status === 'connected');
     const startIso = bounds.startDate.toISOString().slice(0, 10);
     const endIso = bounds.endDate.toISOString().slice(0, 10);
     let cancelled = false;
@@ -62,77 +57,12 @@ export function Profitability() {
     const load = async () => {
       setIsLoadingData(true);
       try {
-        const tasks: Array<Promise<CampaignSpendRow[]>> = [];
-
-        const googleToken = String(googleConnection?.settings?.accessToken || '').trim();
-        const googleCustomerId = String(googleConnection?.settings?.adsAccountId || '').trim();
-        const googleLoginId = String(googleConnection?.settings?.loginCustomerId || '').trim();
-        if (googleToken) {
-          tasks.push(
-            fetchGoogleCampaigns(googleToken, googleCustomerId || undefined, googleLoginId || undefined, startIso, endIso)
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || row.campaignId || `google-${row.name || ''}`),
-                  name: String(row.name || 'Google Campaign'),
-                  platform: 'Google' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversions: toAmount(row.conversions),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                }))
-              )
-              .catch(() => [])
-          );
-        }
-
-        const metaToken = String(metaConnection?.settings?.accessToken || '').trim();
-        const metaAdsId = String(
-          metaConnection?.settings?.adAccountId ||
-            metaConnection?.settings?.adsAccountId ||
-            metaConnection?.settings?.selectedAdAccountId ||
-            ''
-        ).trim();
-        if (metaToken) {
-          tasks.push(
-            fetchMetaCampaigns(metaToken, metaAdsId || undefined, startIso, endIso)
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || `meta-${row.name || ''}`),
-                  name: String(row.name || 'Meta Campaign'),
-                  platform: 'Meta' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversions: toAmount(row.conversions),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                  metaChannels: row.metaChannels || null,
-                }))
-              )
-              .catch(() => [])
-          );
-        }
-
-        const tiktokToken = String(tiktokConnection?.settings?.accessToken || '').trim();
-        const advertiserId = String(tiktokConnection?.settings?.advertiserId || '').trim();
-        if (tiktokToken && advertiserId) {
-          tasks.push(
-            fetchTikTokCampaigns(tiktokToken, advertiserId, startIso, endIso)
-              .then((rows) =>
-                rows.map((row: any) => ({
-                  id: String(row.id || `tiktok-${row.name || ''}`),
-                  name: String(row.name || 'TikTok Campaign'),
-                  platform: 'TikTok' as const,
-                  status: String(row.status || 'Unknown'),
-                  spend: toAmount(row.spend),
-                  conversions: toAmount(row.conversions),
-                  conversionValue: toAmount(row.conversionValue),
-                  roas: toAmount(row.roas),
-                }))
-              )
-              .catch(() => [])
-          );
-        }
+        const { campaignRows: unifiedCampaignRows } =
+          await loadUnifiedCampaignLayerFromConnections({
+            connections,
+            startDate: startIso,
+            endDate: endIso,
+          });
 
         let nextWoo: WooCommerceSalesPoint[] = [];
         if (wooConnection?.settings) {
@@ -142,8 +72,27 @@ export function Profitability() {
           }
         }
 
-        const connectedCampaigns = (await Promise.all(tasks))
-          .flat()
+        const connectedCampaigns = unifiedCampaignRows
+          .map((row: any) => {
+            const platformRaw = String(row?.platform || '');
+            const platform =
+              platformRaw === 'Google' || platformRaw === 'Meta' || platformRaw === 'TikTok'
+                ? (platformRaw as 'Google' | 'Meta' | 'TikTok')
+                : null;
+            if (!platform) return null;
+            return {
+              id: String(row?.campaignId || row?.id || `${platform.toLowerCase()}-${row?.name || ''}`),
+              name: String(row?.name || `${platform} Campaign`),
+              platform,
+              status: String(row?.status || 'Unknown'),
+              spend: toAmount(row?.spend),
+              conversions: toAmount(row?.conversions),
+              conversionValue: toAmount(row?.conversionValue),
+              roas: toAmount(row?.roas),
+              metaChannels: platform === 'Meta' ? (row?.metaChannels || null) : null,
+            } as CampaignSpendRow;
+          })
+          .filter((row): row is CampaignSpendRow => Boolean(row))
           .filter((row) => row && (row.spend > 0 || row.conversions > 0 || row.conversionValue > 0 || row.name));
 
         if (!cancelled) {
