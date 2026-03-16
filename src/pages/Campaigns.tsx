@@ -246,6 +246,15 @@ export function Campaigns() {
     wooPublishSubtitle: isHebrew
       ? 'בחר מה לפרסם לפי קטגוריה או לפי מוצר מתוך החנות המחוברת.'
       : 'Choose what to promote by category or by product from connected store.',
+    wooOptionalModeTitle: isHebrew
+      ? 'שימוש ב-WooCommerce (אופציונלי)'
+      : 'Use WooCommerce (optional)',
+    wooOptionalModeDesc: isHebrew
+      ? 'ניתן ליצור ולפרסם קמפיין גם בלי לבחור מוצר/קטגוריה מתוך WooCommerce.'
+      : 'You can create and publish a campaign without selecting WooCommerce product/category.',
+    wooManualModeActive: isHebrew
+      ? 'מצב ידני פעיל: הפרסום לא תלוי במוצרי WooCommerce.'
+      : 'Manual mode active: publishing is independent of WooCommerce products.',
     wooNotConnected: isHebrew
       ? 'כדי לבחור מוצר/קטגוריה, חבר קודם WooCommerce במסך החיבורים.'
       : 'Connect WooCommerce in Integrations to choose category/product.',
@@ -277,6 +286,9 @@ export function Campaigns() {
     platformCopySubtitle: isHebrew
       ? 'נוצר אוטומטית לפי חוקי אורך מומלצים של כל פלטפורמה.'
       : 'Generated automatically according to recommended length rules per platform.',
+    analyzePlatformAds: isHebrew
+      ? 'נתח וצור מודעות מותאמות לפלטפורמות'
+      : 'Analyze and generate platform-fit ads',
     applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
   };
 
@@ -367,6 +379,7 @@ export function Campaigns() {
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
   const [wooProducts, setWooProducts] = useState<WooCampaignProduct[]>([]);
   const [wooLoading, setWooLoading] = useState(false);
+  const [useWooProductData, setUseWooProductData] = useState(false);
   const [wooPublishScope, setWooPublishScope] = useState<WooPublishScope>('category');
   const [selectedWooCategory, setSelectedWooCategory] = useState('');
   const [selectedWooProductId, setSelectedWooProductId] = useState<string>('');
@@ -460,7 +473,7 @@ export function Campaigns() {
   }, [wooProducts, selectedWooProductId]);
 
   const inferredWooTitle = useMemo(() => {
-    if (!isWooConnected) return '';
+    if (!useWooProductData || !isWooConnected) return '';
     if (wooPublishScope === 'product' && selectedWooProduct?.name) {
       return selectedWooProduct.name;
     }
@@ -468,7 +481,7 @@ export function Campaigns() {
       return `${selectedWooCategory} Campaign`;
     }
     return '';
-  }, [isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
+  }, [useWooProductData, isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
 
   const buildWooProductBrief = (product: WooCampaignProduct): string => {
     const longDescription =
@@ -612,20 +625,23 @@ export function Campaigns() {
   }, [wooConnection?.settings]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope === 'product') return;
     if (!selectedWooCategory && wooCategoryOptions.length > 0) {
       setSelectedWooCategory(wooCategoryOptions[0]);
     }
-  }, [wooPublishScope, wooCategoryOptions, selectedWooCategory]);
+  }, [useWooProductData, wooPublishScope, wooCategoryOptions, selectedWooCategory]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product') return;
     if (!selectedWooProductId && wooProductsFiltered.length > 0) {
       setSelectedWooProductId(String(wooProductsFiltered[0].id));
     }
-  }, [wooPublishScope, selectedWooProductId, wooProductsFiltered]);
+  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product') return;
     if (!selectedWooProductId) return;
     const exists = wooProductsFiltered.some(
@@ -636,18 +652,20 @@ export function Campaigns() {
         wooProductsFiltered.length > 0 ? String(wooProductsFiltered[0].id) : ''
       );
     }
-  }, [wooPublishScope, selectedWooProductId, wooProductsFiltered]);
+  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (!inferredWooTitle) return;
     setShortTitleInput((prev) => (prev.trim() ? prev : inferredWooTitle));
     setCampaignNameInput((prev) => (prev.trim() ? prev : inferredWooTitle));
-  }, [inferredWooTitle]);
+  }, [useWooProductData, inferredWooTitle]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product' || !selectedWooProduct) return;
     importWooProductToBuilder(selectedWooProduct, { overwriteExisting: false, notify: false });
-  }, [wooPublishScope, selectedWooProduct]);
+  }, [useWooProductData, wooPublishScope, selectedWooProduct]);
 
   useEffect(() => {
     setWeeklySchedule((prev) => {
@@ -1398,7 +1416,7 @@ export function Campaigns() {
         },
       };
 
-      const wooContext = isWooConnected
+      const wooContext = isWooConnected && useWooProductData
         ? {
             publishScope: wooPublishScope,
             category: selectedWooCategory || null,
@@ -1569,6 +1587,119 @@ export function Campaigns() {
     if (draft.description) setCampaignBrief(draft.description);
   };
 
+  const buildLocalPlatformCopyDrafts = (): Partial<Record<PlatformName, PlatformCopyDraft>> => {
+    const platforms = (selectedPlatforms.filter((p): p is PlatformName =>
+      p === 'Google' || p === 'Meta' || p === 'TikTok'
+    ) as PlatformName[]);
+    const activePlatforms = platforms.length > 0 ? platforms : ['Google'];
+    const baseTitle = shortTitleInput.trim() || campaignNameInput.trim();
+    const baseDescription = campaignBrief.trim() || serviceTypeInput.trim();
+    const trimByLength = (value: string, max: number) =>
+      value.length > max ? `${value.slice(0, Math.max(0, max - 1)).trim()}…` : value;
+    const drafts: Partial<Record<PlatformName, PlatformCopyDraft>> = {};
+
+    activePlatforms.forEach((platform) => {
+      if (platform === 'Google') {
+        drafts.Google = {
+          title: trimByLength(baseTitle || 'Google Ad', 30),
+          description: trimByLength(baseDescription || 'High-intent ad copy for search traffic.', 90),
+        };
+      }
+      if (platform === 'Meta') {
+        drafts.Meta = {
+          title: trimByLength(baseTitle || 'Meta Ad', 40),
+          description: trimByLength(
+            baseDescription || 'Engaging social-first primary text for Meta placements.',
+            125
+          ),
+        };
+      }
+      if (platform === 'TikTok') {
+        drafts.TikTok = {
+          title: trimByLength(baseTitle || 'TikTok Ad', 40),
+          description: trimByLength(
+            baseDescription || 'Short hook-focused caption for TikTok audiences.',
+            100
+          ),
+        };
+      }
+    });
+
+    return drafts;
+  };
+
+  const handleGeneratePlatformAdCopies = async () => {
+    setBuilderMessage(null);
+    setAiAudienceLoading(true);
+    try {
+      if (!shortTitleInput.trim() && !campaignNameInput.trim()) {
+        setBuilderMessage(text.requireFields);
+        return;
+      }
+      const aiKeys = getAIKeysFromConnections(connections);
+      if (!hasAnyAIKey(aiKeys)) {
+        const fallbackDrafts = buildLocalPlatformCopyDrafts();
+        setPlatformCopyDrafts(fallbackDrafts);
+        setBuilderMessage(
+          isHebrew
+            ? 'אין חיבור AI פעיל, נוצרו מודעות מותאמות לפי כללי פלטפורמה מקומיים.'
+            : 'No active AI connection. Platform-fit ads were generated using local rules.'
+        );
+        return;
+      }
+
+      const responseLanguage =
+        language === 'he'
+          ? 'Hebrew'
+          : language === 'ru'
+          ? 'Russian'
+          : language === 'pt'
+          ? 'Portuguese'
+          : language === 'fr'
+          ? 'French'
+          : 'English';
+      const contextPayload = {
+        shortTitle: shortTitleInput.trim() || campaignNameInput.trim(),
+        currentForm: {
+          campaignNameInput,
+          objective,
+          contentType,
+          productType,
+          serviceTypeInput,
+          campaignBrief,
+        },
+        connectedPlatforms: connectedAdPlatforms,
+        selectedPlatforms,
+      };
+      const strategyResult = await getCampaignBuilderSuggestions(
+        JSON.stringify(contextPayload),
+        aiKeys,
+        responseLanguage
+      );
+      const nextPlatformCopy: Partial<Record<PlatformName, PlatformCopyDraft>> = {};
+      (['Google', 'Meta', 'TikTok'] as const).forEach((platform) => {
+        const item = strategyResult?.platformCopy?.[platform];
+        if (!item) return;
+        nextPlatformCopy[platform] = {
+          title: String(item.title || '').trim(),
+          description: String(item.description || '').trim(),
+        };
+      });
+      if (Object.keys(nextPlatformCopy).length > 0) {
+        setPlatformCopyDrafts(nextPlatformCopy);
+      } else {
+        const fallbackDrafts = buildLocalPlatformCopyDrafts();
+        setPlatformCopyDrafts(fallbackDrafts);
+      }
+    } catch (error) {
+      setBuilderMessage(
+        error instanceof Error ? error.message : isHebrew ? 'יצירת מודעות נכשלה.' : 'Ad generation failed.'
+      );
+    } finally {
+      setAiAudienceLoading(false);
+    }
+  };
+
   const handleCreateScheduledCampaign = async () => {
     setBuilderMessage(null);
     setPublishResults([]);
@@ -1580,7 +1711,7 @@ export function Campaigns() {
       setBuilderMessage(text.requireAsset);
       return;
     }
-    if (isWooConnected && wooProducts.length > 0) {
+    if (useWooProductData && isWooConnected && wooProducts.length > 0) {
       if (wooPublishScope === 'category' && !selectedWooCategory) {
         setBuilderMessage(text.wooRequireTarget);
         return;
@@ -1612,11 +1743,19 @@ export function Campaigns() {
           audiences: selectedAudiences,
           timeRules,
           weeklySchedule,
-          wooPublishMode: isWooConnected ? wooPublishScope : null,
-          wooCategory: wooPublishScope === 'category' ? selectedWooCategory || null : null,
-          wooProductId: wooPublishScope === 'product' ? selectedWooProductId || null : null,
+          wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
+          wooCategory:
+            isWooConnected && useWooProductData && wooPublishScope === 'category'
+              ? selectedWooCategory || null
+              : null,
+          wooProductId:
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProductId || null
+              : null,
           wooProductName:
-            wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProduct?.name || null
+              : null,
           platformCopyDrafts,
         }),
       });
@@ -1660,10 +1799,15 @@ export function Campaigns() {
           brief: campaignBrief.trim(),
           audiences: selectedAudiences,
           mediaCount,
-          wooPublishMode: isWooConnected ? wooPublishScope : null,
-          wooCategory: wooPublishScope === 'category' ? selectedWooCategory || null : null,
+          wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
+          wooCategory:
+            isWooConnected && useWooProductData && wooPublishScope === 'category'
+              ? selectedWooCategory || null
+              : null,
           wooProductName:
-            wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProduct?.name || null
+              : null,
         };
       });
       setCreatedCampaigns((prev) => [...created, ...prev]);
@@ -2087,7 +2231,7 @@ export function Campaigns() {
               {text.smartWindowTitle}
             </h4>
             <p className="text-xs text-indigo-700 mb-3">{text.smartWindowSubtitle}</p>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 items-start">
               <input
                 value={shortTitleInput}
                 onChange={(e) => setShortTitleInput(e.target.value)}
@@ -2102,6 +2246,15 @@ export function Campaigns() {
               >
                 {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 {text.analyzeWithAi}
+              </button>
+              <button
+                type="button"
+                onClick={handleGeneratePlatformAdCopies}
+                disabled={aiAudienceLoading || (!shortTitleInput.trim() && !campaignNameInput.trim())}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-indigo-300 bg-white text-indigo-700 font-bold text-sm hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                {text.analyzePlatformAds}
               </button>
             </div>
             {aiAudienceProvider && (
@@ -2242,7 +2395,7 @@ export function Campaigns() {
                   : 'Describe the post/product, target user, and campaign message.'
               }
             />
-            {wooPublishScope === 'product' && selectedWooProduct && (
+            {useWooProductData && wooPublishScope === 'product' && selectedWooProduct && (
               <p className="mt-1 text-[11px] text-sky-700">{text.wooAutoDescriptionHint}</p>
             )}
           </div>
@@ -2250,7 +2403,22 @@ export function Campaigns() {
           <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-4">
             <h4 className="text-sm font-bold text-sky-900 mb-1">{text.wooPublishTitle}</h4>
             <p className="text-xs text-sky-700 mb-3">{text.wooPublishSubtitle}</p>
-            {!isWooConnected ? (
+            <div className="mb-3 rounded-md border border-sky-200 bg-white px-3 py-2.5">
+              <label className="inline-flex items-center gap-2 text-xs font-bold text-sky-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="rounded border-sky-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={useWooProductData}
+                  onChange={(e) => setUseWooProductData(e.target.checked)}
+                />
+                {text.wooOptionalModeTitle}
+              </label>
+              <p className="mt-1 text-[11px] text-sky-700">{text.wooOptionalModeDesc}</p>
+              {!useWooProductData && (
+                <p className="mt-1 text-[11px] text-emerald-700">{text.wooManualModeActive}</p>
+              )}
+            </div>
+            {!useWooProductData ? null : !isWooConnected ? (
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
                 {text.wooNotConnected}
               </p>
