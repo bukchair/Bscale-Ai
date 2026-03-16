@@ -12,14 +12,12 @@ import {
   syncSchema,
   testConnectionSchema,
 } from '@/src/lib/integrations/core/dtos';
+import { GMAIL_API_BASE, META_GRAPH_BASE } from '@/src/lib/constants/api-urls';
+import { normalizeMetaAccountId, toMetaAccountResource } from '@/src/lib/integrations/utils/meta-utils';
 
 type RouteContext = {
   params: Promise<{ platform: string; action: string }>;
 };
-
-const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1';
-const META_GRAPH_VERSION = 'v21.0';
-const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 
 const toBase64Url = (input: string) =>
   Buffer.from(input, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -37,17 +35,6 @@ const toErrorMessage = (status: number, raw: string, parsed: unknown) => {
   }
   if (raw.trim()) return `Gmail send failed (${status}): ${raw.slice(0, 240)}`;
   return `Gmail send failed (${status}).`;
-};
-
-const normalizeMetaAccountId = (value: string) => {
-  const trimmed = String(value || '').replace(/^act_/i, '').trim();
-  const digitsOnly = trimmed.replace(/\D/g, '');
-  return digitsOnly || trimmed;
-};
-const toAccountResource = (value: string) => {
-  const trimmed = normalizeMetaAccountId(value);
-  if (!trimmed) return '';
-  return `act_${trimmed}`;
 };
 
 const pushUniqueAccount = (
@@ -163,7 +150,7 @@ const handleMetaAssets = async (userId: string) => {
   const accountIdsForPixels = adAccounts.map((account) => account.id).filter(Boolean);
   const pixelsMap = new Map<string, { id: string; name: string; adAccountId: string }>();
   for (const accountId of accountIdsForPixels) {
-    const accountResource = toAccountResource(accountId);
+    const accountResource = toMetaAccountResource(accountId);
     if (!accountResource) continue;
     const pixelResponse = await fetchMetaGraph<{ data?: Array<{ id?: string; name?: string }> }>(
       `/${accountResource}/adspixels?fields=id,name&limit=200&access_token=${encodeURIComponent(accessToken)}`

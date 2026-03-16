@@ -1,17 +1,4 @@
-const viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
-const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
-const API_BASE = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return '';
-  try {
-    const configuredOrigin = new URL(configuredApiBase, window.location.origin).origin;
-    return configuredOrigin === window.location.origin ? configuredOrigin : '';
-  } catch {
-    return '';
-  }
-})();
+import { API_BASE } from '../lib/utils/client-api-base';
 
 const sanitizeWooErrorText = (value: string): string =>
   value
@@ -164,7 +151,7 @@ export async function fetchWooCommerceProducts(
   }
 }
 
-export async function updateWooCommerceProduct(url: string, key: string, secret: string, productId: number, data: any) {
+export async function updateWooCommerceProduct(url: string, key: string, secret: string, productId: number, data: Record<string, unknown>) {
   try {
     const response = await fetch(`${API_BASE}/api/proxy/woocommerce`, {
       method: 'POST',
@@ -198,7 +185,7 @@ export async function updateWooCommerceOrderStatus(
     });
 
     const text = await response.text();
-    let payload: any = null;
+    let payload: { message?: string } | null = null;
 
     if (text) {
       try {
@@ -246,9 +233,10 @@ export async function fetchWooCommerceRevenue(url: string, key: string, secret: 
       return 0;
     }
 
-    let data: any;
+    type SalesReport = { total_sales?: string | number };
+    let data: SalesReport | SalesReport[];
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(text) as SalesReport | SalesReport[];
     } catch {
       console.warn('Failed to parse WooCommerce revenue response, returning 0');
       return 0;
@@ -353,15 +341,16 @@ export async function fetchWooCommerceSalesByRange(
       return [];
     }
 
-    let data: any;
+    type SalesRangeRow = { total_sales?: string | number; net_sales?: string | number; total_orders?: number; date?: string; start_date?: string };
+    let data: SalesRangeRow | SalesRangeRow[];
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(text) as SalesRangeRow | SalesRangeRow[];
     } catch {
       console.warn('Failed to parse WooCommerce sales range response, returning empty list');
       return [];
     }
 
-    const rows: any[] = Array.isArray(data) ? data : [data];
+    const rows: SalesRangeRow[] = Array.isArray(data) ? data : [data];
 
     return rows.map((row) => {
       const total = typeof row.total_sales === 'string' ? parseFloat(row.total_sales || '0') : Number(row.total_sales || 0);

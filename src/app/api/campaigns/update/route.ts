@@ -6,6 +6,7 @@ import { connectionService } from '@/src/lib/integrations/services/connection-se
 import { tokenService } from '@/src/lib/integrations/services/token-service';
 import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
+import { GOOGLE_ADS_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 
 type PlatformName = 'Google' | 'Meta' | 'TikTok';
 type UiStatus = 'Active' | 'Paused';
@@ -17,10 +18,6 @@ type UpdateCampaignBody = {
   status?: UiStatus;
   dailyBudget?: number | null;
 };
-
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
-const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0';
-const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
 
 const toGoogleStatus = (status: UiStatus) => (status === 'Active' ? 'ENABLED' : 'PAUSED');
 const toMetaStatus = (status: UiStatus) => (status === 'Active' ? 'ACTIVE' : 'PAUSED');

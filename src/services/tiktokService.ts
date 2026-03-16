@@ -1,17 +1,4 @@
-const viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
-const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
-const API_BASE = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return '';
-  try {
-    const configuredOrigin = new URL(configuredApiBase, window.location.origin).origin;
-    return configuredOrigin === window.location.origin ? configuredOrigin : '';
-  } catch {
-    return '';
-  }
-})();
+import { API_BASE } from '../lib/utils/client-api-base';
 
 export async function fetchTikTokCampaigns(
   accessToken: string,
@@ -41,13 +28,26 @@ export async function fetchTikTokCampaigns(
     throw new Error(data.message || 'TikTok API error');
   }
   
-  const list = Array.isArray(data?.data?.list) ? data.data.list : [];
-  return list.map((c: any) => {
-    const stats = c.stats || c.metrics || {};
-    const spend = parseFloat(stats.spend ?? c.spend ?? 0) || 0;
-    const conversions = parseFloat(stats.conversions ?? stats.convert ?? stats.conversion ?? c.conversions ?? 0) || 0;
+  type TikTokCampaignRow = {
+    campaign_id?: string | number;
+    id?: string | number;
+    campaign_name?: string;
+    name?: string;
+    operation_status?: string;
+    status?: string;
+    spend?: number;
+    conversions?: number;
+    conversion_value?: number;
+    stats?: Record<string, number | string>;
+    metrics?: Record<string, number | string>;
+  };
+  const list: TikTokCampaignRow[] = Array.isArray(data?.data?.list) ? (data.data.list as TikTokCampaignRow[]) : [];
+  return list.map((c) => {
+    const stats = (c.stats || c.metrics || {}) as Record<string, number | string>;
+    const spend = parseFloat(String(stats.spend ?? c.spend ?? 0)) || 0;
+    const conversions = parseFloat(String(stats.conversions ?? stats.convert ?? stats.conversion ?? c.conversions ?? 0)) || 0;
     const conversionValue =
-      parseFloat(stats.conversion_value ?? stats.convert_value ?? stats.revenue ?? c.conversion_value ?? 0) || 0;
+      parseFloat(String(stats.conversion_value ?? stats.convert_value ?? stats.revenue ?? c.conversion_value ?? 0)) || 0;
     const roas = spend > 0 ? conversionValue / spend : 0;
     const cpa = conversions > 0 ? spend / conversions : 0;
 

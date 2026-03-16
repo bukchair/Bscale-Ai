@@ -1,20 +1,5 @@
 import { auth, onAuthStateChanged } from '../lib/firebase';
-
-const viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
-
-const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
-const API_BASE = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return '';
-  try {
-    const configuredOrigin = new URL(configuredApiBase, window.location.origin).origin;
-    return configuredOrigin === window.location.origin ? configuredOrigin : '';
-  } catch {
-    return '';
-  }
-})();
+import { API_BASE } from '../lib/utils/client-api-base';
 
 const META_CACHE_PREFIX = 'bscale:meta-campaigns:';
 const META_RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;

@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { connectionService } from '@/src/lib/integrations/services/connection-service';
 import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
-
-const META_GRAPH_VERSION = 'v21.0';
-const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
+import { META_GRAPH_BASE } from '@/src/lib/constants/api-urls';
+import { normalizeMetaAccountId, toMetaAccountResource } from '@/src/lib/integrations/utils/meta-utils';
 const META_CACHE_TTL_MS = 5 * 60 * 1000;
 type MetaCampaignsPayload = {
   data: Array<Record<string, unknown>>;
@@ -46,17 +45,7 @@ const getClampedDateRange = (url: URL) => {
   return { startDate: clampedEnd, endDate: clampedStart };
 };
 
-const normalizeMetaAccountId = (value: string) => {
-  const trimmed = String(value || '').replace(/^act_/i, '').trim();
-  const digitsOnly = trimmed.replace(/\D/g, '');
-  return digitsOnly || trimmed;
-};
-
-const toAccountResource = (value: string) => {
-  const normalized = normalizeMetaAccountId(value);
-  if (!normalized) return '';
-  return `act_${normalized}`;
-};
+const toAccountResource = toMetaAccountResource;
 
 const discoverMetaAccountIdsFromToken = async (accessToken: string) => {
   if (!accessToken || accessToken === 'server-managed') return [] as string[];

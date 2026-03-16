@@ -2,6 +2,36 @@ const DEFAULT_APP_BASE_URL = 'http://localhost:3000';
 const DEFAULT_ENCRYPTION_KEY = Buffer.alloc(32).toString('base64');
 const DEFAULT_SESSION_SECRET = 'local-dev-session-secret-change-me-12345';
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+if (IS_PRODUCTION) {
+  if (!process.env.ENCRYPTION_KEY) {
+    throw new Error('[integrations-env] ENCRYPTION_KEY must be set in production.');
+  }
+  if (
+    !process.env.SESSION_SIGNING_SECRET ||
+    process.env.SESSION_SIGNING_SECRET.length < 32
+  ) {
+    throw new Error(
+      '[integrations-env] SESSION_SIGNING_SECRET must be at least 32 characters in production.'
+    );
+  }
+} else if (process.env.NODE_ENV !== 'test') {
+  if (!process.env.ENCRYPTION_KEY) {
+    console.warn(
+      '[integrations-env] ENCRYPTION_KEY is not set. Using insecure default — set this variable before going to production.'
+    );
+  }
+  if (
+    !process.env.SESSION_SIGNING_SECRET ||
+    process.env.SESSION_SIGNING_SECRET.length < 32
+  ) {
+    console.warn(
+      '[integrations-env] SESSION_SIGNING_SECRET is weak or missing. Set a strong secret before going to production.'
+    );
+  }
+}
+
 const toBoolean = (value: string | undefined): boolean => value === 'true';
 
 const toPositiveInt = (value: string | undefined, fallback: number): number => {

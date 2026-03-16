@@ -6,6 +6,7 @@ import { connectionService } from '@/src/lib/integrations/services/connection-se
 import { tokenService } from '@/src/lib/integrations/services/token-service';
 import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
+import { GOOGLE_ADS_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 
 type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
 type PlatformName = 'Google' | 'Meta' | 'TikTok';
@@ -32,10 +33,6 @@ type PlatformCreateResult = {
   message: string;
   status: 'Scheduled' | 'Draft';
 };
-
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
-const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
-const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0';
 
 const DAY_BY_JS: Record<number, DayKey> = {
   0: 'sun',

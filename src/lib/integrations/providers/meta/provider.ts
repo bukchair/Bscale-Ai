@@ -22,10 +22,7 @@ import {
 } from '@/src/lib/integrations/core/errors';
 import { toRoutePlatform } from '@/src/lib/integrations/utils/platform-utils';
 import { auditService } from '@/src/lib/integrations/services/audit-service';
-
-const META_GRAPH_VERSION = 'v21.0';
-const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
-const META_AUTH_BASE = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
+import { META_GRAPH_BASE, META_AUTH_BASE } from '@/src/lib/constants/api-urls';
 
 type MetaTokenResponse = {
   access_token?: string;

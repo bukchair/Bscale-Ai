@@ -782,7 +782,6 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
 
   React.useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log("Received postMessage:", event.data);
       // Simple origin check for development and production
       const isAllowedOrigin = event.origin.includes(window.location.hostname) || 
                              event.origin.includes('localhost') ||
