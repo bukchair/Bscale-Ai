@@ -289,6 +289,7 @@ export function Campaigns() {
     analyzePlatformAds: isHebrew
       ? 'נתח וצור מודעות מותאמות לפלטפורמות'
       : 'Analyze and generate platform-fit ads',
+    goToBuilder: isHebrew ? 'מעבר ליצירת מודעה' : 'Go to ad creation',
     applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
   };
 
@@ -384,6 +385,7 @@ export function Campaigns() {
   const [selectedWooCategory, setSelectedWooCategory] = useState('');
   const [selectedWooProductId, setSelectedWooProductId] = useState<string>('');
   const wooAutoBriefRef = useRef('');
+  const builderSectionRef = useRef<HTMLElement | null>(null);
 
   const connectedAdPlatforms = useMemo(() => {
     const options: string[] = [];
@@ -1700,6 +1702,10 @@ export function Campaigns() {
     }
   };
 
+  const scrollToBuilderSection = () => {
+    builderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const handleCreateScheduledCampaign = async () => {
     setBuilderMessage(null);
     setPublishResults([]);
@@ -1897,14 +1903,23 @@ export function Campaigns() {
             <span className="font-bold text-indigo-600">{periodLabel}</span>
           </p>
         </div>
-        <button 
-          onClick={fetchRecommendations}
-          disabled={loading}
-          className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Zap className="w-4 h-4 ml-2" />}
-          {t('campaigns.refreshAi')}
-        </button>
+        <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
+          <button
+            onClick={scrollToBuilderSection}
+            className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-indigo-200 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Target className="w-4 h-4 ml-2" />
+            {text.goToBuilder}
+          </button>
+          <button 
+            onClick={fetchRecommendations}
+            disabled={loading}
+            className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Zap className="w-4 h-4 ml-2" />}
+            {t('campaigns.refreshAi')}
+          </button>
+        </div>
       </div>
 
       <section className="bg-white shadow rounded-lg overflow-hidden flex flex-col border border-gray-200">
@@ -2215,7 +2230,7 @@ export function Campaigns() {
         </div>
       </section>
 
-      <section className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+      <section ref={builderSectionRef} className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50/60">
           <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
             <Target className="w-5 h-5 text-indigo-600" />
