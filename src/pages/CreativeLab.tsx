@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Sparkles, Image as ImageIcon, Type, Send, Wand2, Layout, Loader2, Download, ShoppingCart, ChevronDown, Save, Edit3 } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, Type, Send, Wand2, Layout, Loader2, Download, ShoppingCart, ChevronDown, Save, Edit3, UploadCloud, Copy, ArrowRight, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { generateCreativeCopy, getAIKeysFromConnections } from '../lib/gemini';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -57,8 +57,10 @@ export function CreativeLab() {
   const [overlayCta, setOverlayCta] = useState('');
   const [overlayPosition, setOverlayPosition] = useState<'top' | 'center' | 'bottom'>('bottom');
   const [exportedImageUrl, setExportedImageUrl] = useState<string | null>(null);
+  const [uploadedProductImageDataUrl, setUploadedProductImageDataUrl] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const productDropdownRef = useRef<HTMLDivElement | null>(null);
+  const uploadImageInputRef = useRef<HTMLInputElement>(null);
 
   const wooConnection = connections.find((c) => c.id === 'woocommerce');
   const isWooConnected = wooConnection?.status === 'connected';
@@ -137,6 +139,77 @@ export function CreativeLab() {
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3000);
+  };
+
+  // Navigate to campaigns page with prefilled data from the creative lab
+  const launchCampaign = () => {
+    try {
+      const prefill: Record<string, unknown> = {};
+      if (selectedProduct?.name) prefill.campaignName = selectedProduct.name;
+      if (selectedProduct?.name) prefill.shortTitle = selectedProduct.price
+        ? `${selectedProduct.name} – ₪${selectedProduct.price}`
+        : selectedProduct.name;
+      if (selectedProduct?.shortDesc || prompt) prefill.brief = selectedProduct?.shortDesc || prompt;
+      if (generatedContent?.type === 'copy' && generatedContent.options?.[0]) {
+        prefill.platformCopy = { Google: generatedContent.options[0], Meta: generatedContent.options[0] };
+      }
+      if (exportedImageUrl) prefill.imageDataUrl = exportedImageUrl;
+      else if (uploadedProductImageDataUrl) prefill.imageDataUrl = uploadedProductImageDataUrl;
+      sessionStorage.setItem('bscale:creative-prefill', JSON.stringify(prefill));
+    } catch {
+      // ignore storage errors
+    }
+    window.history.pushState({}, '', '/campaigns');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  // Generate a background-replacement prompt based on product context
+  const buildBackgroundPrompt = (product: CreativeProduct | null, userPrompt: string): string => {
+    const name = product?.name || (isHebrew ? 'מוצר' : 'product');
+    const category = product?.shortDesc || userPrompt || '';
+    const catLower = (name + ' ' + category).toLowerCase();
+    let bgStyle = isHebrew
+      ? 'רקע סטודיו נקי עם תאורה רכה ומקצועית'
+      : 'clean studio background with soft professional lighting';
+    if (catLower.match(/נעל|נעלי|shoes?|sneaker|boot/i))
+      bgStyle = isHebrew ? 'רחוב עירוני ברקע, תאורת ניאון, גשם קל, פודה רטוב' : 'urban street background, neon reflections, light rain, wet pavement';
+    else if (catLower.match(/שעון|watch|sport|ספורט/i))
+      bgStyle = isHebrew ? 'רקע טבעי דינמי עם עשב ירוק, אנרגיה ותנועה' : 'dynamic nature background, green grass, motion energy';
+    else if (catLower.match(/אוזני|headphone|earphone|audio/i))
+      bgStyle = isHebrew ? 'רקע גרדיאנט כהה עם גלי מוזיקה, אווירת סטודיו' : 'dark gradient background with music wave patterns, studio mood';
+    else if (catLower.match(/ביוטי|קרם|שמפו|beauty|cream|cosmetic|skincare/i))
+      bgStyle = isHebrew ? 'פרחים לבנים, שיש קלאסי, תאורה ורודה עדינה' : 'white flowers, classic marble surface, soft pink pastel light';
+    else if (catLower.match(/ריהוט|ספה|שולחן|כסא|furniture|sofa|table|chair/i))
+      bgStyle = isHebrew ? 'חדר מגורים מודרני עם תאורת אמבינט חמה' : 'modern living room with warm ambient lighting';
+    else if (catLower.match(/אוכל|מזון|food|coffee|cake|שתייה/i))
+      bgStyle = isHebrew ? 'שיש לבן עם עלי ירוק טרי וחאריף, תאורת יום טבעית' : 'white marble with fresh green herbs, natural daylight';
+    else if (catLower.match(/טכנולוג|tech|laptop|phone|טלפון|מחשב/i))
+      bgStyle = isHebrew ? 'רקע גאומטרי כהה, צבעי ניאון, אווירת סייברפאנק' : 'dark geometric background, neon accents, cyberpunk mood';
+    else if (catLower.match(/בגד|חולצה|שמלה|fashion|clothing|dress|shirt/i))
+      bgStyle = isHebrew ? 'רקע לבן מינימליסטי או גרדיאנט פסטל, סטודיו מקצועי' : 'minimalist white or pastel gradient, professional studio';
+
+    return isHebrew
+      ? `שנה את הרקע של תמונת המוצר "${name}" ל: ${bgStyle}.\nחשוב מאוד: אל תשנה, תחתוך, תעוות או תגע במוצר עצמו בשום צורה. המוצר חייב להישאר במרכז התמונה, ברור ובולט. הרקע בלבד ישתנה.`
+      : `Replace the background of the product photo "${name}" with: ${bgStyle}.\nIMPORTANT: Do NOT modify, crop, distort or touch the product itself in any way. The product must remain centered, sharp and prominent. Only the background should change.`;
+  };
+
+  // Handle uploading product photo from device
+  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setUploadedProductImageDataUrl(dataUrl);
+      // Auto-generate background-change prompt
+      if (!prompt) {
+        setPrompt(buildBackgroundPrompt(selectedProduct, ''));
+      }
+      showToast(isHebrew ? 'תמונת המוצר הועלתה בהצלחה' : 'Product image uploaded');
+    };
+    reader.readAsDataURL(file);
+    // reset so same file can be re-selected
+    e.target.value = '';
   };
 
   const handleCopyText = async (text: string) => {
@@ -343,8 +416,9 @@ export function CreativeLab() {
     }
 
     if (activeTab === 'image') {
-      // Use real product image when available, with graceful fallback
+      // Use uploaded product image when available, then product image, then fallback
       const mainUrl =
+        uploadedProductImageDataUrl ||
         selectedProduct?.imageUrl ||
         'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800&h=800';
       const variations =
@@ -355,10 +429,15 @@ export function CreativeLab() {
               'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&q=80&w=200&h=200',
               'https://images.unsplash.com/photo-1514989940723-e8e51635b782?auto=format&fit=crop&q=80&w=200&h=200'
             ];
+      // Auto-fill background prompt if empty
+      if (!prompt) {
+        setPrompt(buildBackgroundPrompt(selectedProduct, ''));
+      }
       setGeneratedContent({
         type: 'image',
         url: mainUrl,
-        variations
+        variations,
+        bgPrompt: buildBackgroundPrompt(selectedProduct, prompt),
       });
       setIsGenerating(false);
       setGenerationStartedAt(null);
@@ -522,6 +601,52 @@ export function CreativeLab() {
               </div>
 
               {activeTab === 'image' && (
+                <div className="rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-semibold text-indigo-900">
+                      {isHebrew ? 'העלה תמונת מוצר (מהמחשב / מהמובייל)' : 'Upload product photo (from device)'}
+                    </label>
+                    {uploadedProductImageDataUrl && (
+                      <button
+                        type="button"
+                        onClick={() => { setUploadedProductImageDataUrl(null); }}
+                        className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" />
+                        {isHebrew ? 'הסר' : 'Remove'}
+                      </button>
+                    )}
+                  </div>
+                  {uploadedProductImageDataUrl ? (
+                    <div className="relative rounded-lg overflow-hidden border border-indigo-200 bg-white">
+                      <img src={uploadedProductImageDataUrl} alt="uploaded" className="w-full h-32 object-contain" />
+                      <div className="absolute bottom-1 left-1 bg-emerald-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {isHebrew ? 'מוכן לשינוי רקע' : 'Ready for background swap'}
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 py-4 cursor-pointer text-indigo-600 hover:text-indigo-700">
+                      <UploadCloud className="w-8 h-8 opacity-60" />
+                      <span className="text-xs font-medium">{isHebrew ? 'לחץ לבחירת קובץ' : 'Click to select file'}</span>
+                      <input
+                        ref={uploadImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleProductImageUpload}
+                      />
+                    </label>
+                  )}
+                  <p className="mt-2 text-[11px] text-indigo-700">
+                    {isHebrew
+                      ? 'המערכת תחליף את הרקע לפי אופי המוצר מבלי לגעת במוצר עצמו.'
+                      : 'The system will replace the background based on product type without touching the product.'}
+                  </p>
+                </div>
+              )}
+
+              {activeTab === 'image' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{isHebrew ? 'יחס גובה-רוחב' : 'Aspect ratio'}</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -627,6 +752,34 @@ export function CreativeLab() {
 
             {generatedContent?.type === 'image' && (
               <div className="space-y-4 animate-in fade-in duration-500">
+                {/* Background-change prompt display */}
+                {generatedContent.bgPrompt && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-violet-900">
+                        {isHebrew ? 'פרומט שינוי רקע (לשליחה למנוע AI)' : 'Background-change prompt (send to AI engine)'}
+                      </span>
+                      <button
+                        onClick={() => handleCopyText(generatedContent.bgPrompt)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-violet-200 text-xs text-violet-700 hover:bg-violet-50"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {isHebrew ? 'העתק' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-violet-800 leading-relaxed whitespace-pre-line line-clamp-4">
+                      {generatedContent.bgPrompt}
+                    </p>
+                  </div>
+                )}
+                {/* Launch Campaign button */}
+                <button
+                  onClick={launchCampaign}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  {isHebrew ? 'עבור ליצירת קמפיין מהתמונה הזו' : 'Launch campaign from this image'}
+                </button>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">הוסף כותרת ו-CTA לתמונה</p>
@@ -654,6 +807,16 @@ export function CreativeLab() {
                           {pos === 'top' ? 'למעלה' : pos === 'center' ? 'מרכז' : 'למטה'}
                         </button>
                       ))}
+                    </div>
+                    <div className="flex items-center gap-1 mb-2">
+                      <button
+                        onClick={() => handleCopyText(`${overlayHeadline}${overlayCta ? '\n' + overlayCta : ''}`)}
+                        disabled={!overlayHeadline && !overlayCta}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-40"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {isHebrew ? 'העתק טקסט' : 'Copy text'}
+                      </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -702,7 +865,26 @@ export function CreativeLab() {
                     <canvas ref={canvasRef} className="w-full h-auto max-h-[400px] object-contain" width={800} height={800} />
                   </div>
                 </div>
-                <div className="relative group rounded-xl overflow-hidden border border-gray-200">
+                <div className="rounded-xl overflow-hidden border border-gray-200">
+                  {/* Persistent action bar above image */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+                    <span className="text-xs font-bold text-gray-700 flex-1">
+                      {isHebrew ? 'תמונה ראשית' : 'Main image'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = generatedContent.url;
+                        a.download = 'creative-main.jpg';
+                        a.click();
+                      }}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      {isHebrew ? 'הורד' : 'Download'}
+                    </button>
+                  </div>
+                  <div className="relative group">
                   <img src={generatedContent.url} alt="Generated Ad" className="w-full h-auto object-cover" referrerPolicy="no-referrer" />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 flex-wrap">
                     <button
@@ -738,7 +920,8 @@ export function CreativeLab() {
                       <Send className="w-4 h-4" /> פרסם ב-TikTok
                     </button>
                   </div>
-                </div>
+                  </div>{/* close relative group */}
+                </div>{/* close outer rounded-xl */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {generatedContent.variations.map((url: string, idx: number) => (
                     <button
@@ -771,8 +954,15 @@ export function CreativeLab() {
             {generatedContent?.type === 'copy' && (
               <div className="space-y-4 animate-in fade-in duration-500">
                 <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4">
-                <h4 className="text-sm font-bold text-indigo-900 mb-1">קופירייטינג מבוסס AI - ניתן לעריכה</h4>
+                  <h4 className="text-sm font-bold text-indigo-900 mb-1">קופירייטינג מבוסס AI - ניתן לעריכה</h4>
                   <p className="text-xs text-indigo-700">ערוך את השדות, שמור מודעה או שלח לפרסום ב-Google, Meta או TikTok.</p>
+                  <button
+                    onClick={launchCampaign}
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                    {isHebrew ? 'עבור ליצירת קמפיין עם הטקסט הזה' : 'Launch campaign with this copy'}
+                  </button>
                 </div>
                 
                 <div className="space-y-4">

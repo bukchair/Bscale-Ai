@@ -3,13 +3,13 @@ import { getAIKeysFromConnections, requestJSON, hasAnyAIKey, type AIKeys } from 
 
 export { getAIKeysFromConnections, hasAnyAIKey } from "./multiAI";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.0-flash-001";
 
 export type AIKeysOrApiKey = AIKeys | string | undefined;
 
 function getEnvApiKey(): string | undefined {
   if (typeof process !== "undefined" && process.env?.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-  if (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GEMINI_API_KEY) return (import.meta as any).env.VITE_GEMINI_API_KEY;
+  if (typeof import.meta !== "undefined" && (import.meta as unknown as { env?: Record<string, unknown> }).env?.VITE_GEMINI_API_KEY) return String((import.meta as unknown as { env?: Record<string, unknown> }).env!.VITE_GEMINI_API_KEY);
   return undefined;
 }
 
@@ -100,7 +100,7 @@ export async function getOptimizationRecommendations(
     - "impact" must remain one of: High, Medium, Low.`;
 
   if (isAIKeys(apiKeyOrKeys) && hasAnyAIKey(apiKeyOrKeys)) {
-    return runWithMultiAI<{ recommendations?: any[] }>(prompt, apiKeyOrKeys);
+    return runWithMultiAI<{ recommendations?: Record<string, unknown>[] }>(prompt, apiKeyOrKeys);
   }
   const ai = getAI(typeof apiKeyOrKeys === "string" ? apiKeyOrKeys : undefined);
   if (!ai) return {};
@@ -235,8 +235,8 @@ ${contextData}
 
 Return ONLY strict JSON with this structure:
 {
-  "shortTitle": "short title in ${responseLanguage}",
-  "campaignName": "short campaign name in ${responseLanguage}",
+  "shortTitle": "main campaign title, MAX 90 characters, in ${responseLanguage}. If the context includes a product price, include it in the title (e.g. 'Product Name – ₪XX'). NEVER exceed 90 characters.",
+  "campaignName": "short internal campaign name in ${responseLanguage}",
   "objective": "sales|traffic|leads|awareness|retargeting",
   "contentType": "product|offer|educational|testimonial|video",
   "productType": "fashion|beauty|tech|home|fitness|services|other",
@@ -259,16 +259,16 @@ Return ONLY strict JSON with this structure:
   ],
   "platformCopy": {
     "Google": {
-      "title": "headline up to 30 chars when possible",
-      "description": "description up to 90 chars when possible"
+      "title": "Google Search headline, STRICT MAX 30 characters (Google enforces this limit). If product has price, include it.",
+      "description": "Google Search description, STRICT MAX 90 characters"
     },
     "Meta": {
-      "title": "short headline up to 40 chars",
-      "description": "primary text around 80-125 chars"
+      "title": "Meta ad headline, MAX 40 characters",
+      "description": "Meta primary text, 80-125 characters, engaging and conversational"
     },
     "TikTok": {
-      "title": "hook title up to 40 chars",
-      "description": "caption text up to 100 chars"
+      "title": "TikTok hook/caption title, MAX 40 characters, trendy and direct",
+      "description": "TikTok ad caption, MAX 100 characters"
     }
   }
 }
@@ -276,7 +276,10 @@ Return ONLY strict JSON with this structure:
 Rules:
 - Keep hours integers between 0 and 23.
 - Keep arrays concise and practical.
-- Ensure objective/contentType/productType are from allowed values only.`;
+- Ensure objective/contentType/productType are from allowed values only.
+- shortTitle MUST be 90 characters or fewer — count carefully.
+- Google title MUST be 30 characters or fewer — Google will reject longer headlines.
+- If the context data contains a product price (e.g. WooCommerce price), always weave it into shortTitle and relevant platform copy.`;
 
   if (isAIKeys(apiKeyOrKeys) && hasAnyAIKey(apiKeyOrKeys)) {
     try {

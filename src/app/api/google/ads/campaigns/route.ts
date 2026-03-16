@@ -2,29 +2,8 @@ import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
-
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
-const normalizeCustomerId = (value: string) => value.replace(/\D/g, '');
-const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const normalizeDateParam = (value: string | null) => {
-  const trimmed = (value || '').trim();
-  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
-};
-
-const toErrorMessage = (status: number, raw: string, parsed: unknown) => {
-  if (parsed && typeof parsed === 'object') {
-    const obj = parsed as Record<string, unknown>;
-    const rootError = obj.error;
-    if (rootError && typeof rootError === 'object') {
-      const msg = (rootError as Record<string, unknown>).message;
-      if (typeof msg === 'string' && msg.trim()) return msg;
-    }
-    const msg = obj.message;
-    if (typeof msg === 'string' && msg.trim()) return msg;
-  }
-  if (raw.trim()) return `Google Ads request failed (${status}): ${raw.slice(0, 240)}`;
-  return `Google Ads request failed (${status}).`;
-};
+import { GOOGLE_ADS_API_BASE } from '@/src/lib/constants/api-urls';
+import { toApiErrorMessage as toErrorMessage, normalizeDateParam, normalizeCustomerId } from '@/src/lib/utils/api-request-utils';
 
 export async function GET(request: Request) {
   try {
@@ -47,6 +26,7 @@ export async function GET(request: Request) {
       queryLoginCustomerId || googleLegacyBridge.getLoginCustomerId(connection.metadata) || undefined;
     const startDate = normalizeDateParam(url.searchParams.get('start_date'));
     const endDate = normalizeDateParam(url.searchParams.get('end_date'));
+    // Dates are validated above against /^\d{4}-\d{2}-\d{2}$/ — no injection risk.
     const dateFilter =
       startDate && endDate ? `\n              AND segments.date BETWEEN '${startDate}' AND '${endDate}'` : '';
 

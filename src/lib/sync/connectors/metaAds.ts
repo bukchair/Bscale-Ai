@@ -1,34 +1,31 @@
 import { tokenService } from '@/src/lib/integrations/services/token-service';
 import { fetchWithRetry } from '@/src/lib/sync/jobs/http-retry';
-
-const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0';
+import { META_GRAPH_BASE } from '@/src/lib/constants/api-urls';
+import { toMetaAccountResource } from '@/src/lib/integrations/utils/meta-utils';
 
 const toNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const normalizeAccountId = (value: string) => {
-  const digits = String(value || '').replace(/^act_/i, '').replace(/\D/g, '');
-  return digits ? `act_${digits}` : String(value || '');
-};
-
 export const metaAdsConnector = {
   async fetchCampaigns(connectionId: string, adAccountId: string) {
     const accessToken = await tokenService.getAccessToken(connectionId);
-    const accountId = normalizeAccountId(adAccountId);
+    const accountId = toMetaAccountResource(adAccountId);
     const url = new URL(`${META_GRAPH_BASE}/${accountId}/campaigns`);
     url.searchParams.set(
       'fields',
       'id,name,status,effective_status,objective,created_time,updated_time,start_time,stop_time,daily_budget,lifetime_budget'
     );
     url.searchParams.set('limit', '200');
-    url.searchParams.set('access_token', accessToken);
 
-    const response = await fetchWithRetry(url.toString(), { method: 'GET' });
-    const payload = (await response.json().catch(() => ({}))) as any;
+    const response = await fetchWithRetry(url.toString(), {
+      method: 'GET',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { data?: Record<string, unknown>[] };
     const rows = Array.isArray(payload?.data) ? payload.data : [];
-    return rows.map((row: any) => ({
+    return rows.map((row: Record<string, unknown>) => ({
       id: String(row?.id || ''),
       campaignId: String(row?.id || ''),
       name: String(row?.name || ''),
@@ -48,7 +45,7 @@ export const metaAdsConnector = {
     endDate: string
   ) {
     const accessToken = await tokenService.getAccessToken(connectionId);
-    const accountId = normalizeAccountId(adAccountId);
+    const accountId = toMetaAccountResource(adAccountId);
     const url = new URL(`${META_GRAPH_BASE}/${accountId}/insights`);
     url.searchParams.set(
       'fields',
@@ -64,21 +61,24 @@ export const metaAdsConnector = {
       })
     );
     url.searchParams.set('limit', '500');
-    url.searchParams.set('access_token', accessToken);
 
-    const response = await fetchWithRetry(url.toString(), { method: 'GET' });
-    const payload = (await response.json().catch(() => ({}))) as any;
+    type ActionRow = { action_type?: string; value?: string | number };
+    const response = await fetchWithRetry(url.toString(), {
+      method: 'GET',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { data?: Record<string, unknown>[] };
     const rows = Array.isArray(payload?.data) ? payload.data : [];
 
-    return rows.map((row: any) => {
-      const actions = Array.isArray(row?.actions) ? row.actions : [];
-      const actionValues = Array.isArray(row?.action_values) ? row.action_values : [];
-      const conversions = actions.reduce((sum: number, action: any) => {
+    return rows.map((row: Record<string, unknown>) => {
+      const actions: ActionRow[] = Array.isArray(row?.actions) ? (row.actions as ActionRow[]) : [];
+      const actionValues: ActionRow[] = Array.isArray(row?.action_values) ? (row.action_values as ActionRow[]) : [];
+      const conversions = actions.reduce((sum: number, action: ActionRow) => {
         const key = String(action?.action_type || '').toLowerCase();
         if (!key.includes('purchase') && !key.includes('lead') && !key.includes('messaging')) return sum;
         return sum + toNumber(action?.value);
       }, 0);
-      const revenue = actionValues.reduce((sum: number, action: any) => {
+      const revenue = actionValues.reduce((sum: number, action: ActionRow) => {
         const key = String(action?.action_type || '').toLowerCase();
         if (!key.includes('purchase')) return sum;
         return sum + toNumber(action?.value);

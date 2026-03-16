@@ -3,14 +3,8 @@ import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
 
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
-const normalizeCustomerId = (value: string) => value.replace(/\D/g, '');
-const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-const normalizeDateParam = (value: string | null) => {
-  const trimmed = (value || '').trim();
-  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
-};
+import { GOOGLE_ADS_API_BASE } from '@/src/lib/constants/api-urls';
+import { toApiErrorMessage, normalizeDateParam, normalizeCustomerId } from '@/src/lib/utils/api-request-utils';
 const normalizeMatchType = (value: unknown): 'BROAD' | 'PHRASE' | 'EXACT' => {
   const normalized = String(value || '').trim().toUpperCase();
   if (normalized === 'BROAD' || normalized === 'EXACT') return normalized;
@@ -79,20 +73,7 @@ const parseJsonResponse = async (response: Response) => {
   };
 };
 
-const toErrorMessage = (status: number, raw: string, parsed: unknown) => {
-  if (parsed && typeof parsed === 'object') {
-    const obj = parsed as Record<string, unknown>;
-    const rootError = obj.error;
-    if (rootError && typeof rootError === 'object') {
-      const msg = (rootError as Record<string, unknown>).message;
-      if (typeof msg === 'string' && msg.trim()) return msg;
-    }
-    const msg = obj.message;
-    if (typeof msg === 'string' && msg.trim()) return msg;
-  }
-  if (raw.trim()) return `Google Ads search terms request failed (${status}): ${raw.slice(0, 240)}`;
-  return `Google Ads search terms request failed (${status}).`;
-};
+const toErrorMessage = toApiErrorMessage;
 
 export async function GET(request: Request) {
   try {

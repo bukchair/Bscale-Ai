@@ -1,20 +1,5 @@
 import { auth, onAuthStateChanged } from '../lib/firebase';
-
-const viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
-
-const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
-const API_BASE = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return '';
-  try {
-    const configuredOrigin = new URL(configuredApiBase, window.location.origin).origin;
-    return configuredOrigin === window.location.origin ? configuredOrigin : '';
-  } catch {
-    return '';
-  }
-})();
+import { API_BASE } from '../lib/utils/client-api-base';
 
 const META_CACHE_PREFIX = 'bscale:meta-campaigns:';
 const META_RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
@@ -147,7 +132,9 @@ export async function fetchMetaAdAccounts(accessToken: string) {
     }));
   }
 
-  const response = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?access_token=${accessToken}`);
+  const response = await fetch('https://graph.facebook.com/v19.0/me/adaccounts', {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
   
   if (!response.ok) {
     const error = await response.json();
@@ -411,6 +398,18 @@ export async function fetchMetaCampaigns(
     };
     });
 
+    // Surface server-side diagnostics to the browser console for easier debugging.
+    const responseMeta = (payload as any)?.meta;
+    if (responseMeta?.insightsFetchError) {
+      console.error('[Meta] Server failed to fetch insights:', responseMeta.insightsFetchError);
+    }
+    if (responseMeta?.allMetricsZero && mapped.length > 0) {
+      console.warn(
+        `[Meta] All ${mapped.length} campaign(s) returned zero metrics for date range ${responseMeta?.dateRange?.startDate ?? '?'} → ${responseMeta?.dateRange?.endDate ?? '?'}. ` +
+        'Possible causes: campaigns have no delivery, billing is paused, or ads are disapproved.'
+      );
+    }
+
     saveCachedMetaCampaigns(cacheKey, mapped);
     if (mapped.length > 0) {
       lastSuccessfulMetaCampaigns = mapped;
@@ -424,4 +423,60 @@ export async function fetchMetaCampaigns(
   });
   metaInFlight.set(cacheKey, requestPromise);
   return requestPromise;
+}
+
+export type MetaAdset = {
+  id: string;
+  name: string;
+  status: string;
+  campaignId: string;
+  dailyBudget: number;
+  lifetimeBudget: number;
+  optimizationGoal: string;
+  bidStrategy: string;
+  billingEvent: string;
+  startTime: string;
+  endTime: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  reach: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  frequency: number;
+  uniqueClicks: number;
+  uniqueCtr: number;
+  conversions: number;
+  conversionValue: number;
+  roas: number;
+  cpa: number;
+};
+
+export async function fetchMetaAdsets(
+  accessToken: string,
+  adAccountId?: string,
+  campaignIds?: string[],
+  startDate?: string,
+  endDate?: string
+): Promise<MetaAdset[]> {
+  await ensureManagedApiSession(accessToken);
+  const query = new URLSearchParams();
+  if (adAccountId) query.set('ad_account_id', adAccountId);
+  if (campaignIds?.length) query.set('campaign_ids', campaignIds.join(','));
+  if (startDate) query.set('start_date', startDate);
+  if (endDate) query.set('end_date', endDate);
+
+  const response = await fetch(`${API_BASE}/api/connections/meta/adsets?${query.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error((error as any).message || 'Failed to fetch Meta adsets');
+  }
+
+  const payload = await response.json();
+  return Array.isArray((payload as any).data) ? (payload as any).data : [];
 }

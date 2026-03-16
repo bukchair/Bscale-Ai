@@ -27,12 +27,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 import { auth, signOut } from '../lib/firebase';
 
+type UserProfile = {
+  uid?: string;
+  role?: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
+};
+
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 type NavItem = {

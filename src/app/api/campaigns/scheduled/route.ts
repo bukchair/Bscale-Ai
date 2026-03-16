@@ -6,6 +6,7 @@ import { connectionService } from '@/src/lib/integrations/services/connection-se
 import { tokenService } from '@/src/lib/integrations/services/token-service';
 import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
 import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
+import { GOOGLE_ADS_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 
 type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
 type PlatformName = 'Google' | 'Meta' | 'TikTok';
@@ -32,10 +33,6 @@ type PlatformCreateResult = {
   message: string;
   status: 'Scheduled' | 'Draft';
 };
-
-const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
-const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
-const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0';
 
 const DAY_BY_JS: Record<number, DayKey> = {
   0: 'sun',
@@ -68,7 +65,8 @@ const todayYmd = () => {
   const y = date.getUTCFullYear();
   const m = `${date.getUTCMonth() + 1}`.padStart(2, '0');
   const d = `${date.getUTCDate()}`.padStart(2, '0');
-  return `${y}${m}${d}`;
+  // Google Ads REST API requires YYYY-MM-DD format (not YYYYMMDD)
+  return `${y}-${m}-${d}`;
 };
 
 const sanitizeName = (value: string) => value.trim().slice(0, 120);
@@ -312,7 +310,13 @@ const createGoogleCampaign = async (
                 status: activeNow ? 'ENABLED' : 'PAUSED',
                 advertisingChannelType: 'SEARCH',
                 campaignBudget: campaignBudgetResourceName,
-                manualCpc: {},
+                // Use target spend (maximize clicks) instead of deprecated manualCpc
+                targetSpend: {},
+                networkSettings: {
+                  targetGoogleSearch: true,
+                  targetSearchNetwork: false,
+                  targetContentNetwork: false,
+                },
                 startDate: todayYmd(),
               },
             },
@@ -405,13 +409,15 @@ const createMetaCampaign = async (
     form.set('name', sanitizeName(body.campaignName || 'BScale Campaign'));
     form.set('objective', mapObjectiveToMeta((body.objective || 'sales') as ObjectiveType));
     form.set('status', activeNow ? 'ACTIVE' : 'PAUSED');
-    form.set('special_ad_categories', '[]');
-    form.set('access_token', accessToken);
+    form.set('buying_type', 'AUCTION');
+    // Meta API v19+ requires special_ad_categories as a JSON-encoded array
+    form.set('special_ad_categories', JSON.stringify([]));
 
     const response = await fetch(`${META_GRAPH_BASE}/${accountResource}/campaigns`, {
       method: 'POST',
       headers: {
         'content-type': 'application/x-www-form-urlencoded',
+        authorization: `Bearer ${accessToken}`,
       },
       body: form.toString(),
     });

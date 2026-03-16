@@ -65,11 +65,11 @@ async function tryGemini(prompt: string, apiKey: string): Promise<string> {
   }
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.0-flash-001",
     contents: prompt,
     config: { responseMimeType: "application/json" },
   });
-  return (response as any).text ?? "";
+  return (response as { text?: string }).text ?? "";
 }
 
 function isGeminiNotFoundError(error: unknown): boolean {
@@ -78,54 +78,44 @@ function isGeminiNotFoundError(error: unknown): boolean {
   return (
     lower.includes('404') ||
     lower.includes('not found') ||
-    lower.includes('models/gemini-2.0-flash')
+    lower.includes('models/gemini-2.0-flash') ||
+    lower.includes('no longer available')
   );
 }
 
+// OpenAI and Claude APIs don't support CORS from browsers.
+// Route all requests through our server-side proxy to avoid CORS errors
+// and to keep user API keys out of browser network logs.
+const AI_PROXY_URL = '/api/proxy/ai';
+
 async function tryOpenAI(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch(AI_PROXY_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_tokens: 4096,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "openai", apiKey, prompt }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || res.statusText);
+    const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+    throw new Error(String(err?.message || res.statusText));
   }
-  const data = await res.json();
-  const text = data?.choices?.[0]?.message?.content ?? "";
-  return text;
+  const data = await res.json() as Record<string, unknown>;
+  const choices = data?.choices as Array<{ message?: { content?: string } }> | undefined;
+  return choices?.[0]?.message?.content ?? "";
 }
 
 async function tryClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(AI_PROXY_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }],
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "claude", apiKey, prompt }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || res.statusText);
+    const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+    throw new Error(String(err?.message || res.statusText));
   }
-  const data = await res.json();
-  const text = data?.content?.[0]?.text ?? "";
-  return text;
+  const data = await res.json() as Record<string, unknown>;
+  const content = data?.content as Array<{ text?: string }> | undefined;
+  return content?.[0]?.text ?? "";
 }
 
 /**

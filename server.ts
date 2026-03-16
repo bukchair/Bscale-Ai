@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import axios from "axios";
 import dotenv from "dotenv";
 
@@ -56,7 +55,7 @@ async function startServer() {
           headers['Content-Type'] = 'application/json';
         }
 
-        console.log(`Attempting WooCommerce ${method} request to: ${urlObj.origin}${urlObj.pathname}`);
+        // debug: WooCommerce ${method} → ${urlObj.origin}${urlObj.pathname}
         
         const options: RequestInit = {
           method,
@@ -77,19 +76,18 @@ async function startServer() {
 
       // Try 2: If 405 or 404, try with index.php
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 1 failed (${response.status}), trying with index.php...`);
+        // Attempt 1 failed (${response.status}), trying with index.php...
         apiUrl = `${baseUrl}/index.php/wp-json/wc/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
       // Try 3: Legacy API if still failing
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 2 failed (${response.status}), trying legacy API path...`);
+        // Attempt 2 failed (${response.status}), trying legacy API path...
         apiUrl = `${baseUrl}/wc-api/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
-      console.log(`Final WooCommerce response status: ${response.status}`);
       const text = await response.text();
       
       let data;
@@ -575,15 +573,27 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files from the 'dist' directory in production
+    // Initialize Next.js to serve API routes under src/app/api/
+    const { default: next } = await import('next');
+    const nextApp = next({ dev: false, dir: __dirname });
+    await nextApp.prepare();
+    const nextHandler = nextApp.getRequestHandler();
+
+    // Forward unhandled /api/* to Next.js (Express routes registered above take priority)
+    app.all('/api/*', (req, res) => nextHandler(req, res));
+    // Next.js static assets
+    app.all('/_next/*', (req, res) => nextHandler(req, res));
+
+    // Serve Vite SPA static files from 'dist'
     app.use(express.static(path.join(__dirname, "dist")));
-    
+
     // Handle SPA routing: serve index.html for any unknown paths
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
@@ -591,7 +601,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    console.info(`Server running on port ${PORT}`);
   });
 }
 

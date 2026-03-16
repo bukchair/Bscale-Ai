@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { requestJSON, hasAnyAIKey, type AIKeys } from "../lib/multiAI";
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.0-flash-001";
 
 function parseJsonSafe<T>(text: string, fallback: T): T {
   if (!text || !text.trim()) return fallback;

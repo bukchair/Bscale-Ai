@@ -2,35 +2,15 @@ import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
 
-const SEARCH_CONSOLE_API = 'https://searchconsole.googleapis.com/webmasters/v3';
-const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+import { toApiErrorMessage as toErrorMessage, normalizeDateParam } from '@/src/lib/utils/api-request-utils';
+import { GSC_API_BASE as SEARCH_CONSOLE_API } from '@/src/lib/constants/api-urls';
 const isValidSearchConsoleSite = (value: string) =>
   /^https?:\/\/.+/i.test(value) || /^sc-domain:.+/i.test(value);
-
-const toErrorMessage = (status: number, raw: string, parsed: unknown) => {
-  if (parsed && typeof parsed === 'object') {
-    const obj = parsed as Record<string, unknown>;
-    const rootError = obj.error;
-    if (rootError && typeof rootError === 'object') {
-      const msg = (rootError as Record<string, unknown>).message;
-      if (typeof msg === 'string' && msg.trim()) return msg;
-    }
-    const msg = obj.message;
-    if (typeof msg === 'string' && msg.trim()) return msg;
-  }
-  if (raw.trim()) return `Search Console request failed (${status}): ${raw.slice(0, 240)}`;
-  return `Search Console request failed (${status}).`;
-};
 
 const dateDaysAgo = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() - days);
   return date.toISOString().slice(0, 10);
-};
-
-const normalizeDateParam = (value: string | null) => {
-  const trimmed = (value || '').trim();
-  return DATE_PARAM_REGEX.test(trimmed) ? trimmed : '';
 };
 
 export async function GET(request: Request) {

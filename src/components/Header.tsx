@@ -9,9 +9,18 @@ import { cn } from '../lib/utils';
 import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
+type UserProfile = {
+  uid?: string;
+  role?: string;
+  subscriptionStatus?: string;
+  trialEndsAt?: string;
+  trialStartedAt?: string;
+  createdAt?: string;
+};
+
 interface HeaderProps {
   onMenuClick: () => void;
-  userProfile?: any;
+  userProfile?: UserProfile;
 }
 
 type PendingUserApproval = {

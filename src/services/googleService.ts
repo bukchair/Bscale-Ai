@@ -1,19 +1,5 @@
 import { auth, onAuthStateChanged } from '../lib/firebase';
-
-const viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
-const configuredApiBase = (typeof viteEnv?.VITE_APP_URL === 'string' && viteEnv.VITE_APP_URL.trim()) || '';
-const API_BASE = (() => {
-  if (!configuredApiBase || typeof window === 'undefined') return '';
-  try {
-    const configuredOrigin = new URL(configuredApiBase, window.location.origin).origin;
-    return configuredOrigin === window.location.origin ? configuredOrigin : '';
-  } catch {
-    return '';
-  }
-})();
+import { API_BASE } from '../lib/utils/client-api-base';
 
 const ensureManagedApiSession = async (accessToken: string) => {
   if (accessToken !== 'server-managed') return;
@@ -297,6 +283,24 @@ export async function fetchGA4Report(
   }
 
   return response.json();
+}
+
+export async function fetchGA4Realtime(accessToken: string, propertyId?: string) {
+  await ensureManagedApiSession(accessToken);
+  const query = new URLSearchParams();
+  if (propertyId) query.set('property_id', propertyId);
+  const response = await fetch(`${API_BASE}/api/google/analytics/realtime?${query.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch GA4 realtime data');
+  }
+
+  return response.json() as Promise<{ topPages: Array<{ title: string; path: string; views: number }>; users24h: number }>;
 }
 
 export async function fetchGSCData(accessToken: string, siteUrl?: string, startDate?: string, endDate?: string) {

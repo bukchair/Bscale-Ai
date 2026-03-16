@@ -22,10 +22,7 @@ import {
 } from '@/src/lib/integrations/core/errors';
 import { toRoutePlatform } from '@/src/lib/integrations/utils/platform-utils';
 import { auditService } from '@/src/lib/integrations/services/audit-service';
-
-const META_GRAPH_VERSION = 'v21.0';
-const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
-const META_AUTH_BASE = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
+import { META_GRAPH_BASE, META_AUTH_BASE } from '@/src/lib/constants/api-urls';
 
 type MetaTokenResponse = {
   access_token?: string;
@@ -164,9 +161,10 @@ export class MetaProvider implements IntegrationProvider {
       'id,account_id,name,currency,timezone_name,account_status,business{id,name}'
     );
     url.searchParams.set('limit', '200');
-    url.searchParams.set('access_token', accessToken);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
     const parsed = (await response.json()) as {
       data?: Array<{
         id?: string;
@@ -237,9 +235,10 @@ export class MetaProvider implements IntegrationProvider {
     url.searchParams.set('date_preset', 'last_7d');
     url.searchParams.set('fields', 'spend,impressions,clicks,ctr,cpc');
     url.searchParams.set('limit', '1');
-    url.searchParams.set('access_token', accessToken);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
     const parsed = (await response.json()) as {
       data?: Array<{
         spend?: string;

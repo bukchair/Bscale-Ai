@@ -14,17 +14,15 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email == "asher205@gmail.com" && request.auth.token.email_verified == true) ||
-        (
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-        )
-      );
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isAgency() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agency';
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agency';
     }
 
     function isSharedWithResource(data) {
@@ -35,35 +33,37 @@ service cloud.firestore {
     }
 
     function isSharedWithUser(userId) {
-      let owner = get(/databases/$(database)/documents/users/$(userId)).data;
       return isAuthenticated() &&
              request.auth.token.email is string &&
-             owner.sharedAccessEmails is list &&
-             request.auth.token.email in owner.sharedAccessEmails;
+             exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.sharedAccessEmails is list &&
+             request.auth.token.email in get(/databases/$(database)/documents/users/$(userId)).data.sharedAccessEmails;
     }
 
     function hasSharedEditAccess(userId) {
-      let owner = get(/databases/$(database)/documents/users/$(userId)).data;
       return isAuthenticated() &&
              request.auth.token.email is string &&
-             owner.sharedEditorsEmails is list &&
-             request.auth.token.email in owner.sharedEditorsEmails;
+             exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.sharedEditorsEmails is list &&
+             request.auth.token.email in get(/databases/$(database)/documents/users/$(userId)).data.sharedEditorsEmails;
     }
-    
+
     function hasStoreAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds);
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let storePath = /databases/$(database)/documents/stores/$(storeId);
+      return isAdmin() ||
+             (exists(userPath) && exists(storePath) &&
+              ((get(userPath).data.role == 'agency' && get(storePath).data.agencyId == request.auth.uid) ||
+               (storeId in get(userPath).data.storeIds)));
     }
-    
+
     function hasStoreEditAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds && user.role in ['owner', 'editor']);
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let storePath = /databases/$(database)/documents/stores/$(storeId);
+      return isAdmin() ||
+             (exists(userPath) && exists(storePath) &&
+              ((get(userPath).data.role == 'agency' && get(storePath).data.agencyId == request.auth.uid) ||
+               (storeId in get(userPath).data.storeIds && get(userPath).data.role in ['owner', 'editor'])));
     }
 
     function isValidUser(data) {

@@ -8,7 +8,13 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
-export const ADMIN_SALES_EMAIL = 'asher205@gmail.com';
+const _viteEnv =
+  typeof import.meta !== 'undefined'
+    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
+    : undefined;
+export const ADMIN_SALES_EMAIL: string =
+  (typeof _viteEnv?.VITE_ADMIN_EMAIL === 'string' && _viteEnv.VITE_ADMIN_EMAIL.trim()) ||
+  '';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TRIAL_DAYS = 3;
 const TRIAL_DURATION_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
@@ -26,7 +32,14 @@ const computeTrialEndsAt = (trialStartedAt: string) => {
   return new Date(new Date(trialStartedAt).getTime() + TRIAL_DURATION_MS).toISOString();
 };
 
-export async function syncUserProfile(user: any) {
+type FirebaseUser = {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+};
+
+export async function syncUserProfile(user: FirebaseUser | null) {
   if (!user) return null;
 
   const userRef = doc(db, 'users', user.uid);
@@ -58,8 +71,16 @@ export async function syncUserProfile(user: any) {
     return userData;
   }
 
-  const existing = userDoc.data() as Record<string, any>;
-  const updates: Record<string, any> = {};
+  type UserData = {
+    subscriptionStatus?: string;
+    trialStartedAt?: string;
+    trialEndsAt?: string;
+    createdAt?: string;
+    role?: string;
+    [key: string]: unknown;
+  };
+  const existing = userDoc.data() as UserData;
+  const updates: Partial<UserData> = {};
 
   if (!isAdmin && existing.subscriptionStatus === 'trial') {
     const trialStartedAt =

@@ -116,7 +116,7 @@ actionsEvents.on('failed', ({ jobId, failedReason }) => {
   console.error(`[${syncEnv.WORKER_INSTANCE_ID}] action job failed`, { jobId, failedReason });
 });
 
-console.log(`[${syncEnv.WORKER_INSTANCE_ID}] Sync workers started`);
+console.info(`[${syncEnv.WORKER_INSTANCE_ID}] Sync workers started`);
 
 const shutdown = async () => {
   await Promise.allSettled([
