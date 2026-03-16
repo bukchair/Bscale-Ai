@@ -168,8 +168,13 @@ export async function fetchGoogleSearchTerms(
       const term = String(row?.searchTermView?.searchTerm || '').trim();
       if (!term) return null;
 
+      const campaignId = String(row?.campaign?.id || '').trim();
+      const campaignName = String(row?.campaign?.name || '').trim();
       const clicks = Number(row?.metrics?.clicks || 0);
       const impressions = Number(row?.metrics?.impressions || 0);
+      const ctr =
+        Number(row?.metrics?.ctr || 0) ||
+        (impressions > 0 ? clicks / impressions : 0);
       const cost = Number(row?.metrics?.costMicros || 0) / 1_000_000;
       const conversions = Number(row?.metrics?.conversions || 0);
       const conversionValue = Number(row?.metrics?.conversionsValue || 0);
@@ -186,8 +191,11 @@ export async function fetchGoogleSearchTerms(
 
       return {
         term,
+        campaignId,
+        campaignName,
         impressions,
         clicks,
+        ctr,
         cost,
         conversions,
         conversionValue,
@@ -197,6 +205,40 @@ export async function fetchGoogleSearchTerms(
       };
     })
     .filter(Boolean);
+}
+
+export type GoogleNegativeKeywordItem = {
+  term: string;
+  campaignId: string;
+  campaignName?: string;
+  matchType?: 'BROAD' | 'PHRASE' | 'EXACT';
+};
+
+export async function applyGoogleNegativeKeywords(
+  accessToken: string,
+  items: GoogleNegativeKeywordItem[],
+  customerId?: string,
+  loginCustomerId?: string
+) {
+  await ensureManagedApiSession(accessToken);
+  const response = await fetch(`${API_BASE}/api/google/ads/search-terms`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      customerId,
+      loginCustomerId,
+      items,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.message || 'Failed to apply negative keywords to Google Ads');
+  }
+  return payload;
 }
 
 export async function sendGmailNotification(accessToken: string, to: string, subject: string, body: string) {
