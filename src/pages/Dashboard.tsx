@@ -12,6 +12,7 @@ import {
   Store,
   Target,
   Globe,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -260,6 +261,8 @@ const COPY = {
     totalSpend: 'סה"כ הוצאות פרסום',
     metaSpend: 'הוצאות Meta',
     metaRevenue: 'הכנסה מיוחסת Meta',
+    metaRevenueTooltip:
+      'מחושב כסכום conversion value שהוחזר ממסעות Meta בטווח התאריכים. זהו נתון ייחוס פרסומי (attribution) והוא יכול להיות שונה מהכנסות WooCommerce בפועל.',
     netProfit: 'רווח נקי',
     roas: 'ROAS',
     noFinanceData: 'עדיין אין נתונים חיים להכנסות או הוצאות פרסום לטווח התאריכים שנבחר.',
@@ -311,6 +314,8 @@ const COPY = {
     totalSpend: 'Total ad spend',
     metaSpend: 'Meta spend',
     metaRevenue: 'Meta attributed revenue',
+    metaRevenueTooltip:
+      'Calculated as the sum of Meta campaign conversion value in the selected date range. This is an attribution metric and can differ from actual WooCommerce revenue.',
     netProfit: 'Net profit',
     roas: 'ROAS',
     noFinanceData: 'No live revenue or ad spend data for the selected date range yet.',
@@ -362,6 +367,8 @@ const COPY = {
     totalSpend: 'Расходы на рекламу',
     metaSpend: 'Расходы Meta',
     metaRevenue: 'Доход, атрибутированный Meta',
+    metaRevenueTooltip:
+      'Рассчитывается как сумма conversion value из кампаний Meta за выбранный период. Это атрибуционная метрика и она может отличаться от фактической выручки WooCommerce.',
     netProfit: 'Чистая прибыль',
     roas: 'ROAS',
     noFinanceData: 'Пока нет live данных по доходу или расходам за выбранный период.',
@@ -413,6 +420,8 @@ const COPY = {
     totalSpend: 'Gasto total em anúncios',
     metaSpend: 'Gasto Meta',
     metaRevenue: 'Receita atribuída ao Meta',
+    metaRevenueTooltip:
+      'Calculada como a soma do conversion value das campanhas Meta no período selecionado. É uma métrica de atribuição e pode diferir da receita real do WooCommerce.',
     netProfit: 'Lucro líquido',
     roas: 'ROAS',
     noFinanceData: 'Ainda não há dados ao vivo de receita ou gasto no período selecionado.',
@@ -464,6 +473,8 @@ const COPY = {
     totalSpend: 'Dépenses publicitaires',
     metaSpend: 'Dépense Meta',
     metaRevenue: 'Revenu attribué à Meta',
+    metaRevenueTooltip:
+      'Calculé comme la somme de la conversion value des campagnes Meta sur la période sélectionnée. Il s’agit d’une métrique d’attribution, pouvant différer du revenu WooCommerce réel.',
     netProfit: 'Bénéfice net',
     roas: 'ROAS',
     noFinanceData: 'Aucune donnée en direct de revenu ou de dépense pour la période sélectionnée.',
@@ -1107,6 +1118,27 @@ export function Dashboard() {
       {live ? text.sourceLive : text.sourceMissing}
     </span>
   );
+  const InlineTooltip = ({ message }: { message: string }) => (
+    <span className="relative inline-flex group">
+      <button
+        type="button"
+        aria-label={message}
+        title={message}
+        className="inline-flex items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+      >
+        <HelpCircle className="w-3.5 h-3.5" />
+      </button>
+      <span
+        role="tooltip"
+        className={cn(
+          'pointer-events-none absolute top-full mt-1 z-20 hidden w-64 rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] leading-relaxed text-gray-700 shadow-lg dark:border-white/10 dark:bg-[#111] dark:text-gray-200 group-hover:block group-focus-within:block',
+          dir === 'rtl' ? 'left-0' : 'right-0'
+        )}
+      >
+        {message}
+      </span>
+    </span>
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -1190,6 +1222,7 @@ export function Dashboard() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500 inline-flex items-center gap-1.5">
                     {text.metaRevenue}
+                    <InlineTooltip message={text.metaRevenueTooltip} />
                     <SourceTag live={financialAvailability.metaRevenue} />
                   </span>
                   <span className="font-bold text-emerald-700">
