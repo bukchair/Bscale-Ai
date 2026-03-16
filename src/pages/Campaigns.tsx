@@ -35,7 +35,7 @@ import { fetchTikTokCampaigns } from '../services/tiktokService';
 import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../services/metaService';
 import { fetchGoogleCampaigns, sendGmailNotification } from '../services/googleService';
 import { fetchWooCommerceProducts } from '../services/woocommerceService';
-import { auth } from '../lib/firebase';
+import { auth, onAuthStateChanged } from '../lib/firebase';
 
 const mockCampaignData = [
   { id: 1, name: 'Summer Sale - Shoes', platform: 'Google', status: 'Active', spend: 1200, roas: 2.5, cpa: 45 },
@@ -990,6 +990,44 @@ export function Campaigns() {
     setCustomAudience('');
   };
 
+  const ensureManagedApiSession = async () => {
+    const currentUser =
+      auth.currentUser ||
+      (await new Promise<typeof auth.currentUser>((resolve) => {
+        const timeoutId = window.setTimeout(() => {
+          unsubscribe();
+          resolve(auth.currentUser);
+        }, 3000);
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve(nextUser);
+        });
+      }));
+
+    if (!currentUser) {
+      throw new Error(
+        isHebrew
+          ? 'נדרש להתחבר מחדש למערכת לפני יצירת קמפיין.'
+          : 'Please sign in again before creating a campaign.'
+      );
+    }
+
+    const idToken = await currentUser.getIdToken(true);
+    const response = await fetch('/api/auth/session/bootstrap', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload?.success === false) {
+      throw new Error(
+        payload?.message ||
+          (isHebrew ? 'אימות הסשן נכשל. התחבר מחדש ונסה שוב.' : 'Session bootstrap failed. Please sign in again.')
+      );
+    }
+  };
+
   const normalizeHour = (value: number) => {
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(23, Math.round(value)));
@@ -1254,6 +1292,7 @@ export function Campaigns() {
     setEditLoading(true);
     setEditMessage(null);
     try {
+      await ensureManagedApiSession();
       const parsedBudget = Number(editingCampaign.dailyBudget);
       const dailyBudget =
         editingCampaign.dailyBudget.trim().length > 0 && Number.isFinite(parsedBudget) && parsedBudget >= 0
@@ -1536,6 +1575,7 @@ export function Campaigns() {
     setIsCreatingCampaign(true);
     const mediaCount = uploadedAssets.length;
     try {
+      await ensureManagedApiSession();
       const response = await fetch('/api/campaigns/scheduled', {
         method: 'POST',
         headers: {
@@ -1562,7 +1602,23 @@ export function Campaigns() {
         }),
       });
       const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          payload?.message ||
+            (isHebrew
+              ? `יצירת קמפיין נכשלה (קוד ${response.status}).`
+              : `Campaign creation failed (status ${response.status}).`)
+        );
+      }
       const results = Array.isArray(payload?.results) ? payload.results : [];
+      if (results.length === 0 && payload?.success !== true) {
+        throw new Error(
+          payload?.message ||
+            (isHebrew
+              ? 'לא התקבלו תוצאות יצירה מהשרת. בדוק חיבורים ונסה שוב.'
+              : 'No campaign creation results were returned by the server. Check your connections and retry.')
+        );
+      }
       setPublishResults(results);
 
       const created = selectedPlatforms.map((platform) => {
