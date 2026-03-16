@@ -16,6 +16,7 @@ type UpdateCampaignBody = {
   name?: string;
   status?: UiStatus;
   dailyBudget?: number | null;
+  applyToAds?: boolean;
 };
 
 const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
@@ -53,9 +54,93 @@ const extractErrorMessage = async (response: Response) => {
   }
 };
 
+const buildGoogleHeaders = (
+  accessToken: string,
+  loginCustomerId?: string
+): Record<string, string> => {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${accessToken}`,
+    'developer-token': integrationsEnv.GOOGLE_ADS_DEVELOPER_TOKEN,
+    'content-type': 'application/json',
+  };
+  if (loginCustomerId) headers['login-customer-id'] = loginCustomerId;
+  return headers;
+};
+
+const updateGoogleAdsInCampaign = async (input: {
+  customerId: string;
+  campaignId: string;
+  status: UiStatus;
+  headers: Record<string, string>;
+}) => {
+  const searchResponse = await fetch(
+    `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/googleAds:search`,
+    {
+      method: 'POST',
+      headers: input.headers,
+      body: JSON.stringify({
+        query: `
+          SELECT ad_group_ad.resource_name
+          FROM ad_group_ad
+          WHERE campaign.id = ${input.campaignId}
+            AND ad_group_ad.status != 'REMOVED'
+          LIMIT 500
+        `,
+      }),
+    }
+  );
+  if (!searchResponse.ok) {
+    throw new Error(await extractErrorMessage(searchResponse));
+  }
+  const searchPayload = (await searchResponse.json().catch(() => ({}))) as Record<string, any>;
+  const resourceNames = (Array.isArray(searchPayload?.results) ? searchPayload.results : [])
+    .map((row: any) => String(row?.adGroupAd?.resourceName || '').trim())
+    .filter(Boolean);
+  if (resourceNames.length === 0) {
+    return { updatedAdsCount: 0, adsUpdateFailures: 0 };
+  }
+
+  const chunkSize = 200;
+  let updatedAdsCount = 0;
+  let adsUpdateFailures = 0;
+  for (let offset = 0; offset < resourceNames.length; offset += chunkSize) {
+    const chunk = resourceNames.slice(offset, offset + chunkSize);
+    const mutateResponse = await fetch(
+      `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/adGroupAds:mutate`,
+      {
+        method: 'POST',
+        headers: input.headers,
+        body: JSON.stringify({
+          operations: chunk.map((resourceName) => ({
+            update: {
+              resourceName,
+              status: toGoogleStatus(input.status),
+            },
+            updateMask: 'status',
+          })),
+        }),
+      }
+    );
+    if (!mutateResponse.ok) {
+      adsUpdateFailures += chunk.length;
+      continue;
+    }
+    const mutatePayload = (await mutateResponse.json().catch(() => ({}))) as Record<string, any>;
+    const updatedInChunk = Array.isArray(mutatePayload?.results)
+      ? mutatePayload.results.length
+      : chunk.length;
+    updatedAdsCount += updatedInChunk;
+  }
+
+  return { updatedAdsCount, adsUpdateFailures };
+};
+
 const updateGoogleCampaign = async (
   userId: string,
-  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & { dailyBudget?: number | null }
+  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & {
+    dailyBudget?: number | null;
+    applyToAds?: boolean;
+  }
 ) => {
   if (!integrationsEnv.GOOGLE_ADS_DEVELOPER_TOKEN) {
     throw new Error('GOOGLE_ADS_DEVELOPER_TOKEN is missing.');
@@ -73,18 +158,17 @@ const updateGoogleCampaign = async (
   if (!campaignId) {
     throw new Error('Invalid Google campaign id.');
   }
+  const numericCampaignId = Number(String(campaignId).replace(/\D/g, ''));
+  if (!Number.isFinite(numericCampaignId) || numericCampaignId <= 0) {
+    throw new Error('Google campaign id must be numeric.');
+  }
 
   const loginCustomerId = googleLegacyBridge.getLoginCustomerId(connection.metadata) || undefined;
-  const headers: Record<string, string> = {
-    authorization: `Bearer ${accessToken}`,
-    'developer-token': integrationsEnv.GOOGLE_ADS_DEVELOPER_TOKEN,
-    'content-type': 'application/json',
-  };
-  if (loginCustomerId) headers['login-customer-id'] = loginCustomerId;
+  const headers = buildGoogleHeaders(accessToken, loginCustomerId);
 
   const updatePaths = ['name', 'status'];
   const campaignUpdate: Record<string, unknown> = {
-    resourceName: `customers/${customerId}/campaigns/${campaignId}`,
+    resourceName: `customers/${customerId}/campaigns/${numericCampaignId}`,
     name: body.name.trim().slice(0, 120),
     status: toGoogleStatus(body.status),
   };
@@ -106,17 +190,80 @@ const updateGoogleCampaign = async (
     throw new Error(await extractErrorMessage(response));
   }
 
+  if (typeof body.dailyBudget === 'number' && Number.isFinite(body.dailyBudget) && body.dailyBudget > 0) {
+    const budgetLookupResponse = await fetch(
+      `${GOOGLE_ADS_API_BASE}/customers/${customerId}/googleAds:search`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          query: `
+            SELECT campaign.campaign_budget
+            FROM campaign
+            WHERE campaign.id = ${numericCampaignId}
+            LIMIT 1
+          `,
+        }),
+      }
+    );
+    if (!budgetLookupResponse.ok) {
+      throw new Error(await extractErrorMessage(budgetLookupResponse));
+    }
+    const budgetLookupPayload = (await budgetLookupResponse.json().catch(() => ({}))) as Record<string, any>;
+    const budgetResourceName = String(
+      budgetLookupPayload?.results?.[0]?.campaign?.campaignBudget || ''
+    ).trim();
+    if (budgetResourceName) {
+      const budgetUpdateResponse = await fetch(
+        `${GOOGLE_ADS_API_BASE}/customers/${customerId}/campaignBudgets:mutate`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            operations: [
+              {
+                update: {
+                  resourceName: budgetResourceName,
+                  amountMicros: Math.round(body.dailyBudget * 1_000_000),
+                },
+                updateMask: 'amount_micros',
+              },
+            ],
+          }),
+        }
+      );
+      if (!budgetUpdateResponse.ok) {
+        throw new Error(await extractErrorMessage(budgetUpdateResponse));
+      }
+    }
+  }
+
+  let adsSummary = { updatedAdsCount: 0, adsUpdateFailures: 0 };
+  if (body.applyToAds) {
+    adsSummary = await updateGoogleAdsInCampaign({
+      customerId,
+      campaignId: String(numericCampaignId),
+      status: body.status,
+      headers,
+    });
+  }
+
   return {
     platform: 'Google' as const,
-    campaignId,
+    campaignId: String(numericCampaignId),
     name: String(campaignUpdate.name || ''),
     status: body.status,
+    updatedAdsCount: adsSummary.updatedAdsCount,
+    adsUpdateFailures: adsSummary.adsUpdateFailures,
   };
 };
 
 const updateMetaCampaign = async (
   userId: string,
-  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & { dailyBudget?: number | null }
+  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & {
+    dailyBudget?: number | null;
+    applyToAds?: boolean;
+  }
 ) => {
   const connection = await connectionService.getByUserPlatform(userId, 'META');
   if (!connection || connection.status !== 'CONNECTED') {
@@ -150,17 +297,55 @@ const updateMetaCampaign = async (
     throw new Error(await extractErrorMessage(response));
   }
 
+  let updatedAdsCount = 0;
+  let adsUpdateFailures = 0;
+  if (body.applyToAds) {
+    const adsResponse = await fetch(
+      `${META_GRAPH_BASE}/${campaignId}/ads?fields=id,status&limit=200&access_token=${encodeURIComponent(
+        accessToken
+      )}`,
+      { method: 'GET' }
+    );
+    if (adsResponse.ok) {
+      const adsPayload = (await adsResponse.json().catch(() => ({}))) as Record<string, any>;
+      const adIds = (Array.isArray(adsPayload?.data) ? adsPayload.data : [])
+        .map((ad: any) => String(ad?.id || '').trim())
+        .filter(Boolean);
+      for (const adId of adIds) {
+        const adForm = new URLSearchParams();
+        adForm.set('status', toMetaStatus(body.status));
+        adForm.set('access_token', accessToken);
+        const adUpdateResponse = await fetch(`${META_GRAPH_BASE}/${adId}`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+          },
+          body: adForm.toString(),
+        });
+        if (adUpdateResponse.ok) updatedAdsCount += 1;
+        else adsUpdateFailures += 1;
+      }
+    } else {
+      adsUpdateFailures += 1;
+    }
+  }
+
   return {
     platform: 'Meta' as const,
     campaignId,
     name: body.name.trim().slice(0, 120),
     status: body.status,
+    updatedAdsCount,
+    adsUpdateFailures,
   };
 };
 
 const updateTikTokCampaign = async (
   userId: string,
-  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & { dailyBudget?: number | null }
+  body: Required<Pick<UpdateCampaignBody, 'campaignId' | 'name' | 'status'>> & {
+    dailyBudget?: number | null;
+    applyToAds?: boolean;
+  }
 ) => {
   const connection = await connectionService.getByUserPlatform(userId, 'TIKTOK');
   if (!connection || connection.status !== 'CONNECTED') {
@@ -214,11 +399,58 @@ const updateTikTokCampaign = async (
     throw new Error(String(parsed?.message || `TikTok update failed (${response.status}).`));
   }
 
+  let updatedAdsCount = 0;
+  let adsUpdateFailures = 0;
+  if (body.applyToAds) {
+    const adsListResponse = await fetch(`${TIKTOK_API_BASE}/ad/get/`, {
+      method: 'POST',
+      headers: {
+        'Access-Token': accessToken,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        advertiser_id: account.externalAccountId,
+        page: 1,
+        page_size: 200,
+        filtering: {
+          campaign_ids: [campaignId],
+        },
+      }),
+    });
+    const adsListPayload = (await adsListResponse.json().catch(() => null)) as Record<string, any> | null;
+    if (adsListResponse.ok && Number(adsListPayload?.code) === 0) {
+      const adRows = Array.isArray(adsListPayload?.data?.list) ? adsListPayload?.data?.list : [];
+      for (const adRow of adRows) {
+        const adId = String(adRow?.ad_id || adRow?.id || '').trim();
+        if (!adId) continue;
+        const adUpdateResponse = await fetch(`${TIKTOK_API_BASE}/ad/update/`, {
+          method: 'POST',
+          headers: {
+            'Access-Token': accessToken,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            advertiser_id: account.externalAccountId,
+            ad_id: adId,
+            operation_status: toTikTokStatus(body.status),
+          }),
+        });
+        const adUpdatePayload = (await adUpdateResponse.json().catch(() => null)) as Record<string, any> | null;
+        if (adUpdateResponse.ok && Number(adUpdatePayload?.code) === 0) updatedAdsCount += 1;
+        else adsUpdateFailures += 1;
+      }
+    } else {
+      adsUpdateFailures += 1;
+    }
+  }
+
   return {
     platform: 'TikTok' as const,
     campaignId,
     name: body.name.trim().slice(0, 120),
     status: body.status,
+    updatedAdsCount,
+    adsUpdateFailures,
   };
 };
 
@@ -262,9 +494,17 @@ export async function POST(request: Request) {
         typeof body.dailyBudget === 'number' && Number.isFinite(body.dailyBudget)
           ? Math.max(0, body.dailyBudget)
           : null,
+      applyToAds: Boolean(body.applyToAds),
     };
 
-    let updated: { platform: PlatformName; campaignId: string; name: string; status: UiStatus };
+    let updated: {
+      platform: PlatformName;
+      campaignId: string;
+      name: string;
+      status: UiStatus;
+      updatedAdsCount?: number;
+      adsUpdateFailures?: number;
+    };
     if (body.platform === 'Google') {
       updated = await updateGoogleCampaign(user.id, payload);
     } else if (body.platform === 'Meta') {
@@ -273,10 +513,19 @@ export async function POST(request: Request) {
       updated = await updateTikTokCampaign(user.id, payload);
     }
 
+    const adsMsg =
+      payload.applyToAds
+        ? ` Ads updated: ${updated.updatedAdsCount || 0}${
+            (updated.adsUpdateFailures || 0) > 0
+              ? ` (failures: ${updated.adsUpdateFailures || 0})`
+              : ''
+          }.`
+        : '';
+
     return NextResponse.json({
       success: true,
       updated,
-      message: `${updated.platform} campaign updated successfully.`,
+      message: `${updated.platform} campaign updated successfully.${adsMsg}`,
     });
   } catch (error) {
     return NextResponse.json(

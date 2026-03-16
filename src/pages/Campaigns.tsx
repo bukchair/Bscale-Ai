@@ -239,6 +239,10 @@ export function Campaigns() {
     editName: isHebrew ? 'שם קמפיין' : 'Campaign name',
     editStatus: isHebrew ? 'סטטוס' : 'Status',
     editBudget: isHebrew ? 'תקציב יומי (אופציונלי)' : 'Daily budget (optional)',
+    editApplyAds: isHebrew ? 'עדכן גם מודעות קיימות בקמפיין' : 'Also update existing ads in this campaign',
+    editApplyAdsHint: isHebrew
+      ? 'מעדכן סטטוס מודעות קיימות באותו קמפיין בפלטפורמה.'
+      : 'Updates the status of existing ads under the same campaign on this platform.',
     updateSuccess: isHebrew ? 'הקמפיין עודכן בהצלחה.' : 'Campaign updated successfully.',
     updateFailed: isHebrew ? 'עדכון הקמפיין נכשל.' : 'Failed to update campaign.',
     actions: isHebrew ? 'פעולות' : 'Actions',
@@ -380,6 +384,7 @@ export function Campaigns() {
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; message: string; campaignId?: string }>>([]);
   const [editingCampaign, setEditingCampaign] = useState<EditCampaignDraft | null>(null);
+  const [editApplyToAds, setEditApplyToAds] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
@@ -1340,6 +1345,7 @@ export function Campaigns() {
     const normalizedStatus = normalizeCampaignStatus(campaign?.status);
     const status: EditableStatus = normalizedStatus === 'Paused' ? 'Paused' : 'Active';
     setEditMessage(null);
+    setEditApplyToAds(false);
     setEditingCampaign({
       rowKey: `${platform}-${campaignId}`,
       platform,
@@ -1352,6 +1358,7 @@ export function Campaigns() {
 
   const closeEditCampaign = () => {
     setEditingCampaign(null);
+    setEditApplyToAds(false);
     setEditLoading(false);
   };
 
@@ -1382,6 +1389,7 @@ export function Campaigns() {
           name: trimmedName,
           status: editingCampaign.status,
           dailyBudget,
+          applyToAds: editApplyToAds,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -1406,6 +1414,7 @@ export function Campaigns() {
       setEditMessage(payload?.message || text.updateSuccess);
       setTimeout(() => {
         setEditingCampaign(null);
+        setEditApplyToAds(false);
       }, 250);
     } catch (error) {
       setEditMessage(error instanceof Error ? error.message : text.updateFailed);
@@ -3062,6 +3071,18 @@ export function Campaigns() {
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                   placeholder={isHebrew ? 'למשל 250' : 'e.g. 250'}
                 />
+              </div>
+              <div className="rounded-md border border-indigo-100 bg-indigo-50/40 px-3 py-2">
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={editApplyToAds}
+                    onChange={(e) => setEditApplyToAds(e.target.checked)}
+                  />
+                  {text.editApplyAds}
+                </label>
+                <p className="mt-1 text-[11px] text-indigo-700">{text.editApplyAdsHint}</p>
               </div>
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
