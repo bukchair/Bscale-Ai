@@ -19,7 +19,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { generateDashboardData } from '../lib/dataUtils';
-import { fetchGA4Report, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
+import { fetchGA4Report, fetchGA4Realtime, fetchGSCData, fetchGoogleCampaigns } from '../services/googleService';
 import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../services/metaService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
 import {
@@ -54,6 +54,12 @@ type PlatformRevenueSummary = {
 };
 
 const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
+type Ga4TopPage = { title: string; path: string; views: number };
+const DEMO_GA4_TOP_PAGES: Ga4TopPage[] = [
+  { title: 'דף הבית', path: '/', views: 18 },
+  { title: 'מוצרים', path: '/products', views: 11 },
+  { title: 'צור קשר', path: '/contact', views: 6 },
+];
 const DEMO_GSC_STATS = { clicks: 3842, impressions: 48200, avgPosition: 14.3, ctr: 7.97 };
 
 const DEMO_RECENT_ORDERS: WooCommerceOrder[] = [
@@ -268,8 +274,10 @@ const COPY = {
     noFinanceData: 'עדיין אין נתונים חיים להכנסות או הוצאות פרסום לטווח התאריכים שנבחר.',
     goOrders: 'מעבר לרשימת הזמנות',
     ga4Card: 'מצב גולשים מהאתר GA4',
+    ga4LiveSync: 'Live Sync · 30 דק\' אחרונות',
     activeNow: 'פעילים עכשיו',
-    totalUsers: 'סה"כ משתמשים',
+    totalUsers: 'משתמשים ב-24 שעות אחרונות',
+    topPagesLabel: 'עמודים נצפים (30 דק\' אחרונות)',
     ga4Desc: 'מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.',
     noGa4: 'אין כרגע נתוני GA4 חיים להצגה.',
     latestOrdersCard: '5 הזמנות אחרונות',
@@ -321,8 +329,10 @@ const COPY = {
     noFinanceData: 'No live revenue or ad spend data for the selected date range yet.',
     goOrders: 'Go to orders list',
     ga4Card: 'Website traffic status (GA4)',
+    ga4LiveSync: 'Live Sync · last 30 min',
     activeNow: 'Active now',
-    totalUsers: 'Total users',
+    totalUsers: 'Users in last 24 hours',
+    topPagesLabel: 'Pages viewed (last 30 min)',
     ga4Desc: 'Shows real time site traffic so you can understand whether campaigns are bringing visitors now.',
     noGa4: 'No live GA4 data to display right now.',
     latestOrdersCard: 'Latest 5 orders',
@@ -374,8 +384,10 @@ const COPY = {
     noFinanceData: 'Пока нет live данных по доходу или расходам за выбранный период.',
     goOrders: 'Перейти к списку заказов',
     ga4Card: 'Состояние трафика сайта (GA4)',
+    ga4LiveSync: 'Live Sync · последние 30 мин',
     activeNow: 'Сейчас активны',
-    totalUsers: 'Всего пользователей',
+    totalUsers: 'Пользователей за 24 часа',
+    topPagesLabel: 'Страницы (последние 30 мин)',
     ga4Desc: 'Показывает трафик сайта в реальном времени.',
     noGa4: 'Сейчас нет live данных GA4.',
     latestOrdersCard: 'Последние 5 заказов',
@@ -427,8 +439,10 @@ const COPY = {
     noFinanceData: 'Ainda não há dados ao vivo de receita ou gasto no período selecionado.',
     goOrders: 'Ir para lista de pedidos',
     ga4Card: 'Status de tráfego do site (GA4)',
+    ga4LiveSync: 'Live Sync · últimos 30 min',
     activeNow: 'Ativos agora',
-    totalUsers: 'Usuários totais',
+    totalUsers: 'Usuários nas últimas 24 horas',
+    topPagesLabel: 'Páginas visualizadas (últimos 30 min)',
     ga4Desc: 'Mostra o tráfego em tempo real para entender se as campanhas estão trazendo visitas.',
     noGa4: 'Não há dados GA4 ao vivo para mostrar no momento.',
     latestOrdersCard: '5 pedidos mais recentes',
@@ -480,8 +494,10 @@ const COPY = {
     noFinanceData: 'Aucune donnée en direct de revenu ou de dépense pour la période sélectionnée.',
     goOrders: 'Aller à la liste des commandes',
     ga4Card: 'Statut du trafic du site (GA4)',
+    ga4LiveSync: 'Live Sync · 30 dernières min',
     activeNow: 'Actifs maintenant',
-    totalUsers: 'Utilisateurs totaux',
+    totalUsers: 'Utilisateurs sur 24 heures',
+    topPagesLabel: 'Pages vues (30 dernières min)',
     ga4Desc: 'Affiche le trafic en temps réel pour comprendre si les campagnes apportent des visiteurs.',
     noGa4: 'Aucune donnée GA4 en direct à afficher pour le moment.',
     latestOrdersCard: '5 dernières commandes',
@@ -553,6 +569,9 @@ export function Dashboard() {
   const [netProfit, setNetProfit] = useState(fallbackData.netProfit);
   const [roas, setRoas] = useState(fallbackData.roas);
   const [ga4Stats, setGa4Stats] = useState(DEMO_GA4_STATS);
+  const [ga4Users24h, setGa4Users24h] = useState<number | null>(null);
+  const [ga4TopPages, setGa4TopPages] = useState<Ga4TopPage[]>(DEMO_GA4_TOP_PAGES);
+  const [isGa4TopPagesDemo, setIsGa4TopPagesDemo] = useState(true);
   const [gscStats, setGscStats] = useState(DEMO_GSC_STATS);
   const [recentOrders, setRecentOrders] = useState<WooCommerceOrder[]>(DEMO_RECENT_ORDERS);
   const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>(DEMO_CAMPAIGN_SUMMARY);
@@ -739,6 +758,17 @@ export function Dashboard() {
           ga4SnapshotLoaded = true;
         } catch (error) {
           console.warn('Failed to load GA4 stats', error);
+        }
+
+        try {
+          const realtime = await fetchGA4Realtime(token, google.settings.ga4Id || undefined);
+          if (realtime.users24h > 0 || realtime.topPages.length > 0) {
+            setGa4Users24h(realtime.users24h);
+            setGa4TopPages(realtime.topPages.length > 0 ? realtime.topPages.slice(0, 7) : []);
+            setIsGa4TopPagesDemo(false);
+          }
+        } catch (error) {
+          console.warn('Failed to load GA4 realtime data', error);
         }
 
         try {
@@ -1253,7 +1283,10 @@ export function Dashboard() {
               <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Users className="w-5 h-5" />
               </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">{text.ga4Card}</h2>
+              <div>
+                <h2 className="font-bold text-gray-900 dark:text-white">{text.ga4Card}</h2>
+                <p className="text-[10px] text-emerald-600 font-semibold">{text.ga4LiveSync}</p>
+              </div>
             </div>
             <DemoTag show={isGa4UsingDemo} />
           </div>
@@ -1273,13 +1306,33 @@ export function Dashboard() {
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
                   <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
                     {text.totalUsers}
-                    <SourceTag live={ga4LiveAvailability.totalUsers} />
+                    <SourceTag live={!isGa4TopPagesDemo} />
                   </p>
                   <p className="text-3xl font-black text-indigo-600 mt-1">
-                    {ga4Availability.totalUsers ? safeGa4Stats.totalUsers.toLocaleString() : '—'}
+                    {ga4Users24h !== null
+                      ? ga4Users24h.toLocaleString()
+                      : ga4Availability.totalUsers
+                        ? safeGa4Stats.totalUsers.toLocaleString()
+                        : '—'}
                   </p>
                 </div>
               </div>
+
+              {ga4TopPages.length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-1">
+                  <p className="text-[11px] font-semibold text-gray-600 inline-flex items-center gap-1.5 mb-2">
+                    {text.topPagesLabel}
+                    <SourceTag live={!isGa4TopPagesDemo} />
+                  </p>
+                  {ga4TopPages.slice(0, 7).map((page, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-gray-700 truncate flex-1">{page.title || page.path}</p>
+                      <span className="text-xs font-bold text-indigo-600 shrink-0">{page.views.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <p className="text-xs text-gray-500">
                 {text.ga4Desc}
               </p>

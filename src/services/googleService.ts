@@ -271,6 +271,24 @@ export async function fetchGA4Report(
   return response.json();
 }
 
+export async function fetchGA4Realtime(accessToken: string, propertyId?: string) {
+  await ensureManagedApiSession(accessToken);
+  const query = new URLSearchParams();
+  if (propertyId) query.set('property_id', propertyId);
+  const response = await fetch(`${API_BASE}/api/google/analytics/realtime?${query.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch GA4 realtime data');
+  }
+
+  return response.json() as Promise<{ topPages: Array<{ title: string; path: string; views: number }>; users24h: number }>;
+}
+
 export async function fetchGSCData(accessToken: string, siteUrl?: string, startDate?: string, endDate?: string) {
   await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
