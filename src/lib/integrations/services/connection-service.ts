@@ -4,6 +4,13 @@ import { IntegrationError } from '@/src/lib/integrations/core/errors';
 import { toPrismaJson } from '@/src/lib/integrations/utils/prisma-json';
 
 export const connectionService = {
+  async getById(id: string) {
+    return prisma.platformConnection.findUnique({
+      where: { id },
+      include: { connectedAccounts: true },
+    });
+  },
+
   async listForUser(userId: string) {
     return prisma.platformConnection.findMany({
       where: { userId },

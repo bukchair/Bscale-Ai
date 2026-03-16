@@ -1,4 +1,18 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/sync?type=refreshTokens",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?type=syncMetrics",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync?type=snapshotDaily",
+      "schedule": "30 2 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
