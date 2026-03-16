@@ -53,6 +53,12 @@ type PlatformRevenueSummary = {
   tiktok: { spend: number; attributedRevenue: number };
 };
 
+type Ga4TopPage = {
+  path: string;
+  title: string;
+  views: number;
+};
+
 const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
 const DEMO_GSC_STATS = { clicks: 3842, impressions: 48200, avgPosition: 14.3, ctr: 7.97 };
 
@@ -524,8 +530,13 @@ export function Dashboard() {
   const { connections } = useConnections();
   const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
+  const isHebrew = language === 'he';
   const text = COPY[language] || COPY.en;
   const statusLabels = STATUS_LABELS[language] || STATUS_LABELS.en;
+  const ga4TopPagesTitle = isHebrew ? '4 עמודים נצפים' : 'Top 4 viewed pages';
+  const ga4NoTopPages = isHebrew
+    ? 'אין כרגע נתוני עמודים נצפים מ‑GA4.'
+    : 'No top viewed pages from GA4 yet.';
 
   const connectedPlatforms = connections.filter((c) => c.status === 'connected');
   const isWooConnected = connections.find((c) => c.id === 'woocommerce')?.status === 'connected';
@@ -556,6 +567,7 @@ export function Dashboard() {
   const [gscStats, setGscStats] = useState(DEMO_GSC_STATS);
   const [recentOrders, setRecentOrders] = useState<WooCommerceOrder[]>(DEMO_RECENT_ORDERS);
   const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>(DEMO_CAMPAIGN_SUMMARY);
+  const [ga4TopPages, setGa4TopPages] = useState<Ga4TopPage[]>([]);
   const [platformRevenue, setPlatformRevenue] = useState<PlatformRevenueSummary>({
     meta: { spend: 0, attributedRevenue: 0 },
     google: { spend: 0, attributedRevenue: 0 },
@@ -734,14 +746,25 @@ export function Dashboard() {
           if (totalsRow) {
             totalUsers = moneyFromUnknown(metricValueByName(totalsRow, 'totalUsers', 0));
           }
+          const topPagesRaw = Array.isArray((report as any)?.topPages) ? (report as any).topPages : [];
+          const topPagesMapped: Ga4TopPage[] = topPagesRaw
+            .map((row: any) => ({
+              path: String(row?.path || '').trim(),
+              title: String(row?.title || '').trim(),
+              views: toNumber(row?.views, 0),
+            }))
+            .filter((row: Ga4TopPage) => Boolean(row.path || row.title))
+            .slice(0, 4);
           ga4Live = {
             activeNow: toNumber(activeNow, DEMO_GA4_STATS.activeNow),
             totalUsers: toNumber(totalUsers, DEMO_GA4_STATS.totalUsers),
           };
+          setGa4TopPages(topPagesMapped);
           hasGa4Live = true;
           ga4SnapshotLoaded = true;
         } catch (error) {
           console.warn('Failed to load GA4 stats', error);
+          setGa4TopPages([]);
         }
 
         try {
@@ -930,10 +953,12 @@ export function Dashboard() {
         setGa4Stats(DEMO_GA4_STATS);
         setIsGa4UsingDemo(true);
         setHasGa4LiveSnapshot(false);
+        setGa4TopPages([]);
       } else {
         setGa4Stats({ activeNow: 0, totalUsers: 0 });
         setIsGa4UsingDemo(false);
         setHasGa4LiveSnapshot(false);
+        setGa4TopPages([]);
       }
 
       if (hasGscLive) {
@@ -1286,6 +1311,32 @@ export function Dashboard() {
               <p className="text-xs text-gray-500">
                 {text.ga4Desc}
               </p>
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+                <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
+                  {ga4TopPagesTitle}
+                  <SourceTag live={!isGa4UsingDemo && ga4TopPages.length > 0} />
+                </p>
+                {ga4TopPages.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {ga4TopPages.map((page, index) => {
+                      const pageLabel = page.title || page.path || '/';
+                      return (
+                        <li
+                          key={`${page.path || page.title}-${index}`}
+                          className="flex items-center justify-between gap-2 text-xs"
+                        >
+                          <span className="truncate text-gray-700" title={page.path || pageLabel}>
+                            {pageLabel}
+                          </span>
+                          <span className="font-bold text-indigo-700">{page.views.toLocaleString()}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-[11px] text-gray-500">{ga4NoTopPages}</p>
+                )}
+              </div>
             </>
           ) : (
             <p className="text-xs text-gray-500">

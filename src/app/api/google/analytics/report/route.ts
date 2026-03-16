@@ -252,6 +252,57 @@ export async function GET(request: Request) {
       // Keep the primary GA4 report response even if realtime call fails.
     }
 
+    let topPages: Array<{ path: string; title: string; views: number }> = [];
+    try {
+      const topPagesResponse = await fetch(`${GA4_DATA_API}/properties/${propertyId}:runReport`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          dateRanges: [
+            {
+              startDate: startDate || '30daysAgo',
+              endDate: endDate || 'today',
+            },
+          ],
+          dimensions: [{ name: 'unifiedPagePathScreen' }, { name: 'pageTitle' }],
+          metrics: [{ name: 'screenPageViews' }],
+          orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+          limit: 4,
+        }),
+      });
+      if (topPagesResponse.ok) {
+        const topPagesRaw = await topPagesResponse.text();
+        let topPagesParsed: unknown = {};
+        try {
+          topPagesParsed = topPagesRaw ? JSON.parse(topPagesRaw) : {};
+        } catch {
+          topPagesParsed = null;
+        }
+        const rows =
+          topPagesParsed && typeof topPagesParsed === 'object'
+            ? ((topPagesParsed as { rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }> })
+                .rows ?? [])
+            : [];
+        topPages = rows
+          .map((row) => {
+            const path = String(row.dimensionValues?.[0]?.value || '').trim();
+            const title = String(row.dimensionValues?.[1]?.value || '').trim();
+            const views = Number(row.metricValues?.[0]?.value ?? 0);
+            return {
+              path,
+              title,
+              views: Number.isFinite(views) ? views : 0,
+            };
+          })
+          .filter((item) => item.path || item.title);
+      }
+    } catch {
+      // Keep primary response even when top-pages query is unavailable.
+    }
+
     const payload = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
     return NextResponse.json(
       {
@@ -260,6 +311,7 @@ export async function GET(request: Request) {
           activeUsers: realtimeActiveUsers,
           source: realtimeActiveUsers != null ? 'runRealtimeReport' : 'unavailable',
         },
+        topPages,
       },
       { status: 200 }
     );
