@@ -130,6 +130,15 @@ const isMetaRateLimitError = (message: string) => {
   );
 };
 
+const isMetaFieldCompatibilityError = (message: string) => {
+  const normalized = String(message || '').toLowerCase();
+  return (
+    normalized.includes('invalid parameter') ||
+    normalized.includes('nonexisting field') ||
+    normalized.includes('tried accessing nonexisting field')
+  );
+};
+
 const buildMetaCacheKey = (accountId: string, startDate: string, endDate: string) =>
   `${normalizeMetaAccountId(accountId)}|${startDate || 'none'}|${endDate || 'none'}`;
 
@@ -361,8 +370,8 @@ export async function GET(request: Request) {
           return { response, parsed };
         }
 
-        const message = extractErrorMessage(response.status, parsed).toLowerCase();
-        if (!message.includes('invalid parameter')) {
+        const message = extractErrorMessage(response.status, parsed);
+        if (!isMetaFieldCompatibilityError(message)) {
           break;
         }
       }
@@ -416,8 +425,8 @@ export async function GET(request: Request) {
           return { response, parsed };
         }
 
-        const message = extractErrorMessage(response.status, parsed).toLowerCase();
-        if (!message.includes('invalid parameter')) {
+        const message = extractErrorMessage(response.status, parsed);
+        if (!isMetaFieldCompatibilityError(message)) {
           break;
         }
       }
@@ -470,8 +479,8 @@ export async function GET(request: Request) {
           }
           return lastResult;
         }
-        const message = extractErrorMessage(lastResult.response.status, lastResult.parsed).toLowerCase();
-        if (!message.includes('invalid parameter')) {
+        const message = extractErrorMessage(lastResult.response.status, lastResult.parsed);
+        if (!isMetaFieldCompatibilityError(message)) {
           return lastResult;
         }
       }
