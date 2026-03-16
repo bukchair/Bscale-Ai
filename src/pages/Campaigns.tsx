@@ -25,6 +25,7 @@ import {
   Video,
   Pencil,
   X,
+  ShoppingCart,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -278,6 +279,9 @@ export function Campaigns() {
       ? 'נוצר אוטומטית לפי חוקי אורך מומלצים של כל פלטפורמה.'
       : 'Generated automatically according to recommended length rules per platform.',
     applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
+    adPreview: isHebrew ? 'תצוגה מקדימה' : 'Ad preview',
+    charLimit: isHebrew ? 'תווים' : 'chars',
+    fromCreativeLab: isHebrew ? 'יובא ממעבדת היצירה' : 'Imported from Creative Lab',
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
@@ -301,6 +305,22 @@ export function Campaigns() {
       }
     } catch {
       // ignore cache parse errors
+    }
+  }, []);
+
+  // Read creative-lab prefill on mount (from the "Launch Campaign" button)
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('bscale:creative-prefill');
+      if (!raw) return;
+      sessionStorage.removeItem('bscale:creative-prefill');
+      const prefill = JSON.parse(raw) as Record<string, any>;
+      if (prefill.campaignName) setCampaignNameInput(prefill.campaignName);
+      if (prefill.shortTitle) setShortTitleInput(prefill.shortTitle);
+      if (prefill.brief) setCampaignBrief(prefill.brief);
+      if (prefill.platformCopy) setPlatformCopyDrafts(prefill.platformCopy);
+    } catch {
+      // ignore prefill errors
     }
   }, []);
 
@@ -365,6 +385,7 @@ export function Campaigns() {
   const [editLoading, setEditLoading] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
+  const [previewPlatform, setPreviewPlatform] = useState<PlatformName>('Google');
   const [wooProducts, setWooProducts] = useState<WooCampaignProduct[]>([]);
   const [wooLoading, setWooLoading] = useState(false);
   const [wooPublishScope, setWooPublishScope] = useState<WooPublishScope>('category');
@@ -511,9 +532,11 @@ export function Campaigns() {
       return;
     }
 
+    const priceStr = product.price ? ` – ₪${product.price}` : '';
+    const titleWithPrice = `${product.name}${priceStr}`.slice(0, 90);
     setContentType('product');
     setShortTitleInput((prev) =>
-      overwriteExisting || !prev.trim() ? product.name : prev
+      overwriteExisting || !prev.trim() ? titleWithPrice : prev
     );
     setCampaignNameInput((prev) =>
       overwriteExisting || !prev.trim() ? product.name : prev
@@ -2071,41 +2094,117 @@ export function Campaigns() {
         </div>
       </section>
 
-      <section className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
-        <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50/60">
-          <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-            <Target className="w-5 h-5 text-indigo-600" />
+      <section className="bg-white shadow-md rounded-2xl overflow-hidden border border-gray-200">
+        <div className="px-5 py-4 border-b border-indigo-100 bg-gradient-to-l from-indigo-600 to-indigo-800">
+          <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <Target className="w-5 h-5 text-indigo-200" />
             {text.builderTitle}
           </h3>
-          <p className="text-sm text-indigo-700 mt-1">{text.builderSubtitle}</p>
+          <p className="text-sm text-indigo-200 mt-0.5">{text.builderSubtitle}</p>
         </div>
 
         <div className="p-4 sm:p-6 space-y-6">
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-            <h4 className="text-sm font-bold text-indigo-900 flex items-center gap-2 mb-1">
-              <Sparkles className="w-4 h-4" />
-              {text.smartWindowTitle}
-            </h4>
-            <p className="text-xs text-indigo-700 mb-3">{text.smartWindowSubtitle}</p>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-start">
+          <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-indigo-900">{text.smartWindowTitle}</h4>
+                <p className="text-xs text-indigo-600">{text.smartWindowSubtitle}</p>
+              </div>
+            </div>
+
+            {/* WooCommerce inline strip */}
+            {isWooConnected && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 bg-sky-50 rounded-xl border border-sky-200 px-3 py-2">
+                <ShoppingCart className="w-4 h-4 text-sky-600 shrink-0" />
+                <span className="text-xs font-bold text-sky-900">WooCommerce</span>
+                <select
+                  value={wooPublishScope}
+                  onChange={(e) => setWooPublishScope(e.target.value as WooPublishScope)}
+                  className="rounded-md border-sky-200 text-xs py-1 bg-white focus:border-sky-400 focus:ring-sky-300"
+                >
+                  <option value="category">{text.wooByCategory}</option>
+                  <option value="product">{text.wooByProduct}</option>
+                </select>
+                {wooPublishScope === 'category' ? (
+                  <select
+                    value={selectedWooCategory}
+                    onChange={(e) => setSelectedWooCategory(e.target.value)}
+                    className="flex-1 min-w-0 rounded-md border-sky-200 text-xs py-1 bg-white focus:border-sky-400 focus:ring-sky-300"
+                  >
+                    {!selectedWooCategory && <option value="">{text.wooChooseCategory}</option>}
+                    {wooCategoryOptions.map((cat) => (
+                      <option key={`woo-cat-inline-${cat}`} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={selectedWooProductId}
+                    onChange={(e) => setSelectedWooProductId(e.target.value)}
+                    className="flex-1 min-w-0 rounded-md border-sky-200 text-xs py-1 bg-white focus:border-sky-400 focus:ring-sky-300"
+                  >
+                    {!selectedWooProductId && <option value="">{text.wooChooseProduct}</option>}
+                    {wooProductsFiltered.map((product) => (
+                      <option key={`woo-prod-inline-${product.id}`} value={String(product.id)}>
+                        {product.name}{product.price ? ` – ₪${product.price}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedWooProduct?.price && (
+                  <span className="shrink-0 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    ₪{selectedWooProduct.price}
+                  </span>
+                )}
+                {selectedWooProduct && (
+                  <button
+                    type="button"
+                    onClick={() => importWooProductToBuilder(selectedWooProduct, { overwriteExisting: true, notify: true })}
+                    className="shrink-0 text-xs font-bold text-sky-700 bg-white border border-sky-300 rounded-md px-2 py-1 hover:bg-sky-50"
+                  >
+                    {text.wooImportProduct}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Short title with 90-char counter */}
+            <div className="relative mb-3">
               <input
                 value={shortTitleInput}
-                onChange={(e) => setShortTitleInput(e.target.value)}
-                className="w-full rounded-md border-indigo-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                placeholder={isHebrew ? 'למשל: קמפיין אביב למוצר חדש' : 'e.g. Spring launch for new product'}
+                onChange={(e) => setShortTitleInput(e.target.value.slice(0, 90))}
+                className={cn(
+                  "w-full rounded-xl border shadow-sm focus:ring-2 sm:text-sm py-2.5 px-3 pr-16",
+                  shortTitleInput.length >= 85
+                    ? "border-amber-300 focus:border-amber-400 focus:ring-amber-200"
+                    : "border-indigo-300 focus:border-indigo-400 focus:ring-indigo-200"
+                )}
+                placeholder={isHebrew ? 'כותרת ראשית עד 90 תווים...' : 'Main title up to 90 chars...'}
               />
+              <span className={cn(
+                "absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums",
+                shortTitleInput.length >= 85 ? "text-amber-600" : shortTitleInput.length > 0 ? "text-indigo-500" : "text-gray-400"
+              )}>
+                {shortTitleInput.length}/90
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-start">
+              <div /> {/* spacer */}
               <button
                 type="button"
                 onClick={handleAutoAudienceAndStrategy}
                 disabled={aiAudienceLoading || !shortTitleInput.trim()}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 shadow-sm"
               >
                 {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 {text.analyzeWithAi}
               </button>
             </div>
             {aiAudienceProvider && (
-              <p className="mt-2 text-[11px] text-indigo-700">
+              <p className="mt-2 text-[11px] text-indigo-600 bg-indigo-50 rounded-lg px-2 py-1">
                 {text.aiAudienceFromConnections} · {aiAudienceProvider}
               </p>
             )}
@@ -2114,23 +2213,38 @@ export function Campaigns() {
             <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
               <h4 className="text-sm font-bold text-violet-900 mb-1">{text.platformCopyTitle}</h4>
               <p className="text-xs text-violet-700 mb-3">{text.platformCopySubtitle}</p>
-              <div className="space-y-3">
+
+              {/* Platform tabs */}
+              <div className="flex gap-1 mb-4 bg-white/60 rounded-xl p-1 border border-violet-100">
                 {(['Google', 'Meta', 'TikTok'] as const)
-                  .filter((platform) => Boolean(platformCopyDrafts[platform]))
-                  .map((platform) => {
-                    const draft = platformCopyDrafts[platform] as PlatformCopyDraft;
-                    return (
-                      <div key={`platform-copy-${platform}`} className="rounded-lg border border-violet-100 bg-white p-3">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <p className="text-xs font-bold text-violet-900">{platform}</p>
-                          <button
-                            type="button"
-                            onClick={() => applyPlatformCopyToFields(platform)}
-                            className="inline-flex items-center rounded-md border border-violet-300 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-50"
-                          >
-                            {text.applyPlatformCopy}
-                          </button>
-                        </div>
+                  .filter((p) => Boolean(platformCopyDrafts[p]))
+                  .map((p) => (
+                    <button
+                      key={`preview-tab-${p}`}
+                      type="button"
+                      onClick={() => setPreviewPlatform(p)}
+                      className={cn(
+                        'flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors',
+                        previewPlatform === p
+                          ? 'bg-violet-600 text-white shadow-sm'
+                          : 'text-violet-700 hover:bg-violet-100'
+                      )}
+                    >
+                      {p}
+                    </button>
+                  ))}
+              </div>
+
+              {/* Edit fields */}
+              {(['Google', 'Meta', 'TikTok'] as const)
+                .filter((platform) => Boolean(platformCopyDrafts[platform]) && platform === previewPlatform)
+                .map((platform) => {
+                  const draft = platformCopyDrafts[platform] as PlatformCopyDraft;
+                  const titleLimit = platform === 'Google' ? 30 : 40;
+                  const descLimit = platform === 'Google' ? 90 : platform === 'Meta' ? 125 : 100;
+                  return (
+                    <div key={`platform-copy-edit-${platform}`} className="space-y-3">
+                      <div className="relative">
                         <input
                           value={draft.title}
                           onChange={(e) =>
@@ -2138,13 +2252,26 @@ export function Campaigns() {
                               ...prev,
                               [platform]: {
                                 ...(prev[platform] || { title: '', description: '' }),
-                                title: e.target.value,
+                                title: e.target.value.slice(0, titleLimit),
                               },
                             }))
                           }
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs mb-2"
-                          placeholder={isHebrew ? 'כותרת מותאמת פלטפורמה' : 'Platform title'}
+                          className={cn(
+                            'w-full rounded-xl border shadow-sm focus:ring-2 text-sm py-2.5 px-3 pr-14',
+                            draft.title.length >= titleLimit - 2
+                              ? 'border-amber-300 focus:border-amber-400 focus:ring-amber-200'
+                              : 'border-violet-200 focus:border-violet-400 focus:ring-violet-200'
+                          )}
+                          placeholder={isHebrew ? 'כותרת מודעה' : 'Ad headline'}
                         />
+                        <span className={cn(
+                          'absolute end-3 top-1/2 -translate-y-1/2 text-[10px] font-bold tabular-nums',
+                          draft.title.length >= titleLimit - 2 ? 'text-amber-600' : 'text-violet-400'
+                        )}>
+                          {draft.title.length}/{titleLimit}
+                        </span>
+                      </div>
+                      <div className="relative">
                         <textarea
                           value={draft.description}
                           onChange={(e) =>
@@ -2152,18 +2279,102 @@ export function Campaigns() {
                               ...prev,
                               [platform]: {
                                 ...(prev[platform] || { title: '', description: '' }),
-                                description: e.target.value,
+                                description: e.target.value.slice(0, descLimit),
                               },
                             }))
                           }
-                          rows={2}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
-                          placeholder={isHebrew ? 'תיאור מותאם פלטפורמה' : 'Platform description'}
+                          rows={3}
+                          className={cn(
+                            'w-full rounded-xl border shadow-sm focus:ring-2 text-sm py-2.5 px-3 pb-6 resize-none',
+                            draft.description.length >= descLimit - 5
+                              ? 'border-amber-300 focus:border-amber-400 focus:ring-amber-200'
+                              : 'border-violet-200 focus:border-violet-400 focus:ring-violet-200'
+                          )}
+                          placeholder={isHebrew ? 'תיאור / גוף המודעה' : 'Ad description / body'}
                         />
+                        <span className={cn(
+                          'absolute end-3 bottom-2 text-[10px] font-bold tabular-nums',
+                          draft.description.length >= descLimit - 5 ? 'text-amber-600' : 'text-violet-400'
+                        )}>
+                          {draft.description.length}/{descLimit}
+                        </span>
                       </div>
-                    );
-                  })}
-              </div>
+
+                      {/* Real ad preview */}
+                      {platform === 'Google' && (
+                        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                          <p className="text-[10px] text-green-700 font-medium mb-0.5">
+                            {isHebrew ? 'מודעה · ' : 'Ad · '}
+                            <span className="text-gray-500">https://example.com</span>
+                          </p>
+                          <p className="text-[15px] text-blue-700 font-medium leading-tight truncate">
+                            {draft.title || (isHebrew ? 'כותרת המודעה שלך' : 'Your Ad Headline')}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                            {draft.description || (isHebrew ? 'תיאור המודעה שלך יופיע כאן...' : 'Your ad description will appear here...')}
+                          </p>
+                        </div>
+                      )}
+                      {platform === 'Meta' && (
+                        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                          <div className="flex items-center gap-2 p-3 border-b border-gray-100">
+                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">B</div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-900">{isHebrew ? 'העסק שלך' : 'Your Business'}</p>
+                              <p className="text-[10px] text-gray-500">{isHebrew ? 'ממומן ·' : 'Sponsored ·'} <span className="text-blue-500">🌐</span></p>
+                            </div>
+                          </div>
+                          <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                            <p className="text-[11px] text-gray-400">{isHebrew ? 'תמונת המודעה' : 'Ad Image'}</p>
+                          </div>
+                          <div className="p-3">
+                            <p className="text-[11px] text-gray-700 leading-relaxed">
+                              {draft.description || (isHebrew ? 'טקסט המודעה הראשי...' : 'Primary ad text...')}
+                            </p>
+                            <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2">
+                              <p className="text-xs font-bold text-gray-900 truncate">
+                                {draft.title || (isHebrew ? 'כותרת' : 'Headline')}
+                              </p>
+                              <button type="button" className="shrink-0 text-[11px] font-bold text-white bg-blue-600 px-3 py-1 rounded">
+                                {isHebrew ? 'למידע נוסף' : 'Learn More'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {platform === 'TikTok' && (
+                        <div className="rounded-xl border border-gray-200 bg-black overflow-hidden shadow-sm relative h-48">
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                          <div className="absolute bottom-3 start-3 end-12">
+                            <p className="text-[11px] font-bold text-white mb-0.5">
+                              @{isHebrew ? 'העסק_שלך' : 'your_business'} · <span className="font-normal opacity-75">{isHebrew ? 'ממומן' : 'Sponsored'}</span>
+                            </p>
+                            <p className="text-[11px] text-white/90 leading-relaxed line-clamp-2">
+                              {draft.description || draft.title || (isHebrew ? 'כתוביות המודעה שלך...' : 'Your TikTok ad caption...')}
+                            </p>
+                          </div>
+                          <div className="absolute bottom-3 end-3 flex flex-col items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
+                              <span className="text-white text-[10px] font-bold">♥</span>
+                            </div>
+                            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+                              <span className="text-white text-[10px]">💬</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => applyPlatformCopyToFields(platform)}
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-violet-300 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        {text.applyPlatformCopy}
+                      </button>
+                    </div>
+                  );
+                })}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -2244,99 +2455,6 @@ export function Campaigns() {
             />
             {wooPublishScope === 'product' && selectedWooProduct && (
               <p className="mt-1 text-[11px] text-sky-700">{text.wooAutoDescriptionHint}</p>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-4">
-            <h4 className="text-sm font-bold text-sky-900 mb-1">{text.wooPublishTitle}</h4>
-            <p className="text-xs text-sky-700 mb-3">{text.wooPublishSubtitle}</p>
-            {!isWooConnected ? (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                {text.wooNotConnected}
-              </p>
-            ) : wooLoading ? (
-              <div className="flex items-center gap-2 text-xs text-sky-700">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                {text.wooLoading}
-              </div>
-            ) : wooProducts.length === 0 ? (
-              <p className="text-xs text-gray-600">{text.wooNoProducts}</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooScope}</label>
-                  <select
-                    value={wooPublishScope}
-                    onChange={(e) => setWooPublishScope(e.target.value as WooPublishScope)}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  >
-                    <option value="category">{text.wooByCategory}</option>
-                    <option value="product">{text.wooByProduct}</option>
-                  </select>
-                </div>
-
-                {wooPublishScope === 'category' ? (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooCategory}</label>
-                    <select
-                      value={selectedWooCategory}
-                      onChange={(e) => setSelectedWooCategory(e.target.value)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                    >
-                      {!selectedWooCategory && <option value="">{text.wooChooseCategory}</option>}
-                      {wooCategoryOptions.map((category) => (
-                        <option key={`woo-category-${category}`} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooProduct}</label>
-                    <select
-                      value={selectedWooProductId}
-                      onChange={(e) => setSelectedWooProductId(e.target.value)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                    >
-                      {!selectedWooProductId && <option value="">{text.wooChooseProduct}</option>}
-                      {wooProductsFiltered.map((product) => (
-                        <option key={`woo-product-${product.id}`} value={String(product.id)}>
-                          {product.name}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedWooProduct && (
-                      <div className="mt-2 rounded-md border border-sky-200 bg-white p-2.5 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-sky-900 truncate" title={selectedWooProduct.name}>
-                            {selectedWooProduct.name}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              importWooProductToBuilder(selectedWooProduct, {
-                                overwriteExisting: true,
-                                notify: true,
-                              })
-                            }
-                            className="inline-flex items-center rounded-md border border-sky-300 px-2 py-1 text-[11px] font-bold text-sky-800 hover:bg-sky-50"
-                          >
-                            {text.wooImportProduct}
-                          </button>
-                        </div>
-                        <p className="text-[11px] text-gray-600 line-clamp-3">
-                          {selectedWooProduct.shortDescription ||
-                            selectedWooProduct.description ||
-                            selectedWooProduct.categories.join(', ') ||
-                            selectedWooProduct.price ||
-                            ''}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
             )}
           </div>
 
