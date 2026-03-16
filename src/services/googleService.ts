@@ -156,6 +156,8 @@ export async function fetchGoogleSearchTerms(
 
       const campaignId = String(row?.campaign?.id || '').trim();
       const campaignName = String(row?.campaign?.name || '').trim();
+      const adGroupId = String(row?.adGroup?.id || row?.ad_group?.id || '').trim();
+      const adGroupName = String(row?.adGroup?.name || row?.ad_group?.name || '').trim();
       const clicks = Number(row?.metrics?.clicks || 0);
       const impressions = Number(row?.metrics?.impressions || 0);
       const ctr =
@@ -179,6 +181,8 @@ export async function fetchGoogleSearchTerms(
         term,
         campaignId,
         campaignName,
+        adGroupId,
+        adGroupName,
         impressions,
         clicks,
         ctr,
@@ -195,16 +199,24 @@ export async function fetchGoogleSearchTerms(
 
 export type GoogleNegativeKeywordItem = {
   term: string;
-  campaignId: string;
+  campaignId?: string;
   campaignName?: string;
+  adGroupId?: string;
+  adGroupName?: string;
   matchType?: 'BROAD' | 'PHRASE' | 'EXACT';
 };
+
+export type GoogleNegativeKeywordScope = 'campaign' | 'ad_group' | 'shared_list';
 
 export async function applyGoogleNegativeKeywords(
   accessToken: string,
   items: GoogleNegativeKeywordItem[],
   customerId?: string,
-  loginCustomerId?: string
+  loginCustomerId?: string,
+  options?: {
+    scope?: GoogleNegativeKeywordScope;
+    sharedListName?: string;
+  }
 ) {
   await ensureManagedApiSession(accessToken);
   const response = await fetch(`${API_BASE}/api/google/ads/search-terms`, {
@@ -216,6 +228,8 @@ export async function applyGoogleNegativeKeywords(
     body: JSON.stringify({
       customerId,
       loginCustomerId,
+      scope: options?.scope,
+      sharedListName: options?.sharedListName,
       items,
     }),
   });

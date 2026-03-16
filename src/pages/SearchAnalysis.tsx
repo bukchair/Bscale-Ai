@@ -21,6 +21,7 @@ import {
   fetchGoogleSearchTerms,
   fetchGSCData,
   type GoogleNegativeKeywordItem,
+  type GoogleNegativeKeywordScope,
 } from '../services/googleService';
 
 type SearchStatus = 'review' | 'optimal' | 'opportunity' | 'negative_candidate' | 'improve';
@@ -38,6 +39,8 @@ type SearchTermRow = {
   position?: number;
   campaignId?: string;
   campaignName?: string;
+  adGroupId?: string;
+  adGroupName?: string;
   reason?: string;
 };
 
@@ -45,7 +48,9 @@ type AppliedNegativeKeyword = {
   id: string;
   term: string;
   matchType: 'BROAD' | 'PHRASE' | 'EXACT';
-  campaign: string;
+  scope: GoogleNegativeKeywordScope;
+  target: string;
+  sharedListName?: string;
   addedDate: string;
   result: 'applied' | 'failed';
   error?: string;
@@ -119,6 +124,9 @@ export function SearchAnalysis() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isAiExpanded, setIsAiExpanded] = useState(false);
   const [isApplyingNegatives, setIsApplyingNegatives] = useState(false);
+  const [selectedMatchType, setSelectedMatchType] = useState<'BROAD' | 'PHRASE' | 'EXACT'>('PHRASE');
+  const [negativeApplyScope, setNegativeApplyScope] = useState<GoogleNegativeKeywordScope>('campaign');
+  const [sharedListName, setSharedListName] = useState('BScale Shared Negatives');
   const [lastApplySummary, setLastApplySummary] = useState<{
     requested: number;
     deduplicated: number;
@@ -150,7 +158,7 @@ export function SearchAnalysis() {
   );
 
   const gscSignalsByTerm = (
-    rows: Record<string, unknown>[]
+    rows: any[]
   ): Map<string, { clicks: number; impressions: number; position: number; ctr: number }> => {
     const map = new Map<string, { clicks: number; impressions: number; position: number; ctr: number }>();
     rows.forEach((row) => {
@@ -210,7 +218,7 @@ export function SearchAnalysis() {
 
       if (adsResult.status === 'fulfilled') {
         const adsRows = Array.isArray(adsResult.value) ? adsResult.value : [];
-        adsRows.forEach((row: Record<string, unknown>) => {
+        adsRows.forEach((row: any) => {
           const term = String(row?.term || '').trim();
           if (!term) return;
           const normalized = term.toLowerCase();
@@ -252,6 +260,8 @@ export function SearchAnalysis() {
             term,
             campaignId: String(row?.campaignId || ''),
             campaignName: String(row?.campaignName || ''),
+            adGroupId: String(row?.adGroupId || ''),
+            adGroupName: String(row?.adGroupName || ''),
             clicks,
             impressions: Number(row?.impressions || 0),
             cost: spend,
@@ -271,7 +281,7 @@ export function SearchAnalysis() {
       }
 
       if (gscResult.status === 'fulfilled') {
-        gscRows.forEach((row: Record<string, unknown>) => {
+        gscRows.forEach((row: any) => {
           const term = String(row?.keys?.[0] || '').trim();
           if (!term) return;
           const impressions = Number(row?.impressions || 0);
@@ -368,24 +378,46 @@ export function SearchAnalysis() {
     }
 
     const itemsMap = new Map<string, GoogleNegativeKeywordItem>();
+    const normalizedSharedListName = String(sharedListName || '').trim().slice(0, 120);
+
     rows.forEach((row) => {
       if (row.source !== 'Google Ads') return;
       const term = String(row.term || '').trim();
       const campaignId = String(row.campaignId || '').trim();
-      if (!term || !campaignId) return;
-      const key = `${campaignId}:${term.toLowerCase()}:PHRASE`;
+      const adGroupId = String(row.adGroupId || '').trim();
+      if (!term) return;
+      if (negativeApplyScope === 'campaign' && !campaignId) return;
+      if (negativeApplyScope === 'ad_group' && !adGroupId) return;
+
+      const targetKey =
+        negativeApplyScope === 'campaign'
+          ? campaignId
+          : negativeApplyScope === 'ad_group'
+          ? adGroupId
+          : normalizedSharedListName || 'shared';
+      const key = `${negativeApplyScope}:${targetKey}:${term.toLowerCase()}:${selectedMatchType}`;
       if (itemsMap.has(key)) return;
       itemsMap.set(key, {
         term,
-        campaignId,
+        campaignId: campaignId || undefined,
         campaignName: row.campaignName || campaignId,
-        matchType: 'PHRASE',
+        adGroupId: adGroupId || undefined,
+        adGroupName: String(row.adGroupName || ''),
+        matchType: selectedMatchType,
       });
     });
     const items = Array.from(itemsMap.values());
     if (!items.length) {
       setSyncError(
-        isHebrew
+        negativeApplyScope === 'ad_group'
+          ? isHebrew
+            ? 'אין מועמדים תקינים עם Ad Group לעדכון בגוגל.'
+            : 'No valid candidates with Ad Group were found for Google update.'
+          : negativeApplyScope === 'shared_list'
+          ? isHebrew
+            ? 'אין מועמדים תקינים לעדכון Shared List בגוגל.'
+            : 'No valid candidates were found for shared list update in Google.'
+          : isHebrew
           ? 'אין מועמדים תקינים עם campaignId לעדכון בגוגל.'
           : 'No valid candidates with campaignId were found for Google update.'
       );
@@ -399,7 +431,11 @@ export function SearchAnalysis() {
         googleToken,
         items,
         googleCustomerId || undefined,
-        googleLoginCustomerId || undefined
+        googleLoginCustomerId || undefined,
+        {
+          scope: negativeApplyScope,
+          sharedListName: normalizedSharedListName || undefined,
+        }
       );
       setLastApplySummary(payload?.summary || null);
 
@@ -407,21 +443,34 @@ export function SearchAnalysis() {
       const appliedRows = Array.isArray(payload?.applied) ? payload.applied : [];
       const failedRows = Array.isArray(payload?.failed) ? payload.failed : [];
 
-      type NegativeKeywordRow = Record<string, unknown>;
       setNegativeKeywords((prev) => [
-        ...appliedRows.map((item: NegativeKeywordRow) => ({
-          id: `${item.campaignId}-${item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...appliedRows.map((item: any) => ({
+          id: `${item.scope}-${item.campaignId || item.adGroupId || item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
-          campaign: String(item.campaignName || item.campaignId || ''),
+          scope: (item.scope || negativeApplyScope) as GoogleNegativeKeywordScope,
+          target:
+            item.scope === 'ad_group'
+              ? String(item.adGroupName || item.adGroupId || '')
+              : item.scope === 'shared_list'
+              ? String(item.sharedSetName || normalizedSharedListName || 'Shared List')
+              : String(item.campaignName || item.campaignId || ''),
+          sharedListName: String(item.sharedSetName || normalizedSharedListName || ''),
           addedDate: nowDate,
           result: 'applied' as const,
         })),
-        ...failedRows.map((item: NegativeKeywordRow) => ({
-          id: `${item.campaignId}-${item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...failedRows.map((item: any) => ({
+          id: `${item.scope}-${item.campaignId || item.adGroupId || item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
-          campaign: String(item.campaignName || item.campaignId || ''),
+          scope: (item.scope || negativeApplyScope) as GoogleNegativeKeywordScope,
+          target:
+            item.scope === 'ad_group'
+              ? String(item.adGroupName || item.adGroupId || '')
+              : item.scope === 'shared_list'
+              ? String(item.sharedSetName || normalizedSharedListName || 'Shared List')
+              : String(item.campaignName || item.campaignId || ''),
+          sharedListName: String(item.sharedSetName || normalizedSharedListName || ''),
           addedDate: nowDate,
           result: 'failed' as const,
           error: String(item.message || ''),
@@ -430,11 +479,18 @@ export function SearchAnalysis() {
       ]);
 
       const appliedSet = new Set(
-        appliedRows.map((item: NegativeKeywordRow) => `${String(item.campaignId || '')}:${String(item.term || '').toLowerCase()}`)
+        appliedRows.map((item: any) =>
+          negativeApplyScope === 'ad_group'
+            ? `${String(item.adGroupId || '')}:${String(item.term || '').toLowerCase()}`
+            : `${String(item.campaignId || '')}:${String(item.term || '').toLowerCase()}`
+        )
       );
       setSearchTerms((prev) =>
         prev.map((row) => {
-          const key = `${String(row.campaignId || '')}:${String(row.term || '').toLowerCase()}`;
+          const key =
+            negativeApplyScope === 'ad_group'
+              ? `${String(row.adGroupId || '')}:${String(row.term || '').toLowerCase()}`
+              : `${String(row.campaignId || '')}:${String(row.term || '').toLowerCase()}`;
           if (!appliedSet.has(key)) return row;
           return {
             ...row,
@@ -534,6 +590,51 @@ export function SearchAnalysis() {
           <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200" dir="ltr">
             {formatCurrency(estimatedMonthlySavings)} {isHebrew ? 'חיסכון חודשי משוער' : 'estimated monthly savings'}
           </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <label className="text-xs font-bold text-gray-600">
+            {isHebrew ? 'Match Type' : 'Match Type'}
+            <select
+              value={selectedMatchType}
+              onChange={(event) =>
+                setSelectedMatchType(
+                  (event.target.value as 'BROAD' | 'PHRASE' | 'EXACT') || 'PHRASE'
+                )
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800"
+            >
+              <option value="BROAD">{isHebrew ? 'רחב (Broad)' : 'Broad'}</option>
+              <option value="PHRASE">{isHebrew ? 'ביטוי (Phrase)' : 'Phrase'}</option>
+              <option value="EXACT">{isHebrew ? 'מדויק (Exact)' : 'Exact'}</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-gray-600">
+            {isHebrew ? 'רמת יישום' : 'Apply scope'}
+            <select
+              value={negativeApplyScope}
+              onChange={(event) =>
+                setNegativeApplyScope(
+                  (event.target.value as GoogleNegativeKeywordScope) || 'campaign'
+                )
+              }
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800"
+            >
+              <option value="campaign">{isHebrew ? 'Campaign' : 'Campaign'}</option>
+              <option value="ad_group">{isHebrew ? 'Ad Group' : 'Ad Group'}</option>
+              <option value="shared_list">{isHebrew ? 'Shared List' : 'Shared List'}</option>
+            </select>
+          </label>
+          <label className="text-xs font-bold text-gray-600">
+            {isHebrew ? 'שם רשימה משותפת' : 'Shared list name'}
+            <input
+              value={sharedListName}
+              onChange={(event) => setSharedListName(event.target.value)}
+              disabled={negativeApplyScope !== 'shared_list'}
+              placeholder={isHebrew ? 'BScale Shared Negatives' : 'BScale Shared Negatives'}
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 disabled:opacity-60"
+            />
+          </label>
         </div>
 
         {isAiExpanded ? (
@@ -648,6 +749,7 @@ export function SearchAnalysis() {
                   <tr>
                     <th className="px-6 py-4 font-bold">{t('search.negativeKeyword')}</th>
                     <th className="px-6 py-4 font-bold">{t('search.matchType')}</th>
+                    <th className="px-6 py-4 font-bold">{isHebrew ? 'רמת יישום' : 'Scope'}</th>
                     <th className="px-6 py-4 font-bold">{t('search.campaignGroup')}</th>
                     <th className="px-6 py-4 font-bold">{t('search.addedDate')}</th>
                     <th className="px-6 py-4 font-bold">{t('common.status')}</th>
@@ -665,7 +767,14 @@ export function SearchAnalysis() {
                           {kw.matchType}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">{kw.campaign}</td>
+                      <td className="px-6 py-4 text-gray-600">
+                        {kw.scope === 'campaign'
+                          ? 'Campaign'
+                          : kw.scope === 'ad_group'
+                          ? 'Ad Group'
+                          : 'Shared List'}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600">{kw.target}</td>
                       <td className="px-6 py-4 text-gray-500">{kw.addedDate}</td>
                       <td className="px-6 py-4">
                         <span className={cn('text-xs font-bold', kw.result === 'applied' ? 'text-emerald-600' : 'text-red-600')}>
@@ -691,7 +800,7 @@ export function SearchAnalysis() {
                   ))}
                   {!negativeKeywords.length ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
+                      <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-500">
                         {isHebrew
                           ? 'עדיין לא בוצעו עדכוני מילות שלילה חיים לגוגל.'
                           : 'No live negative-keyword updates were applied to Google yet.'}
@@ -726,8 +835,9 @@ export function SearchAnalysis() {
                         <div className="min-w-0">
                           <p className="truncate">{term.term}</p>
                           {term.source === 'Google Ads' && term.campaignName ? (
-                            <p className="text-[10px] text-gray-500 font-medium">
+                            <p className="text-[10px] text-gray-500 font-medium truncate">
                               {term.campaignName}
+                              {term.adGroupName ? ` · ${term.adGroupName}` : ''}
                             </p>
                           ) : null}
                         </div>
@@ -826,7 +936,14 @@ export function SearchAnalysis() {
                       {term.status === 'negative_candidate' ? (
                         <button
                           onClick={() => void applyNegativeTerms([term])}
-                          disabled={isApplyingNegatives}
+                          disabled={
+                            isApplyingNegatives ||
+                            (negativeApplyScope === 'campaign'
+                              ? !term.campaignId
+                              : negativeApplyScope === 'ad_group'
+                              ? !term.adGroupId
+                              : false)
+                          }
                           className="text-red-600 hover:text-red-800 font-bold text-sm bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
                         >
                           {isApplyingNegatives ? (isHebrew ? 'מעדכן...' : 'Applying...') : t('search.addAsNegative')}

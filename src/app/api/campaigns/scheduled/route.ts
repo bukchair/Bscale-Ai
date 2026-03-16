@@ -15,11 +15,11 @@ type WeeklySchedule = Record<string, Record<DayKey, number[]>>;
 
 type CreateScheduledCampaignBody = {
   campaignName?: string;
+  shortTitle?: string;
+  brief?: string;
   objective?: ObjectiveType;
   platforms?: PlatformName[];
   weeklySchedule?: WeeklySchedule;
-  shortTitle?: string;
-  brief?: string;
   audiences?: string[];
   contentType?: string;
   productType?: string;
@@ -70,6 +70,8 @@ const todayYmd = () => {
 };
 
 const sanitizeName = (value: string) => value.trim().slice(0, 120);
+const sanitizeAudienceName = (value: string) => value.trim().slice(0, 80);
+const escapeGaqlLike = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 const extractErrorMessage = async (response: Response) => {
   const raw = await response.text();
@@ -95,6 +97,127 @@ const isHourActiveForPlatform = (schedule: WeeklySchedule | undefined, platform:
   const hour = now.getHours();
   const activeHours = Array.isArray(platformSchedule[day]) ? platformSchedule[day] : [];
   return activeHours.includes(hour);
+};
+
+const normalizeAudienceInputs = (audiences: unknown): string[] => {
+  if (!Array.isArray(audiences)) return [];
+  const cleaned = audiences
+    .map((item) => sanitizeAudienceName(String(item || '')))
+    .filter((item) => item.length > 0);
+  return [...new Set(cleaned)];
+};
+
+const applyGoogleAudiencesToCampaign = async (input: {
+  customerId: string;
+  campaignId: string;
+  headers: Record<string, string>;
+  audienceNames: string[];
+}) => {
+  let applied = 0;
+  let failed = 0;
+  const notes: string[] = [];
+  for (const audienceName of input.audienceNames) {
+    try {
+      const searchResponse = await fetch(
+        `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/googleAds:search`,
+        {
+          method: 'POST',
+          headers: input.headers,
+          body: JSON.stringify({
+            query: `
+              SELECT user_list.resource_name, user_list.name
+              FROM user_list
+              WHERE user_list.status != 'REMOVED'
+                AND user_list.name LIKE '%${escapeGaqlLike(audienceName)}%'
+              LIMIT 1
+            `,
+          }),
+        }
+      );
+      if (!searchResponse.ok) {
+        failed += 1;
+        notes.push(`Google audience lookup failed for "${audienceName}".`);
+        continue;
+      }
+      const lookupPayload = (await searchResponse.json().catch(() => ({}))) as Record<string, any>;
+      const userListResource = String(lookupPayload?.results?.[0]?.userList?.resourceName || '').trim();
+      if (!userListResource) {
+        failed += 1;
+        notes.push(`Google user list not found for "${audienceName}".`);
+        continue;
+      }
+
+      const criteriaResponse = await fetch(
+        `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/campaignCriteria:mutate`,
+        {
+          method: 'POST',
+          headers: input.headers,
+          body: JSON.stringify({
+            operations: [
+              {
+                create: {
+                  campaign: `customers/${input.customerId}/campaigns/${input.campaignId}`,
+                  userList: { userList: userListResource },
+                },
+              },
+            ],
+          }),
+        }
+      );
+      if (!criteriaResponse.ok) {
+        const message = (await extractErrorMessage(criteriaResponse)).toLowerCase();
+        if (message.includes('already exists')) {
+          applied += 1;
+          continue;
+        }
+        failed += 1;
+        notes.push(`Google audience apply failed for "${audienceName}".`);
+        continue;
+      }
+      applied += 1;
+    } catch {
+      failed += 1;
+      notes.push(`Google audience apply crashed for "${audienceName}".`);
+    }
+  }
+
+  return { applied, failed, notes };
+};
+
+const createMetaSavedAudiences = async (input: {
+  adAccountResource: string;
+  accessToken: string;
+  audienceNames: string[];
+}) => {
+  let created = 0;
+  let failed = 0;
+  const notes: string[] = [];
+  for (const audienceName of input.audienceNames) {
+    try {
+      const form = new URLSearchParams();
+      form.set('name', audienceName);
+      form.set('description', `Created by BScale AI smart campaign`);
+      form.set('targeting', JSON.stringify({ geo_locations: { countries: ['IL'] } }));
+      form.set('access_token', input.accessToken);
+      const response = await fetch(`${META_GRAPH_BASE}/${input.adAccountResource}/saved_audiences`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+        },
+        body: form.toString(),
+      });
+      if (!response.ok) {
+        failed += 1;
+        notes.push(`Meta saved audience failed for "${audienceName}".`);
+        continue;
+      }
+      created += 1;
+    } catch {
+      failed += 1;
+      notes.push(`Meta saved audience crashed for "${audienceName}".`);
+    }
+  }
+  return { created, failed, notes };
 };
 
 const createGoogleCampaign = async (
@@ -213,6 +336,24 @@ const createGoogleCampaign = async (
     const campaignPayload = (await campaignResponse.json()) as Record<string, any>;
     const resourceName = String(campaignPayload?.results?.[0]?.resourceName || '');
     const campaignId = resourceName.split('/').pop() || resourceName;
+    const audienceNames = normalizeAudienceInputs(body.audiences);
+    if (audienceNames.length > 0) {
+      const audienceResult = await applyGoogleAudiencesToCampaign({
+        customerId,
+        campaignId,
+        headers,
+        audienceNames,
+      });
+      const notesSuffix =
+        audienceResult.notes.length > 0 ? ` ${audienceResult.notes.slice(0, 2).join(' ')}` : '';
+      return {
+        platform: 'Google',
+        ok: true,
+        campaignId,
+        message: `Campaign created in Google Ads. Audiences applied: ${audienceResult.applied}/${audienceNames.length}.${notesSuffix}`,
+        status: activeNow ? 'Scheduled' : 'Draft',
+      };
+    }
     return {
       platform: 'Google',
       ok: true,
@@ -290,6 +431,23 @@ const createMetaCampaign = async (
       };
     }
     const payload = (await response.json()) as Record<string, any>;
+    const audienceNames = normalizeAudienceInputs(body.audiences);
+    if (audienceNames.length > 0) {
+      const audienceResult = await createMetaSavedAudiences({
+        adAccountResource: accountResource,
+        accessToken,
+        audienceNames,
+      });
+      const notesSuffix =
+        audienceResult.notes.length > 0 ? ` ${audienceResult.notes.slice(0, 2).join(' ')}` : '';
+      return {
+        platform: 'Meta',
+        ok: true,
+        campaignId: String(payload?.id || ''),
+        message: `Campaign created in Meta Ads. Saved audiences created: ${audienceResult.created}/${audienceNames.length}.${notesSuffix}`,
+        status: activeNow ? 'Scheduled' : 'Draft',
+      };
+    }
     return {
       platform: 'Meta',
       ok: true,
@@ -378,6 +536,17 @@ const createTikTokCampaign = async (
     const campaignId = String(
       payload?.data?.campaign_id || payload?.data?.campaignId || payload?.request_id || ''
     );
+    const audienceNames = normalizeAudienceInputs(body.audiences);
+    if (audienceNames.length > 0) {
+      return {
+        platform: 'TikTok',
+        ok: true,
+        campaignId,
+        message:
+          'Campaign created in TikTok Ads. Audience list sync is not available via this flow yet (requires TikTok DMP seed/source setup).',
+        status: activeNow ? 'Scheduled' : 'Draft',
+      };
+    }
     return {
       platform: 'TikTok',
       ok: true,
@@ -399,38 +568,64 @@ export async function POST(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
     const body = (await request.json().catch(() => null)) as CreateScheduledCampaignBody | null;
-    if (!body?.campaignName || !Array.isArray(body.platforms) || body.platforms.length === 0) {
+    const resolvedCampaignName = sanitizeName(
+      String(
+        body?.campaignName ||
+          body?.shortTitle ||
+          body?.brief?.slice(0, 80) ||
+          'BScale Campaign'
+      )
+    );
+    if (!resolvedCampaignName) {
       return NextResponse.json(
         {
           success: false,
-          message: 'campaignName and platforms are required.',
+          message: 'campaignName (or shortTitle) is required.',
         },
         { status: 400 }
       );
     }
 
-    const platforms = body.platforms.filter(
+    let platforms = (Array.isArray(body?.platforms) ? body?.platforms : []).filter(
       (platform): platform is PlatformName =>
         platform === 'Google' || platform === 'Meta' || platform === 'TikTok'
     );
     if (!platforms.length) {
+      const [googleConnection, metaConnection, tiktokConnection] = await Promise.all([
+        connectionService.getByUserPlatform(user.id, 'GOOGLE_ADS'),
+        connectionService.getByUserPlatform(user.id, 'META'),
+        connectionService.getByUserPlatform(user.id, 'TIKTOK'),
+      ]);
+      platforms = [
+        googleConnection?.status === 'CONNECTED' ? 'Google' : null,
+        metaConnection?.status === 'CONNECTED' ? 'Meta' : null,
+        tiktokConnection?.status === 'CONNECTED' ? 'TikTok' : null,
+      ].filter((value): value is PlatformName => Boolean(value));
+    }
+    if (!platforms.length) {
       return NextResponse.json(
         {
           success: false,
-          message: 'No valid platforms were provided.',
+          message: 'No connected ad platforms were provided.',
         },
         { status: 400 }
       );
     }
 
+    const normalizedBody: CreateScheduledCampaignBody = {
+      ...(body || {}),
+      campaignName: resolvedCampaignName,
+      platforms,
+    };
+
     const results: PlatformCreateResult[] = [];
     for (const platform of platforms) {
       if (platform === 'Google') {
-        results.push(await createGoogleCampaign(user.id, body));
+        results.push(await createGoogleCampaign(user.id, normalizedBody));
       } else if (platform === 'Meta') {
-        results.push(await createMetaCampaign(user.id, body));
+        results.push(await createMetaCampaign(user.id, normalizedBody));
       } else if (platform === 'TikTok') {
-        results.push(await createTikTokCampaign(user.id, body));
+        results.push(await createTikTokCampaign(user.id, normalizedBody));
       }
     }
 

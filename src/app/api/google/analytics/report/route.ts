@@ -196,7 +196,213 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(parsed, { status: 200 });
+    let realtimeActiveUsers: number | null = null;
+    let usersLast24h: number | null = null;
+    try {
+      const realtimeResponse = await fetch(
+        `${GA4_DATA_API}/properties/${propertyId}:runRealtimeReport`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            metrics: [{ name: 'activeUsers' }],
+          }),
+        }
+      );
+      if (realtimeResponse.ok) {
+        const realtimeRaw = await realtimeResponse.text();
+        let realtimeParsed: unknown = {};
+        try {
+          realtimeParsed = realtimeRaw ? JSON.parse(realtimeRaw) : {};
+        } catch {
+          realtimeParsed = null;
+        }
+        const realtimeRows =
+          realtimeParsed && typeof realtimeParsed === 'object'
+            ? ((realtimeParsed as { rows?: Array<{ metricValues?: Array<{ value?: string }> }> }).rows ??
+              [])
+            : [];
+        const candidate = Number(realtimeRows[0]?.metricValues?.[0]?.value ?? NaN);
+        if (Number.isFinite(candidate)) {
+          realtimeActiveUsers = candidate;
+        }
+      }
+    } catch {
+      // Keep the primary GA4 report response even if realtime call fails.
+    }
+
+    try {
+      const users24hResponse = await fetch(`${GA4_DATA_API}/properties/${propertyId}:runReport`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          dateRanges: [
+            {
+              startDate: '1daysAgo',
+              endDate: 'today',
+            },
+          ],
+          metrics: [{ name: 'activeUsers' }],
+          metricAggregations: ['TOTAL'],
+        }),
+      });
+      if (users24hResponse.ok) {
+        const users24hRaw = await users24hResponse.text();
+        let users24hParsed: unknown = {};
+        try {
+          users24hParsed = users24hRaw ? JSON.parse(users24hRaw) : {};
+        } catch {
+          users24hParsed = null;
+        }
+        const totals =
+          users24hParsed && typeof users24hParsed === 'object'
+            ? ((users24hParsed as { totals?: Array<{ metricValues?: Array<{ value?: string }> }> }).totals ??
+              [])
+            : [];
+        const rows =
+          users24hParsed && typeof users24hParsed === 'object'
+            ? ((users24hParsed as { rows?: Array<{ metricValues?: Array<{ value?: string }> }> }).rows ?? [])
+            : [];
+        const totalsCandidate = Number(totals[0]?.metricValues?.[0]?.value ?? NaN);
+        const rowCandidate = Number(rows[0]?.metricValues?.[0]?.value ?? NaN);
+        if (Number.isFinite(totalsCandidate)) {
+          usersLast24h = totalsCandidate;
+        } else if (Number.isFinite(rowCandidate)) {
+          usersLast24h = rowCandidate;
+        }
+      }
+    } catch {
+      // Keep GA4 response even when 24h users query fails.
+    }
+
+    let topPages: Array<{ path: string; title: string; views: number }> = [];
+    try {
+      const realtimeTopPagesResponse = await fetch(
+        `${GA4_DATA_API}/properties/${propertyId}:runRealtimeReport`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            dimensions: [{ name: 'unifiedPagePathScreen' }, { name: 'pageTitle' }],
+            metrics: [{ name: 'screenPageViews' }],
+            minuteRanges: [{ startMinutesAgo: 29, endMinutesAgo: 0 }],
+            orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+            limit: 7,
+          }),
+        }
+      );
+      if (realtimeTopPagesResponse.ok) {
+        const topPagesRaw = await realtimeTopPagesResponse.text();
+        let topPagesParsed: unknown = {};
+        try {
+          topPagesParsed = topPagesRaw ? JSON.parse(topPagesRaw) : {};
+        } catch {
+          topPagesParsed = null;
+        }
+        const rows =
+          topPagesParsed && typeof topPagesParsed === 'object'
+            ? ((topPagesParsed as {
+                rows?: Array<{
+                  dimensionValues?: Array<{ value?: string }>;
+                  metricValues?: Array<{ value?: string }>;
+                }>;
+              }).rows ?? [])
+            : [];
+        topPages = rows
+          .map((row) => {
+            const path = String(row.dimensionValues?.[0]?.value || '').trim();
+            const title = String(row.dimensionValues?.[1]?.value || '').trim();
+            const views = Number(row.metricValues?.[0]?.value ?? 0);
+            return {
+              path,
+              title,
+              views: Number.isFinite(views) ? views : 0,
+            };
+          })
+          .filter((item) => item.path || item.title)
+          .slice(0, 7);
+      }
+    } catch {
+      // Fallback below when realtime top-pages query is unavailable.
+    }
+
+    if (topPages.length === 0) {
+      try {
+        const topPagesResponse = await fetch(`${GA4_DATA_API}/properties/${propertyId}:runReport`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            dateRanges: [
+              {
+                startDate: startDate || '30daysAgo',
+                endDate: endDate || 'today',
+              },
+            ],
+            dimensions: [{ name: 'unifiedPagePathScreen' }, { name: 'pageTitle' }],
+            metrics: [{ name: 'screenPageViews' }],
+            orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+            limit: 7,
+          }),
+        });
+        if (topPagesResponse.ok) {
+          const topPagesRaw = await topPagesResponse.text();
+          let topPagesParsed: unknown = {};
+          try {
+            topPagesParsed = topPagesRaw ? JSON.parse(topPagesRaw) : {};
+          } catch {
+            topPagesParsed = null;
+          }
+          const rows =
+            topPagesParsed && typeof topPagesParsed === 'object'
+              ? ((topPagesParsed as { rows?: Array<{ dimensionValues?: Array<{ value?: string }>; metricValues?: Array<{ value?: string }> }> })
+                  .rows ?? [])
+              : [];
+          topPages = rows
+            .map((row) => {
+              const path = String(row.dimensionValues?.[0]?.value || '').trim();
+              const title = String(row.dimensionValues?.[1]?.value || '').trim();
+              const views = Number(row.metricValues?.[0]?.value ?? 0);
+              return {
+                path,
+                title,
+                views: Number.isFinite(views) ? views : 0,
+              };
+            })
+            .filter((item) => item.path || item.title)
+            .slice(0, 7);
+        }
+      } catch {
+        // Keep primary response even when fallback top-pages query is unavailable.
+      }
+    }
+
+    const topPagesWindowMinutes = topPages.length > 0 ? 30 : null;
+    const payload = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    return NextResponse.json(
+      {
+        ...payload,
+        realtime: {
+          activeUsers: realtimeActiveUsers,
+          usersLast24h,
+          topPagesWindowMinutes,
+          source: realtimeActiveUsers != null ? 'runRealtimeReport' : 'unavailable',
+        },
+        topPages,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Failed to load GA4 report for this user.' },

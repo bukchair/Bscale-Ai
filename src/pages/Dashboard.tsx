@@ -53,6 +53,12 @@ type PlatformRevenueSummary = {
   tiktok: { spend: number; attributedRevenue: number };
 };
 
+type Ga4TopPage = {
+  path: string;
+  title: string;
+  views: number;
+};
+
 const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
 type Ga4TopPage = { title: string; path: string; views: number };
 const DEMO_GA4_TOP_PAGES: Ga4TopPage[] = [
@@ -278,7 +284,7 @@ const COPY = {
     activeNow: 'פעילים עכשיו',
     totalUsers: 'משתמשים ב-24 שעות אחרונות',
     topPagesLabel: 'עמודים נצפים (30 דק\' אחרונות)',
-    ga4Desc: 'מציג תמונת מצב מיידית של התנועה לאתר ומסייע להבין האם הקמפיינים מביאים גולשים בזמן אמת.',
+    ga4Desc: 'חלון חי: פעילים עכשיו + משתמשים ב-24 שעות אחרונות + 7 עמודים מובילים מתוך 30 הדקות האחרונות.',
     noGa4: 'אין כרגע נתוני GA4 חיים להצגה.',
     latestOrdersCard: '5 הזמנות אחרונות',
     customerFallback: 'לקוח',
@@ -333,7 +339,7 @@ const COPY = {
     activeNow: 'Active now',
     totalUsers: 'Users in last 24 hours',
     topPagesLabel: 'Pages viewed (last 30 min)',
-    ga4Desc: 'Shows real time site traffic so you can understand whether campaigns are bringing visitors now.',
+    ga4Desc: 'Live window: active now + users in last 24 hours + top 7 pages from the last 30 minutes.',
     noGa4: 'No live GA4 data to display right now.',
     latestOrdersCard: 'Latest 5 orders',
     customerFallback: 'Customer',
@@ -386,9 +392,9 @@ const COPY = {
     ga4Card: 'Состояние трафика сайта (GA4)',
     ga4LiveSync: 'Live Sync · последние 30 мин',
     activeNow: 'Сейчас активны',
-    totalUsers: 'Пользователей за 24 часа',
+    totalUsers: 'Пользователи за последние 24 часа',
     topPagesLabel: 'Страницы (последние 30 мин)',
-    ga4Desc: 'Показывает трафик сайта в реальном времени.',
+    ga4Desc: 'Live окно: активны сейчас + пользователи за 24 часа + топ-7 страниц за последние 30 минут.',
     noGa4: 'Сейчас нет live данных GA4.',
     latestOrdersCard: 'Последние 5 заказов',
     customerFallback: 'Клиент',
@@ -443,7 +449,7 @@ const COPY = {
     activeNow: 'Ativos agora',
     totalUsers: 'Usuários nas últimas 24 horas',
     topPagesLabel: 'Páginas visualizadas (últimos 30 min)',
-    ga4Desc: 'Mostra o tráfego em tempo real para entender se as campanhas estão trazendo visitas.',
+    ga4Desc: 'Janela ao vivo: ativos agora + usuários nas últimas 24h + top 7 páginas dos últimos 30 minutos.',
     noGa4: 'Não há dados GA4 ao vivo para mostrar no momento.',
     latestOrdersCard: '5 pedidos mais recentes',
     customerFallback: 'Cliente',
@@ -496,9 +502,9 @@ const COPY = {
     ga4Card: 'Statut du trafic du site (GA4)',
     ga4LiveSync: 'Live Sync · 30 dernières min',
     activeNow: 'Actifs maintenant',
-    totalUsers: 'Utilisateurs sur 24 heures',
+    totalUsers: 'Utilisateurs des 24 dernières heures',
     topPagesLabel: 'Pages vues (30 dernières min)',
-    ga4Desc: 'Affiche le trafic en temps réel pour comprendre si les campagnes apportent des visiteurs.',
+    ga4Desc: 'Fenêtre live : actifs maintenant + utilisateurs sur 24h + top 7 pages des 30 dernières minutes.',
     noGa4: 'Aucune donnée GA4 en direct à afficher pour le moment.',
     latestOrdersCard: '5 dernières commandes',
     customerFallback: 'Client',
@@ -540,8 +546,13 @@ export function Dashboard() {
   const { connections } = useConnections();
   const { format: formatCurrency } = useCurrency();
   const currentUser = auth.currentUser;
+  const isHebrew = language === 'he';
   const text = COPY[language] || COPY.en;
   const statusLabels = STATUS_LABELS[language] || STATUS_LABELS.en;
+  const ga4TopPagesTitle = isHebrew ? '7 עמודים נצפים (30 דק׳ אחרונות)' : 'Top 7 viewed pages (last 30 min)';
+  const ga4NoTopPages = isHebrew
+    ? 'אין כרגע נתוני עמודים נצפים ב‑30 הדקות האחרונות מ‑GA4.'
+    : 'No top viewed pages from GA4 in the last 30 minutes yet.';
 
   const connectedPlatforms = connections.filter((c) => c.status === 'connected');
   const isWooConnected = connections.find((c) => c.id === 'woocommerce')?.status === 'connected';
@@ -575,6 +586,7 @@ export function Dashboard() {
   const [gscStats, setGscStats] = useState(DEMO_GSC_STATS);
   const [recentOrders, setRecentOrders] = useState<WooCommerceOrder[]>(DEMO_RECENT_ORDERS);
   const [campaignSummary, setCampaignSummary] = useState<CampaignSummary>(DEMO_CAMPAIGN_SUMMARY);
+  const [ga4TopPages, setGa4TopPages] = useState<Ga4TopPage[]>([]);
   const [platformRevenue, setPlatformRevenue] = useState<PlatformRevenueSummary>({
     meta: { spend: 0, attributedRevenue: 0 },
     google: { spend: 0, attributedRevenue: 0 },
@@ -740,24 +752,42 @@ export function Dashboard() {
           };
           let totalUsers = 0;
           let activeNow = 0;
+          const realtimeActiveUsers = Number((report as any)?.realtime?.activeUsers ?? NaN);
+          const usersLast24hRaw = Number((report as any)?.realtime?.usersLast24h ?? NaN);
           rows.forEach((row: any) => {
             totalUsers += moneyFromUnknown(metricValueByName(row, 'totalUsers', 0));
           });
-          if (rows.length) {
+          if (Number.isFinite(realtimeActiveUsers)) {
+            activeNow = realtimeActiveUsers;
+          } else if (rows.length) {
             activeNow = moneyFromUnknown(metricValueByName(rows[rows.length - 1], 'activeUsers', 0));
           }
           const totalsRow = Array.isArray((report as any).totals) ? (report as any).totals[0] : undefined;
           if (totalsRow) {
             totalUsers = moneyFromUnknown(metricValueByName(totalsRow, 'totalUsers', 0));
           }
+          if (Number.isFinite(usersLast24hRaw)) {
+            totalUsers = usersLast24hRaw;
+          }
+          const topPagesRaw = Array.isArray((report as any)?.topPages) ? (report as any).topPages : [];
+          const topPagesMapped: Ga4TopPage[] = topPagesRaw
+            .map((row: any) => ({
+              path: String(row?.path || '').trim(),
+              title: String(row?.title || '').trim(),
+              views: toNumber(row?.views, 0),
+            }))
+            .filter((row: Ga4TopPage) => Boolean(row.path || row.title))
+            .slice(0, 7);
           ga4Live = {
             activeNow: toNumber(activeNow, DEMO_GA4_STATS.activeNow),
             totalUsers: toNumber(totalUsers, DEMO_GA4_STATS.totalUsers),
           };
+          setGa4TopPages(topPagesMapped);
           hasGa4Live = true;
           ga4SnapshotLoaded = true;
         } catch (error) {
           console.warn('Failed to load GA4 stats', error);
+          setGa4TopPages([]);
         }
 
         try {
@@ -957,10 +987,12 @@ export function Dashboard() {
         setGa4Stats(DEMO_GA4_STATS);
         setIsGa4UsingDemo(true);
         setHasGa4LiveSnapshot(false);
+        setGa4TopPages([]);
       } else {
         setGa4Stats({ activeNow: 0, totalUsers: 0 });
         setIsGa4UsingDemo(false);
         setHasGa4LiveSnapshot(false);
+        setGa4TopPages([]);
       }
 
       if (hasGscLive) {
@@ -1284,8 +1316,8 @@ export function Dashboard() {
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="font-bold text-gray-900 dark:text-white">{text.ga4Card}</h2>
-                <p className="text-[10px] text-emerald-600 font-semibold">{text.ga4LiveSync}</p>
+                <h2 className="font-bold text-gray-900 dark:text-white tracking-tight">{text.ga4Card}</h2>
+                <p className="text-[11px] font-semibold text-indigo-600">{text.ga4LiveSync}</p>
               </div>
             </div>
             <DemoTag show={isGa4UsingDemo} />
@@ -1336,6 +1368,32 @@ export function Dashboard() {
               <p className="text-xs text-gray-500">
                 {text.ga4Desc}
               </p>
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+                <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
+                  {ga4TopPagesTitle}
+                  <SourceTag live={!isGa4UsingDemo && ga4TopPages.length > 0} />
+                </p>
+                {ga4TopPages.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {ga4TopPages.map((page, index) => {
+                      const pageLabel = page.title || page.path || '/';
+                      return (
+                        <li
+                          key={`${page.path || page.title}-${index}`}
+                          className="flex items-center justify-between gap-2 text-xs"
+                        >
+                          <span className="truncate text-gray-700" title={page.path || pageLabel}>
+                            {pageLabel}
+                          </span>
+                          <span className="font-bold text-indigo-700">{page.views.toLocaleString()}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-[11px] text-gray-500">{ga4NoTopPages}</p>
+                )}
+              </div>
             </>
           ) : (
             <p className="text-xs text-gray-500">

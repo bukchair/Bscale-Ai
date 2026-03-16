@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Eye,
   Video,
   Pencil,
   X,
@@ -189,7 +190,9 @@ export function Campaigns() {
       ? 'הכנס כותרת קצרה והמערכת תציע קהלים, מטרה, סוג תוכן, סוג מוצר/שירות ושעות ביצוע מומלצות.'
       : 'Enter a short title and the system suggests audiences, objective, content type, product/service type, and recommended hours.',
     shortTitle: isHebrew ? 'כותרת קצרה' : 'Short title',
-    analyzeWithAi: isHebrew ? 'נתח עם AI' : 'Analyze with AI',
+    createSmartAd: isHebrew ? 'צור מודעה חכמה' : 'Create smart ad',
+    smartAdRunning: isHebrew ? 'AI מעבד את המודעה...' : 'AI is processing the ad...',
+    smartAdDuration: isHebrew ? 'זמן עיבוד' : 'Processing time',
     aiAudienceFromConnections: isHebrew
       ? 'קהלים חכמים מנותחים מנתוני החיבורים הפעילים'
       : 'Smart audiences analyzed from connected platform data',
@@ -238,6 +241,10 @@ export function Campaigns() {
     editName: isHebrew ? 'שם קמפיין' : 'Campaign name',
     editStatus: isHebrew ? 'סטטוס' : 'Status',
     editBudget: isHebrew ? 'תקציב יומי (אופציונלי)' : 'Daily budget (optional)',
+    editApplyAds: isHebrew ? 'עדכן גם מודעות קיימות בקמפיין' : 'Also update existing ads in this campaign',
+    editApplyAdsHint: isHebrew
+      ? 'מעדכן סטטוס מודעות קיימות באותו קמפיין בפלטפורמה.'
+      : 'Updates the status of existing ads under the same campaign on this platform.',
     updateSuccess: isHebrew ? 'הקמפיין עודכן בהצלחה.' : 'Campaign updated successfully.',
     updateFailed: isHebrew ? 'עדכון הקמפיין נכשל.' : 'Failed to update campaign.',
     actions: isHebrew ? 'פעולות' : 'Actions',
@@ -247,6 +254,15 @@ export function Campaigns() {
     wooPublishSubtitle: isHebrew
       ? 'בחר מה לפרסם לפי קטגוריה או לפי מוצר מתוך החנות המחוברת.'
       : 'Choose what to promote by category or by product from connected store.',
+    wooOptionalModeTitle: isHebrew
+      ? 'שימוש ב-WooCommerce (אופציונלי)'
+      : 'Use WooCommerce (optional)',
+    wooOptionalModeDesc: isHebrew
+      ? 'ניתן ליצור ולפרסם קמפיין גם בלי לבחור מוצר/קטגוריה מתוך WooCommerce.'
+      : 'You can create and publish a campaign without selecting WooCommerce product/category.',
+    wooManualModeActive: isHebrew
+      ? 'מצב ידני פעיל: הפרסום לא תלוי במוצרי WooCommerce.'
+      : 'Manual mode active: publishing is independent of WooCommerce products.',
     wooNotConnected: isHebrew
       ? 'כדי לבחור מוצר/קטגוריה, חבר קודם WooCommerce במסך החיבורים.'
       : 'Connect WooCommerce in Integrations to choose category/product.',
@@ -266,6 +282,7 @@ export function Campaigns() {
       ? 'בחירת מוצר ממלאת אוטומטית את התיאור לפי מידע המוצר, וניתן לערוך חופשי.'
       : 'Selecting a product auto-fills the description from product data and remains editable.',
     wooImportProduct: isHebrew ? 'ייבא מוצר לקמפיין' : 'Import product to campaign',
+    wooImportInSmartWindow: isHebrew ? 'ייבוא מוצר ל‑AI מתוך WooCommerce' : 'Import WooCommerce product into AI',
     wooImportSuccess: isHebrew
       ? 'פרטי המוצר יובאו בהצלחה מ-WooCommerce.'
       : 'Product details imported successfully from WooCommerce.',
@@ -278,10 +295,29 @@ export function Campaigns() {
     platformCopySubtitle: isHebrew
       ? 'נוצר אוטומטית לפי חוקי אורך מומלצים של כל פלטפורמה.'
       : 'Generated automatically according to recommended length rules per platform.',
+    analyzePlatformAds: isHebrew
+      ? 'נתח וצור מודעות מותאמות לפלטפורמות'
+      : 'Analyze and generate platform-fit ads',
+    goToBuilder: isHebrew ? 'מעבר ליצירת מודעה' : 'Go to ad creation',
     applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
     adPreview: isHebrew ? 'תצוגה מקדימה' : 'Ad preview',
     charLimit: isHebrew ? 'תווים' : 'chars',
     fromCreativeLab: isHebrew ? 'יובא ממעבדת היצירה' : 'Imported from Creative Lab',
+    applyPlatformCopyDone: isHebrew ? 'טיוטת הפלטפורמה הוחלה על שדות הקמפיין.' : 'Platform draft applied to campaign fields.',
+    disableWooImport: isHebrew ? 'בטל ייבוא Woo ועבור להזנה ידנית' : 'Disable Woo import and switch to manual input',
+    manualTextMode: isHebrew ? 'מצב עריכה ידני' : 'Manual editing mode',
+    wooTextMode: isHebrew ? 'מצב טקסט ממוצר Woo' : 'Woo product-assisted text mode',
+    previewTitle: isHebrew ? 'תצוגה מקדימה לפני פרסום' : 'Pre-publish preview',
+    previewSubtitle: isHebrew
+      ? 'כך המודעה תיראה לפי כל פלטפורמה על בסיס הנתונים שמילאת.'
+      : 'How your ad will look per platform based on entered data.',
+    previewDataTitle: isHebrew ? 'נתונים שייכנסו לפרסום' : 'Publishing payload summary',
+    previewObjective: isHebrew ? 'מטרה' : 'Objective',
+    previewPlatforms: isHebrew ? 'פלטפורמות לפרסום' : 'Platforms to publish',
+    previewMedia: isHebrew ? 'מדיה' : 'Media',
+    previewAudiences: isHebrew ? 'קהלים' : 'Audiences',
+    previewSchedule: isHebrew ? 'שעות פעילות' : 'Scheduled active slots',
+    previewNoText: isHebrew ? 'אין עדיין טקסט. הזן כותרת ותיאור.' : 'No text yet. Enter title and description.',
   };
 
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
@@ -382,19 +418,26 @@ export function Campaigns() {
   const [aiAudienceProvider, setAiAudienceProvider] = useState<string>('');
   const [aiGeneratedAudienceNames, setAiGeneratedAudienceNames] = useState<string[]>([]);
   const [aiRecommendedHoursByPlatform, setAiRecommendedHoursByPlatform] = useState<Record<string, number[]>>({});
+  const [smartAdRunStartedAt, setSmartAdRunStartedAt] = useState<number | null>(null);
+  const [smartAdElapsedMs, setSmartAdElapsedMs] = useState(0);
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; message: string; campaignId?: string }>>([]);
   const [editingCampaign, setEditingCampaign] = useState<EditCampaignDraft | null>(null);
+  const [editApplyToAds, setEditApplyToAds] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
-  const [previewPlatform, setPreviewPlatform] = useState<PlatformName>('Google');
+  const [selectedCopyPlatform, setSelectedCopyPlatform] = useState<PlatformName>('Google');
+  const [selectedPreviewPlatform, setSelectedPreviewPlatform] = useState<PlatformName>('Google');
   const [wooProducts, setWooProducts] = useState<WooCampaignProduct[]>([]);
   const [wooLoading, setWooLoading] = useState(false);
+  const [useWooProductData, setUseWooProductData] = useState(false);
   const [wooPublishScope, setWooPublishScope] = useState<WooPublishScope>('category');
   const [selectedWooCategory, setSelectedWooCategory] = useState('');
   const [selectedWooProductId, setSelectedWooProductId] = useState<string>('');
   const wooAutoBriefRef = useRef('');
+  const builderSectionRef = useRef<HTMLElement | null>(null);
+  const shortTitleInputRef = useRef<HTMLInputElement | null>(null);
 
   const connectedAdPlatforms = useMemo(() => {
     const options: string[] = [];
@@ -409,6 +452,23 @@ export function Campaigns() {
     [connections]
   );
   const isWooConnected = Boolean(wooConnection);
+
+  useEffect(() => {
+    if (!aiAudienceLoading || !smartAdRunStartedAt) return;
+    const intervalId = window.setInterval(() => {
+      setSmartAdElapsedMs(Date.now() - smartAdRunStartedAt);
+    }, 250);
+    return () => window.clearInterval(intervalId);
+  }, [aiAudienceLoading, smartAdRunStartedAt]);
+
+  const formatSmartElapsed = (elapsedMs: number) => {
+    const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, '0');
+    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${seconds}`;
+  };
 
   const objectiveOptions: Array<{ value: ObjectiveType; label: string }> = [
     { value: 'sales', label: isHebrew ? 'מכירות' : 'Sales' },
@@ -484,7 +544,7 @@ export function Campaigns() {
   }, [wooProducts, selectedWooProductId]);
 
   const inferredWooTitle = useMemo(() => {
-    if (!isWooConnected) return '';
+    if (!useWooProductData || !isWooConnected) return '';
     if (wooPublishScope === 'product' && selectedWooProduct?.name) {
       return selectedWooProduct.name;
     }
@@ -492,7 +552,23 @@ export function Campaigns() {
       return `${selectedWooCategory} Campaign`;
     }
     return '';
-  }, [isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
+  }, [useWooProductData, isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
+
+  const draftPlatforms = useMemo(
+    () =>
+      (['Google', 'Meta', 'TikTok'] as const).filter((platform) =>
+        Boolean(platformCopyDrafts[platform])
+      ) as PlatformName[],
+    [platformCopyDrafts]
+  );
+
+  const previewPlatforms = useMemo(() => {
+    const base = (selectedPlatforms.length > 0 ? selectedPlatforms : connectedAdPlatforms).filter(
+      (platform): platform is PlatformName =>
+        platform === 'Google' || platform === 'Meta' || platform === 'TikTok'
+    );
+    return base.length > 0 ? base : (['Google'] as PlatformName[]);
+  }, [connectedAdPlatforms, selectedPlatforms]);
 
   const buildWooProductBrief = (product: WooCampaignProduct): string => {
     const longDescription =
@@ -522,6 +598,18 @@ export function Campaigns() {
       .filter((item) => item && item.trim().length > 0)
       .join('\n');
   };
+
+  const aiProcessingBrief = useMemo(() => {
+    const baseBrief = campaignBrief.trim();
+    const productBrief =
+      useWooProductData && wooPublishScope === 'product' && selectedWooProduct
+        ? buildWooProductBrief(selectedWooProduct)
+        : '';
+    if (!productBrief) return baseBrief;
+    if (!baseBrief) return productBrief;
+    if (baseBrief.includes(productBrief)) return baseBrief;
+    return `${baseBrief}\n\n${isHebrew ? 'נתוני מוצר מ-WooCommerce:' : 'WooCommerce product data:'}\n${productBrief}`;
+  }, [campaignBrief, useWooProductData, wooPublishScope, selectedWooProduct, isHebrew]);
 
   const importWooProductToBuilder = (
     product: WooCampaignProduct,
@@ -558,6 +646,12 @@ export function Campaigns() {
     if (notify) setBuilderMessage(text.wooImportSuccess);
   };
 
+  const disableWooImportMode = () => {
+    setUseWooProductData(false);
+    setBuilderMessage(text.manualTextMode);
+    window.setTimeout(() => shortTitleInputRef.current?.focus(), 0);
+  };
+
   const audienceSuggestions = useMemo(() => {
     const combined = [
       ...aiGeneratedAudienceNames,
@@ -575,7 +669,7 @@ export function Campaigns() {
     }
     setSelectedPlatforms((prev) => {
       const filtered = prev.filter((p) => connectedAdPlatforms.includes(p));
-      return filtered.length ? filtered : [connectedAdPlatforms[0]];
+      return filtered.length ? filtered : [...connectedAdPlatforms];
     });
     setSelectedSchedulePlatform((prev) => (connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]));
     setRulePlatform((prev) =>
@@ -584,6 +678,20 @@ export function Campaigns() {
         : ((connectedAdPlatforms[0] || 'Google') as PlatformName)
     );
   }, [connectedAdPlatforms]);
+
+  useEffect(() => {
+    if (!draftPlatforms.length) return;
+    if (!draftPlatforms.includes(selectedCopyPlatform)) {
+      setSelectedCopyPlatform(draftPlatforms[0]);
+    }
+  }, [draftPlatforms, selectedCopyPlatform]);
+
+  useEffect(() => {
+    if (!previewPlatforms.length) return;
+    if (!previewPlatforms.includes(selectedPreviewPlatform)) {
+      setSelectedPreviewPlatform(previewPlatforms[0]);
+    }
+  }, [previewPlatforms, selectedPreviewPlatform]);
 
   useEffect(() => {
     if (!wooConnection?.settings) {
@@ -638,20 +746,23 @@ export function Campaigns() {
   }, [wooConnection?.settings]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope === 'product') return;
     if (!selectedWooCategory && wooCategoryOptions.length > 0) {
       setSelectedWooCategory(wooCategoryOptions[0]);
     }
-  }, [wooPublishScope, wooCategoryOptions, selectedWooCategory]);
+  }, [useWooProductData, wooPublishScope, wooCategoryOptions, selectedWooCategory]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product') return;
     if (!selectedWooProductId && wooProductsFiltered.length > 0) {
       setSelectedWooProductId(String(wooProductsFiltered[0].id));
     }
-  }, [wooPublishScope, selectedWooProductId, wooProductsFiltered]);
+  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product') return;
     if (!selectedWooProductId) return;
     const exists = wooProductsFiltered.some(
@@ -662,18 +773,20 @@ export function Campaigns() {
         wooProductsFiltered.length > 0 ? String(wooProductsFiltered[0].id) : ''
       );
     }
-  }, [wooPublishScope, selectedWooProductId, wooProductsFiltered]);
+  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (!inferredWooTitle) return;
     setShortTitleInput((prev) => (prev.trim() ? prev : inferredWooTitle));
     setCampaignNameInput((prev) => (prev.trim() ? prev : inferredWooTitle));
-  }, [inferredWooTitle]);
+  }, [useWooProductData, inferredWooTitle]);
 
   useEffect(() => {
+    if (!useWooProductData) return;
     if (wooPublishScope !== 'product' || !selectedWooProduct) return;
     importWooProductToBuilder(selectedWooProduct, { overwriteExisting: false, notify: false });
-  }, [wooPublishScope, selectedWooProduct]);
+  }, [useWooProductData, wooPublishScope, selectedWooProduct]);
 
   useEffect(() => {
     setWeeklySchedule((prev) => {
@@ -1344,6 +1457,7 @@ export function Campaigns() {
     const normalizedStatus = normalizeCampaignStatus(campaign?.status);
     const status: EditableStatus = normalizedStatus === 'Paused' ? 'Paused' : 'Active';
     setEditMessage(null);
+    setEditApplyToAds(false);
     setEditingCampaign({
       rowKey: `${platform}-${campaignId}`,
       platform,
@@ -1356,6 +1470,7 @@ export function Campaigns() {
 
   const closeEditCampaign = () => {
     setEditingCampaign(null);
+    setEditApplyToAds(false);
     setEditLoading(false);
   };
 
@@ -1386,6 +1501,7 @@ export function Campaigns() {
           name: trimmedName,
           status: editingCampaign.status,
           dailyBudget,
+          applyToAds: editApplyToAds,
         }),
       });
       const payload = await response.json().catch(() => ({}));
@@ -1410,6 +1526,7 @@ export function Campaigns() {
       setEditMessage(payload?.message || text.updateSuccess);
       setTimeout(() => {
         setEditingCampaign(null);
+        setEditApplyToAds(false);
       }, 250);
     } catch (error) {
       setEditMessage(error instanceof Error ? error.message : text.updateFailed);
@@ -1419,7 +1536,10 @@ export function Campaigns() {
   };
 
   const handleAutoAudienceAndStrategy = async () => {
+    const runStartedAt = Date.now();
     setBuilderMessage(null);
+    setSmartAdRunStartedAt(runStartedAt);
+    setSmartAdElapsedMs(0);
     setAiAudienceLoading(true);
     try {
       const aiKeys = getAIKeysFromConnections(connections);
@@ -1456,7 +1576,7 @@ export function Campaigns() {
         },
       };
 
-      const wooContext = isWooConnected
+      const wooContext = isWooConnected && useWooProductData
         ? {
             publishScope: wooPublishScope,
             category: selectedWooCategory || null,
@@ -1476,7 +1596,11 @@ export function Campaigns() {
           }
         : null;
 
-      const fallbackTitle = shortTitleInput.trim() || inferredWooTitle || campaignNameInput.trim();
+      const fallbackTitle =
+        shortTitleInput.trim() ||
+        inferredWooTitle ||
+        selectedWooProduct?.name ||
+        campaignNameInput.trim();
 
       const contextPayload = {
         shortTitle: fallbackTitle,
@@ -1486,12 +1610,13 @@ export function Campaigns() {
           contentType,
           productType,
           serviceTypeInput,
-          campaignBrief,
+          campaignBrief: aiProcessingBrief,
         },
         connectedPlatforms: connectedAdPlatforms,
         selectedPlatforms,
         campaignData: realCampaigns.slice(0, 120),
         wooContext,
+        aiInputText: aiProcessingBrief,
         platformTextRules,
       };
 
@@ -1616,6 +1741,7 @@ export function Campaigns() {
     } catch (error) {
       setBuilderMessage(error instanceof Error ? error.message : 'AI generation failed.');
     } finally {
+      setSmartAdElapsedMs(Date.now() - runStartedAt);
       setAiAudienceLoading(false);
     }
   };
@@ -1623,14 +1749,154 @@ export function Campaigns() {
   const applyPlatformCopyToFields = (platform: PlatformName) => {
     const draft = platformCopyDrafts[platform];
     if (!draft) return;
-    if (draft.title) setCampaignNameInput(draft.title);
+    if (draft.title) {
+      setCampaignNameInput(draft.title);
+      setShortTitleInput(draft.title);
+    }
     if (draft.description) setCampaignBrief(draft.description);
+    setSelectedPreviewPlatform(platform);
+    setBuilderMessage(text.applyPlatformCopyDone);
+  };
+
+  const getPlatformTitleLimit = (platform: PlatformName) => (platform === 'Google' ? 30 : 40);
+  const getPlatformDescriptionLimit = (platform: PlatformName) =>
+    platform === 'Google' ? 90 : platform === 'Meta' ? 125 : 100;
+
+  const buildLocalPlatformCopyDrafts = (): Partial<Record<PlatformName, PlatformCopyDraft>> => {
+    const platforms = (selectedPlatforms.filter((p): p is PlatformName =>
+      p === 'Google' || p === 'Meta' || p === 'TikTok'
+    ) as PlatformName[]);
+    const activePlatforms = platforms.length > 0 ? platforms : ['Google'];
+    const baseTitle = shortTitleInput.trim() || campaignNameInput.trim();
+    const baseDescription = campaignBrief.trim() || serviceTypeInput.trim();
+    const trimByLength = (value: string, max: number) =>
+      value.length > max ? `${value.slice(0, Math.max(0, max - 1)).trim()}…` : value;
+    const drafts: Partial<Record<PlatformName, PlatformCopyDraft>> = {};
+
+    activePlatforms.forEach((platform) => {
+      if (platform === 'Google') {
+        drafts.Google = {
+          title: trimByLength(baseTitle || 'Google Ad', 30),
+          description: trimByLength(baseDescription || 'High-intent ad copy for search traffic.', 90),
+        };
+      }
+      if (platform === 'Meta') {
+        drafts.Meta = {
+          title: trimByLength(baseTitle || 'Meta Ad', 40),
+          description: trimByLength(
+            baseDescription || 'Engaging social-first primary text for Meta placements.',
+            125
+          ),
+        };
+      }
+      if (platform === 'TikTok') {
+        drafts.TikTok = {
+          title: trimByLength(baseTitle || 'TikTok Ad', 40),
+          description: trimByLength(
+            baseDescription || 'Short hook-focused caption for TikTok audiences.',
+            100
+          ),
+        };
+      }
+    });
+
+    return drafts;
+  };
+
+  const handleGeneratePlatformAdCopies = async () => {
+    setBuilderMessage(null);
+    setAiAudienceLoading(true);
+    try {
+      if (!shortTitleInput.trim() && !campaignNameInput.trim()) {
+        setBuilderMessage(text.requireFields);
+        return;
+      }
+      const aiKeys = getAIKeysFromConnections(connections);
+      if (!hasAnyAIKey(aiKeys)) {
+        const fallbackDrafts = buildLocalPlatformCopyDrafts();
+        setPlatformCopyDrafts(fallbackDrafts);
+        setBuilderMessage(
+          isHebrew
+            ? 'אין חיבור AI פעיל, נוצרו מודעות מותאמות לפי כללי פלטפורמה מקומיים.'
+            : 'No active AI connection. Platform-fit ads were generated using local rules.'
+        );
+        return;
+      }
+
+      const responseLanguage =
+        language === 'he'
+          ? 'Hebrew'
+          : language === 'ru'
+          ? 'Russian'
+          : language === 'pt'
+          ? 'Portuguese'
+          : language === 'fr'
+          ? 'French'
+          : 'English';
+      const contextPayload = {
+        shortTitle:
+          shortTitleInput.trim() || selectedWooProduct?.name || inferredWooTitle || campaignNameInput.trim(),
+        currentForm: {
+          campaignNameInput,
+          objective,
+          contentType,
+          productType,
+          serviceTypeInput,
+          campaignBrief: aiProcessingBrief,
+        },
+        connectedPlatforms: connectedAdPlatforms,
+        selectedPlatforms,
+        aiInputText: aiProcessingBrief,
+      };
+      const strategyResult = await getCampaignBuilderSuggestions(
+        JSON.stringify(contextPayload),
+        aiKeys,
+        responseLanguage
+      );
+      const nextPlatformCopy: Partial<Record<PlatformName, PlatformCopyDraft>> = {};
+      (['Google', 'Meta', 'TikTok'] as const).forEach((platform) => {
+        const item = strategyResult?.platformCopy?.[platform];
+        if (!item) return;
+        nextPlatformCopy[platform] = {
+          title: String(item.title || '').trim(),
+          description: String(item.description || '').trim(),
+        };
+      });
+      if (Object.keys(nextPlatformCopy).length > 0) {
+        setPlatformCopyDrafts(nextPlatformCopy);
+      } else {
+        const fallbackDrafts = buildLocalPlatformCopyDrafts();
+        setPlatformCopyDrafts(fallbackDrafts);
+      }
+    } catch (error) {
+      setBuilderMessage(
+        error instanceof Error ? error.message : isHebrew ? 'יצירת מודעות נכשלה.' : 'Ad generation failed.'
+      );
+    } finally {
+      setAiAudienceLoading(false);
+    }
+  };
+
+  const scrollToBuilderSection = () => {
+    builderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleCreateScheduledCampaign = async () => {
     setBuilderMessage(null);
     setPublishResults([]);
-    if (!campaignNameInput.trim() || selectedPlatforms.length === 0) {
+    const resolvedPlatforms = (
+      (selectedPlatforms.length > 0 ? selectedPlatforms : connectedAdPlatforms).filter((platform) =>
+        connectedAdPlatforms.includes(platform)
+      ) as PlatformName[]
+    );
+    const resolvedCampaignName =
+      campaignNameInput.trim() ||
+      shortTitleInput.trim() ||
+      inferredWooTitle ||
+      selectedWooProduct?.name ||
+      '';
+
+    if (!resolvedCampaignName || resolvedPlatforms.length === 0) {
       setBuilderMessage(text.requireFields);
       return;
     }
@@ -1638,7 +1904,7 @@ export function Campaigns() {
       setBuilderMessage(text.requireAsset);
       return;
     }
-    if (isWooConnected && wooProducts.length > 0) {
+    if (useWooProductData && isWooConnected && wooProducts.length > 0) {
       if (wooPublishScope === 'category' && !selectedWooCategory) {
         setBuilderMessage(text.wooRequireTarget);
         return;
@@ -1659,22 +1925,30 @@ export function Campaigns() {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          campaignName: campaignNameInput.trim(),
+          campaignName: resolvedCampaignName,
           shortTitle: shortTitleInput.trim(),
           objective,
           contentType,
           productType,
           serviceType: serviceTypeInput.trim(),
           brief: campaignBrief.trim(),
-          platforms: selectedPlatforms,
+          platforms: resolvedPlatforms,
           audiences: selectedAudiences,
           timeRules,
           weeklySchedule,
-          wooPublishMode: isWooConnected ? wooPublishScope : null,
-          wooCategory: wooPublishScope === 'category' ? selectedWooCategory || null : null,
-          wooProductId: wooPublishScope === 'product' ? selectedWooProductId || null : null,
+          wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
+          wooCategory:
+            isWooConnected && useWooProductData && wooPublishScope === 'category'
+              ? selectedWooCategory || null
+              : null,
+          wooProductId:
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProductId || null
+              : null,
           wooProductName:
-            wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProduct?.name || null
+              : null,
           platformCopyDrafts,
         }),
       });
@@ -1698,12 +1972,12 @@ export function Campaigns() {
       }
       setPublishResults(results);
 
-      const created = selectedPlatforms.map((platform) => {
+      const created = resolvedPlatforms.map((platform) => {
         const activeHours = getActiveSlotsCount(platform);
         const platformResult = results.find((item: any) => String(item?.platform || '') === platform);
         return {
           id: `live-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          name: campaignNameInput.trim(),
+          name: resolvedCampaignName,
           platform,
           status:
             platformResult?.ok === true
@@ -1718,17 +1992,22 @@ export function Campaigns() {
           brief: campaignBrief.trim(),
           audiences: selectedAudiences,
           mediaCount,
-          wooPublishMode: isWooConnected ? wooPublishScope : null,
-          wooCategory: wooPublishScope === 'category' ? selectedWooCategory || null : null,
+          wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
+          wooCategory:
+            isWooConnected && useWooProductData && wooPublishScope === 'category'
+              ? selectedWooCategory || null
+              : null,
           wooProductName:
-            wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+            isWooConnected && useWooProductData && wooPublishScope === 'product'
+              ? selectedWooProduct?.name || null
+              : null,
         };
       });
       setCreatedCampaigns((prev) => [...created, ...prev]);
 
       const successCount = results.filter((item: any) => item?.ok).length;
       setBuilderMessage(
-        successCount === selectedPlatforms.length
+        successCount === resolvedPlatforms.length
           ? text.publishedOk
           : successCount > 0
             ? text.publishedPartial
@@ -1811,14 +2090,23 @@ export function Campaigns() {
             <span className="font-bold text-indigo-600">{periodLabel}</span>
           </p>
         </div>
-        <button 
-          onClick={fetchRecommendations}
-          disabled={loading}
-          className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Zap className="w-4 h-4 ml-2" />}
-          {t('campaigns.refreshAi')}
-        </button>
+        <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
+          <button
+            onClick={scrollToBuilderSection}
+            className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-indigo-200 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Target className="w-4 h-4 ml-2" />
+            {text.goToBuilder}
+          </button>
+          <button 
+            onClick={fetchRecommendations}
+            disabled={loading}
+            className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Zap className="w-4 h-4 ml-2" />}
+            {t('campaigns.refreshAi')}
+          </button>
+        </div>
       </div>
 
       <section className="bg-white shadow rounded-lg overflow-hidden flex flex-col border border-gray-200">
@@ -2225,10 +2513,10 @@ export function Campaigns() {
         </div>
       </section>
 
-      <section className="bg-white shadow-md rounded-2xl overflow-hidden border border-gray-200">
-        <div className="px-5 py-4 border-b border-indigo-100 bg-gradient-to-l from-indigo-600 to-indigo-800">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Target className="w-5 h-5 text-indigo-200" />
+      <section ref={builderSectionRef} className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50/60">
+          <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+            <Target className="w-5 h-5 text-indigo-600" />
             {text.builderTitle}
           </h3>
           <p className="text-sm text-indigo-200 mt-0.5">{text.builderSubtitle}</p>
@@ -2304,6 +2592,7 @@ export function Campaigns() {
             {/* Short title with 90-char counter */}
             <div className="relative mb-3">
               <input
+                ref={shortTitleInputRef}
                 value={shortTitleInput}
                 onChange={(e) => setShortTitleInput(e.target.value.slice(0, 90))}
                 className={cn(
@@ -2314,198 +2603,193 @@ export function Campaigns() {
                 )}
                 placeholder={isHebrew ? 'כותרת ראשית עד 90 תווים...' : 'Main title up to 90 chars...'}
               />
-              <span className={cn(
-                "absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums",
-                shortTitleInput.length >= 85 ? "text-amber-600" : shortTitleInput.length > 0 ? "text-indigo-500" : "text-gray-400"
-              )}>
-                {shortTitleInput.length}/90
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoAudienceAndStrategy}
+                  disabled={aiAudienceLoading || (!shortTitleInput.trim() && !campaignNameInput.trim())}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {text.createSmartAd}
+                </button>
+                {useWooProductData && (
+                  <button
+                    type="button"
+                    onClick={disableWooImportMode}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50"
+                  >
+                    {text.disableWooImport}
+                  </button>
+                )}
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 items-start">
-              <div /> {/* spacer */}
-              <button
-                type="button"
-                onClick={handleAutoAudienceAndStrategy}
-                disabled={aiAudienceLoading || !shortTitleInput.trim()}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 shadow-sm"
-              >
-                {aiAudienceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {text.analyzeWithAi}
-              </button>
-            </div>
+            {(aiAudienceLoading || smartAdElapsedMs > 0) && (
+              <p className="mt-2 text-[11px] text-indigo-700 inline-flex items-center gap-1.5">
+                <Clock3 className="w-3.5 h-3.5" />
+                {aiAudienceLoading ? text.smartAdRunning : text.smartAdDuration}:{' '}
+                <span className="font-bold">{formatSmartElapsed(smartAdElapsedMs)}</span>
+              </p>
+            )}
+            {isWooConnected && (
+              <div className="mt-3 rounded-md border border-indigo-200 bg-white px-3 py-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <p className="text-[11px] font-bold text-indigo-900">{text.wooImportInSmartWindow}</p>
+                  <div className="flex items-center gap-2 sm:ml-auto">
+                    <select
+                      value={selectedWooProductId}
+                      onChange={(e) => {
+                        const nextId = e.target.value;
+                        setUseWooProductData(true);
+                        setWooPublishScope('product');
+                        setSelectedWooProductId(nextId);
+                      }}
+                      className="min-w-[210px] rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                      disabled={wooLoading || wooProducts.length === 0}
+                    >
+                      {!selectedWooProductId && <option value="">{text.wooChooseProduct}</option>}
+                      {wooProducts.map((product) => (
+                        <option key={`smart-woo-product-${product.id}`} value={String(product.id)}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedWooProduct) return;
+                        setUseWooProductData(true);
+                        setWooPublishScope('product');
+                        importWooProductToBuilder(selectedWooProduct, {
+                          overwriteExisting: true,
+                          notify: true,
+                        });
+                      }}
+                      disabled={!selectedWooProduct || wooLoading}
+                      className="inline-flex items-center rounded-md border border-indigo-300 px-2.5 py-1.5 text-[11px] font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                    >
+                      {text.wooImportProduct}
+                    </button>
+                    {useWooProductData && (
+                      <button
+                        type="button"
+                        onClick={disableWooImportMode}
+                        className="inline-flex items-center rounded-md border border-slate-300 px-2.5 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        {text.disableWooImport}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             {aiAudienceProvider && (
               <p className="mt-2 text-[11px] text-indigo-600 bg-indigo-50 rounded-lg px-2 py-1">
                 {text.aiAudienceFromConnections} · {aiAudienceProvider}
               </p>
             )}
           </div>
-          {Object.keys(platformCopyDrafts).length > 0 && (
-            <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+          {draftPlatforms.length > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/70 via-white to-indigo-50/50 p-4">
               <h4 className="text-sm font-bold text-violet-900 mb-1">{text.platformCopyTitle}</h4>
               <p className="text-xs text-violet-700 mb-3">{text.platformCopySubtitle}</p>
-
-              {/* Platform tabs */}
-              <div className="flex gap-1 mb-4 bg-white/60 rounded-xl p-1 border border-violet-100">
-                {(['Google', 'Meta', 'TikTok'] as const)
-                  .filter((p) => Boolean(platformCopyDrafts[p]))
-                  .map((p) => (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {draftPlatforms.map((platform) => {
+                  const selected = selectedCopyPlatform === platform;
+                  const titleLength = (platformCopyDrafts[platform]?.title || '').trim().length;
+                  const descriptionLength = (platformCopyDrafts[platform]?.description || '').trim().length;
+                  return (
                     <button
-                      key={`preview-tab-${p}`}
+                      key={`platform-copy-tab-${platform}`}
                       type="button"
-                      onClick={() => setPreviewPlatform(p)}
+                      onClick={() => setSelectedCopyPlatform(platform)}
                       className={cn(
-                        'flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors',
-                        previewPlatform === p
-                          ? 'bg-violet-600 text-white shadow-sm'
-                          : 'text-violet-700 hover:bg-violet-100'
+                        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold',
+                        selected
+                          ? 'border-violet-500 bg-violet-600 text-white'
+                          : 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50'
                       )}
                     >
-                      {p}
+                      {platform}
+                      <span className={cn('text-[10px]', selected ? 'text-violet-100' : 'text-violet-500')}>
+                        {titleLength}/{descriptionLength}
+                      </span>
                     </button>
-                  ))}
-              </div>
-
-              {/* Edit fields */}
-              {(['Google', 'Meta', 'TikTok'] as const)
-                .filter((platform) => Boolean(platformCopyDrafts[platform]) && platform === previewPlatform)
-                .map((platform) => {
-                  const draft = platformCopyDrafts[platform] as PlatformCopyDraft;
-                  const titleLimit = platform === 'Google' ? 30 : 40;
-                  const descLimit = platform === 'Google' ? 90 : platform === 'Meta' ? 125 : 100;
-                  return (
-                    <div key={`platform-copy-edit-${platform}`} className="space-y-3">
-                      <div className="relative">
-                        <input
-                          value={draft.title}
-                          onChange={(e) =>
-                            setPlatformCopyDrafts((prev) => ({
-                              ...prev,
-                              [platform]: {
-                                ...(prev[platform] || { title: '', description: '' }),
-                                title: e.target.value.slice(0, titleLimit),
-                              },
-                            }))
-                          }
-                          className={cn(
-                            'w-full rounded-xl border shadow-sm focus:ring-2 text-sm py-2.5 px-3 pr-14',
-                            draft.title.length >= titleLimit - 2
-                              ? 'border-amber-300 focus:border-amber-400 focus:ring-amber-200'
-                              : 'border-violet-200 focus:border-violet-400 focus:ring-violet-200'
-                          )}
-                          placeholder={isHebrew ? 'כותרת מודעה' : 'Ad headline'}
-                        />
-                        <span className={cn(
-                          'absolute end-3 top-1/2 -translate-y-1/2 text-[10px] font-bold tabular-nums',
-                          draft.title.length >= titleLimit - 2 ? 'text-amber-600' : 'text-violet-400'
-                        )}>
-                          {draft.title.length}/{titleLimit}
-                        </span>
-                      </div>
-                      <div className="relative">
-                        <textarea
-                          value={draft.description}
-                          onChange={(e) =>
-                            setPlatformCopyDrafts((prev) => ({
-                              ...prev,
-                              [platform]: {
-                                ...(prev[platform] || { title: '', description: '' }),
-                                description: e.target.value.slice(0, descLimit),
-                              },
-                            }))
-                          }
-                          rows={3}
-                          className={cn(
-                            'w-full rounded-xl border shadow-sm focus:ring-2 text-sm py-2.5 px-3 pb-6 resize-none',
-                            draft.description.length >= descLimit - 5
-                              ? 'border-amber-300 focus:border-amber-400 focus:ring-amber-200'
-                              : 'border-violet-200 focus:border-violet-400 focus:ring-violet-200'
-                          )}
-                          placeholder={isHebrew ? 'תיאור / גוף המודעה' : 'Ad description / body'}
-                        />
-                        <span className={cn(
-                          'absolute end-3 bottom-2 text-[10px] font-bold tabular-nums',
-                          draft.description.length >= descLimit - 5 ? 'text-amber-600' : 'text-violet-400'
-                        )}>
-                          {draft.description.length}/{descLimit}
-                        </span>
-                      </div>
-
-                      {/* Real ad preview */}
-                      {platform === 'Google' && (
-                        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                          <p className="text-[10px] text-green-700 font-medium mb-0.5">
-                            {isHebrew ? 'מודעה · ' : 'Ad · '}
-                            <span className="text-gray-500">https://example.com</span>
-                          </p>
-                          <p className="text-[15px] text-blue-700 font-medium leading-tight truncate">
-                            {draft.title || (isHebrew ? 'כותרת המודעה שלך' : 'Your Ad Headline')}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
-                            {draft.description || (isHebrew ? 'תיאור המודעה שלך יופיע כאן...' : 'Your ad description will appear here...')}
-                          </p>
-                        </div>
-                      )}
-                      {platform === 'Meta' && (
-                        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-                          <div className="flex items-center gap-2 p-3 border-b border-gray-100">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">B</div>
-                            <div>
-                              <p className="text-xs font-bold text-gray-900">{isHebrew ? 'העסק שלך' : 'Your Business'}</p>
-                              <p className="text-[10px] text-gray-500">{isHebrew ? 'ממומן ·' : 'Sponsored ·'} <span className="text-blue-500">🌐</span></p>
-                            </div>
-                          </div>
-                          <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                            <p className="text-[11px] text-gray-400">{isHebrew ? 'תמונת המודעה' : 'Ad Image'}</p>
-                          </div>
-                          <div className="p-3">
-                            <p className="text-[11px] text-gray-700 leading-relaxed">
-                              {draft.description || (isHebrew ? 'טקסט המודעה הראשי...' : 'Primary ad text...')}
-                            </p>
-                            <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2">
-                              <p className="text-xs font-bold text-gray-900 truncate">
-                                {draft.title || (isHebrew ? 'כותרת' : 'Headline')}
-                              </p>
-                              <button type="button" className="shrink-0 text-[11px] font-bold text-white bg-blue-600 px-3 py-1 rounded">
-                                {isHebrew ? 'למידע נוסף' : 'Learn More'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {platform === 'TikTok' && (
-                        <div className="rounded-xl border border-gray-200 bg-black overflow-hidden shadow-sm relative h-48">
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                          <div className="absolute bottom-3 start-3 end-12">
-                            <p className="text-[11px] font-bold text-white mb-0.5">
-                              @{isHebrew ? 'העסק_שלך' : 'your_business'} · <span className="font-normal opacity-75">{isHebrew ? 'ממומן' : 'Sponsored'}</span>
-                            </p>
-                            <p className="text-[11px] text-white/90 leading-relaxed line-clamp-2">
-                              {draft.description || draft.title || (isHebrew ? 'כתוביות המודעה שלך...' : 'Your TikTok ad caption...')}
-                            </p>
-                          </div>
-                          <div className="absolute bottom-3 end-3 flex flex-col items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center">
-                              <span className="text-white text-[10px] font-bold">♥</span>
-                            </div>
-                            <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
-                              <span className="text-white text-[10px]">💬</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => applyPlatformCopyToFields(platform)}
-                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-violet-300 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        {text.applyPlatformCopy}
-                      </button>
-                    </div>
                   );
                 })}
+              </div>
+              {(() => {
+                const platform = selectedCopyPlatform;
+                const draft = platformCopyDrafts[platform];
+                if (!draft) return null;
+                const titleLimit = getPlatformTitleLimit(platform);
+                const descriptionLimit = getPlatformDescriptionLimit(platform);
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-3">
+                    <div className="rounded-lg border border-violet-200 bg-white p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-violet-900">{platform}</p>
+                        <button
+                          type="button"
+                          onClick={() => applyPlatformCopyToFields(platform)}
+                          className="inline-flex items-center rounded-md border border-violet-300 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-50"
+                        >
+                          {text.applyPlatformCopy}
+                        </button>
+                      </div>
+                      <label className="text-[11px] font-semibold text-gray-600">
+                        {isHebrew ? 'כותרת' : 'Title'} · {draft.title.trim().length}/{titleLimit}
+                      </label>
+                      <input
+                        value={draft.title}
+                        onChange={(e) =>
+                          setPlatformCopyDrafts((prev) => ({
+                            ...prev,
+                            [platform]: {
+                              ...(prev[platform] || { title: '', description: '' }),
+                              title: e.target.value,
+                            },
+                          }))
+                        }
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs mb-2"
+                        placeholder={isHebrew ? 'כותרת מותאמת פלטפורמה' : 'Platform title'}
+                      />
+                      <label className="text-[11px] font-semibold text-gray-600">
+                        {isHebrew ? 'טקסט מודעה' : 'Ad text'} · {draft.description.trim().length}/{descriptionLimit}
+                      </label>
+                      <textarea
+                        value={draft.description}
+                        onChange={(e) =>
+                          setPlatformCopyDrafts((prev) => ({
+                            ...prev,
+                            [platform]: {
+                              ...(prev[platform] || { title: '', description: '' }),
+                              description: e.target.value,
+                            },
+                          }))
+                        }
+                        rows={3}
+                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs"
+                        placeholder={isHebrew ? 'תיאור מותאם פלטפורמה' : 'Platform description'}
+                      />
+                    </div>
+                    <div className="rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+                      <p className="text-[11px] font-bold text-violet-900 inline-flex items-center gap-1.5 mb-2">
+                        <Eye className="w-3.5 h-3.5" />
+                        {isHebrew ? 'תצוגה מהירה של הטיוטה' : 'Quick draft preview'}
+                      </p>
+                      <div className="rounded-lg border border-violet-100 bg-white p-2.5 space-y-1.5">
+                        <p className="text-[12px] font-extrabold text-gray-900">
+                          {draft.title.trim() || (isHebrew ? 'כותרת מודעה' : 'Ad headline')}
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-gray-700 whitespace-pre-wrap">
+                          {draft.description.trim() || text.previewNoText}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -2571,21 +2855,168 @@ export function Campaigns() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1">{text.description}</label>
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-white via-indigo-50/20 to-violet-50/30 p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <label className="block text-xs font-bold text-indigo-900">{text.description}</label>
+              <div className="flex items-center gap-2">
+                <span
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold',
+                    useWooProductData
+                      ? 'border-sky-300 bg-sky-50 text-sky-800'
+                      : 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                  )}
+                >
+                  {useWooProductData ? text.wooTextMode : text.manualTextMode}
+                </span>
+                <span className="text-[10px] font-semibold text-indigo-700">
+                  {campaignBrief.trim().length}/{getPlatformDescriptionLimit(selectedPreviewPlatform)}
+                </span>
+              </div>
+            </div>
             <textarea
               value={campaignBrief}
               onChange={(e) => setCampaignBrief(e.target.value)}
-              rows={3}
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              rows={4}
+              className="w-full rounded-lg border-indigo-200 bg-white/90 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               placeholder={
                 isHebrew
                   ? 'כתוב מה הפוסט/המוצר, למי הוא מיועד ומה המסר.'
                   : 'Describe the post/product, target user, and campaign message.'
               }
             />
-            {wooPublishScope === 'product' && selectedWooProduct && (
-              <p className="mt-1 text-[11px] text-sky-700">{text.wooAutoDescriptionHint}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {useWooProductData && (
+                <button
+                  type="button"
+                  onClick={disableWooImportMode}
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  {text.disableWooImport}
+                </button>
+              )}
+              {useWooProductData && wooPublishScope === 'product' && selectedWooProduct && (
+                <p className="text-[11px] text-sky-700">{text.wooAutoDescriptionHint}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-4">
+            <h4 className="text-sm font-bold text-sky-900 mb-1">{text.wooPublishTitle}</h4>
+            <p className="text-xs text-sky-700 mb-3">{text.wooPublishSubtitle}</p>
+            <div className="mb-3 rounded-md border border-sky-200 bg-white px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-sky-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-sky-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={useWooProductData}
+                    onChange={(e) => setUseWooProductData(e.target.checked)}
+                  />
+                  {text.wooOptionalModeTitle}
+                </label>
+                {useWooProductData && (
+                  <button
+                    type="button"
+                    onClick={disableWooImportMode}
+                    className="inline-flex items-center rounded-md border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    {text.disableWooImport}
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-[11px] text-sky-700">{text.wooOptionalModeDesc}</p>
+              {!useWooProductData && (
+                <p className="mt-1 text-[11px] text-emerald-700">{text.wooManualModeActive}</p>
+              )}
+            </div>
+            {!useWooProductData ? null : !isWooConnected ? (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                {text.wooNotConnected}
+              </p>
+            ) : wooLoading ? (
+              <div className="flex items-center gap-2 text-xs text-sky-700">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {text.wooLoading}
+              </div>
+            ) : wooProducts.length === 0 ? (
+              <p className="text-xs text-gray-600">{text.wooNoProducts}</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooScope}</label>
+                  <select
+                    value={wooPublishScope}
+                    onChange={(e) => setWooPublishScope(e.target.value as WooPublishScope)}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  >
+                    <option value="category">{text.wooByCategory}</option>
+                    <option value="product">{text.wooByProduct}</option>
+                  </select>
+                </div>
+
+                {wooPublishScope === 'category' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooCategory}</label>
+                    <select
+                      value={selectedWooCategory}
+                      onChange={(e) => setSelectedWooCategory(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                    >
+                      {!selectedWooCategory && <option value="">{text.wooChooseCategory}</option>}
+                      {wooCategoryOptions.map((category) => (
+                        <option key={`woo-category-${category}`} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">{text.wooProduct}</label>
+                    <select
+                      value={selectedWooProductId}
+                      onChange={(e) => setSelectedWooProductId(e.target.value)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                    >
+                      {!selectedWooProductId && <option value="">{text.wooChooseProduct}</option>}
+                      {wooProductsFiltered.map((product) => (
+                        <option key={`woo-product-${product.id}`} value={String(product.id)}>
+                          {product.name}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedWooProduct && (
+                      <div className="mt-2 rounded-md border border-sky-200 bg-white p-2.5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold text-sky-900 truncate" title={selectedWooProduct.name}>
+                            {selectedWooProduct.name}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              importWooProductToBuilder(selectedWooProduct, {
+                                overwriteExisting: true,
+                                notify: true,
+                              })
+                            }
+                            className="inline-flex items-center rounded-md border border-sky-300 px-2 py-1 text-[11px] font-bold text-sky-800 hover:bg-sky-50"
+                          >
+                            {text.wooImportProduct}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-gray-600 line-clamp-3">
+                          {selectedWooProduct.shortDescription ||
+                            selectedWooProduct.description ||
+                            selectedWooProduct.categories.join(', ') ||
+                            selectedWooProduct.price ||
+                            ''}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -2925,6 +3356,91 @@ export function Campaigns() {
             </div>
           </div>
 
+          <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50/60 via-white to-blue-50/40 p-4">
+            <h4 className="text-sm font-bold text-indigo-900 mb-1">{text.previewTitle}</h4>
+            <p className="text-xs text-indigo-700 mb-3">{text.previewSubtitle}</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {previewPlatforms.map((platform) => (
+                <button
+                  key={`preview-tab-${platform}`}
+                  type="button"
+                  onClick={() => setSelectedPreviewPlatform(platform)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold',
+                    selectedPreviewPlatform === platform
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
+                  )}
+                >
+                  {platform}
+                </button>
+              ))}
+            </div>
+            {(() => {
+              const platform = selectedPreviewPlatform;
+              const platformDraft = platformCopyDrafts[platform];
+              const previewTitle =
+                platformDraft?.title?.trim() ||
+                shortTitleInput.trim() ||
+                campaignNameInput.trim() ||
+                (isHebrew ? 'כותרת מודעה' : 'Ad headline');
+              const previewDescription =
+                platformDraft?.description?.trim() ||
+                campaignBrief.trim() ||
+                (isHebrew ? 'הטקסט יוצג כאן לפי הנתונים שהוזנו.' : 'Ad body will appear here based on the data entered.');
+              const mediaCount = uploadedAssets.length;
+              const audienceCount = selectedAudiences.length;
+              const activeSlots = getActiveSlotsCount(platform);
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-3">
+                  <div className="rounded-lg border border-indigo-200 bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-indigo-900">{platform}</p>
+                      <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                        {isHebrew ? 'תצוגה חיה' : 'Live preview'}
+                      </span>
+                    </div>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                      <p className="text-[13px] font-extrabold text-gray-900 break-words">{previewTitle}</p>
+                      <p className="text-[12px] leading-relaxed text-gray-700 whitespace-pre-wrap break-words">
+                        {previewDescription}
+                      </p>
+                      <div className="pt-1 flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center rounded-full bg-indigo-100 text-indigo-700 px-2 py-0.5 text-[10px] font-semibold">
+                          {text.previewObjective}: {objectiveOptions.find((item) => item.value === objective)?.label || objective}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-sky-100 text-sky-700 px-2 py-0.5 text-[10px] font-semibold">
+                          {text.previewMedia}: {mediaCount}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3">
+                    <p className="text-[11px] font-bold text-indigo-900 mb-2">{text.previewDataTitle}</p>
+                    <ul className="space-y-1.5 text-xs text-indigo-800">
+                      <li className="flex items-start justify-between gap-2">
+                        <span>{text.previewPlatforms}</span>
+                        <span className="font-bold text-right">{previewPlatforms.join(', ')}</span>
+                      </li>
+                      <li className="flex items-start justify-between gap-2">
+                        <span>{text.previewAudiences}</span>
+                        <span className="font-bold">{audienceCount}</span>
+                      </li>
+                      <li className="flex items-start justify-between gap-2">
+                        <span>{text.previewSchedule}</span>
+                        <span className="font-bold">{activeSlots}</span>
+                      </li>
+                      <li className="flex items-start justify-between gap-2">
+                        <span>{text.previewMedia}</span>
+                        <span className="font-bold">{mediaCount}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <p className="text-xs text-gray-500">
               {isHebrew
@@ -2934,7 +3450,7 @@ export function Campaigns() {
             <button
               type="button"
               onClick={handleCreateScheduledCampaign}
-              disabled={selectedPlatforms.length === 0 || isCreatingCampaign}
+              disabled={connectedAdPlatforms.length === 0 || isCreatingCampaign}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 disabled:opacity-50"
             >
               {isCreatingCampaign ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
@@ -3030,6 +3546,18 @@ export function Campaigns() {
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                   placeholder={isHebrew ? 'למשל 250' : 'e.g. 250'}
                 />
+              </div>
+              <div className="rounded-md border border-indigo-100 bg-indigo-50/40 px-3 py-2">
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={editApplyToAds}
+                    onChange={(e) => setEditApplyToAds(e.target.checked)}
+                  />
+                  {text.editApplyAds}
+                </label>
+                <p className="mt-1 text-[11px] text-indigo-700">{text.editApplyAdsHint}</p>
               </div>
               <div className="flex items-center justify-end gap-2 pt-1">
                 <button
