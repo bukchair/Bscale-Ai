@@ -721,10 +721,13 @@ export function Dashboard() {
           };
           let totalUsers = 0;
           let activeNow = 0;
+          const realtimeActiveUsers = Number((report as any)?.realtime?.activeUsers ?? NaN);
           rows.forEach((row: any) => {
             totalUsers += moneyFromUnknown(metricValueByName(row, 'totalUsers', 0));
           });
-          if (rows.length) {
+          if (Number.isFinite(realtimeActiveUsers)) {
+            activeNow = realtimeActiveUsers;
+          } else if (rows.length) {
             activeNow = moneyFromUnknown(metricValueByName(rows[rows.length - 1], 'activeUsers', 0));
           }
           const totalsRow = Array.isArray((report as any).totals) ? (report as any).totals[0] : undefined;

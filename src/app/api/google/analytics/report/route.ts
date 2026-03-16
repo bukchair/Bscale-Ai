@@ -215,7 +215,54 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json(parsed, { status: 200 });
+    let realtimeActiveUsers: number | null = null;
+    try {
+      const realtimeResponse = await fetch(
+        `${GA4_DATA_API}/properties/${propertyId}:runRealtimeReport`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            metrics: [{ name: 'activeUsers' }],
+          }),
+        }
+      );
+      if (realtimeResponse.ok) {
+        const realtimeRaw = await realtimeResponse.text();
+        let realtimeParsed: unknown = {};
+        try {
+          realtimeParsed = realtimeRaw ? JSON.parse(realtimeRaw) : {};
+        } catch {
+          realtimeParsed = null;
+        }
+        const realtimeRows =
+          realtimeParsed && typeof realtimeParsed === 'object'
+            ? ((realtimeParsed as { rows?: Array<{ metricValues?: Array<{ value?: string }> }> }).rows ??
+              [])
+            : [];
+        const candidate = Number(realtimeRows[0]?.metricValues?.[0]?.value ?? NaN);
+        if (Number.isFinite(candidate)) {
+          realtimeActiveUsers = candidate;
+        }
+      }
+    } catch {
+      // Keep the primary GA4 report response even if realtime call fails.
+    }
+
+    const payload = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+    return NextResponse.json(
+      {
+        ...payload,
+        realtime: {
+          activeUsers: realtimeActiveUsers,
+          source: realtimeActiveUsers != null ? 'runRealtimeReport' : 'unavailable',
+        },
+      },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Failed to load GA4 report for this user.' },
