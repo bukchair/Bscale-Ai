@@ -11,6 +11,8 @@ type MetaCampaignsPayload = {
   meta: {
     adAccountId: string;
     insightsFallbackUsed: boolean;
+    insightsFetchError?: string;
+    allMetricsZero?: boolean;
     dateRange: { startDate: string | null; endDate: string | null };
     cached?: boolean;
     stale?: boolean;
@@ -571,6 +573,7 @@ export async function GET(request: Request) {
     const campaigns = getCampaignRows(parsed);
     let enrichedCampaigns = campaigns;
     let insightsFallbackUsed = false;
+    let insightsFetchError: string | undefined;
 
     // If campaign payload has no embedded insights (or partial), enrich via account insights endpoint.
     if (campaigns.length > 0 && !hasUsableEmbeddedInsights(campaigns)) {
@@ -596,14 +599,22 @@ export async function GET(request: Request) {
           });
           insightsFallbackUsed = true;
         } else {
-          const insightsError = extractErrorMessage(insightsResult.response.status, insightsResult.parsed);
-          if (isMetaRateLimitError(insightsError)) {
+          const insightErrMsg = extractErrorMessage(insightsResult.response.status, insightsResult.parsed);
+          if (isMetaRateLimitError(insightErrMsg)) {
             // Keep campaign rows without insights when account is temporarily rate-limited.
             insightsFallbackUsed = false;
+          } else {
+            // Log non-rate-limit errors so they appear in server logs for debugging.
+            console.error(
+              `[Meta campaigns] insights fallback failed (${insightsResult.response.status}) for account ${resolvedAccountId}: ${insightErrMsg}`
+            );
+            insightsFetchError = insightErrMsg;
           }
         }
-      } catch {
-        // Keep base campaigns list if enrichment fails.
+      } catch (insightsErr) {
+        const msg = insightsErr instanceof Error ? insightsErr.message : String(insightsErr);
+        console.error(`[Meta campaigns] insights fallback threw for account ${resolvedAccountId}: ${msg}`);
+        insightsFetchError = msg;
       }
     }
 
@@ -636,11 +647,32 @@ export async function GET(request: Request) {
       }
     }
 
+    // Detect if all campaigns returned with all-zero metrics (useful for client-side diagnostics).
+    const allMetricsZero =
+      enrichedCampaigns.length > 0 &&
+      enrichedCampaigns.every((c) => {
+        const ins = (c as { insights?: { data?: Array<Record<string, unknown>> } }).insights?.data?.[0];
+        if (!ins) return true;
+        return (
+          parseFloat(String(ins.spend || 0)) === 0 &&
+          parseFloat(String(ins.impressions || 0)) === 0 &&
+          parseFloat(String(ins.clicks || 0)) === 0
+        );
+      });
+
+    if (allMetricsZero && enrichedCampaigns.length > 0) {
+      console.warn(
+        `[Meta campaigns] All ${enrichedCampaigns.length} campaign(s) returned zero metrics for account ${resolvedAccountId} (dateRange: ${startDate || 'none'} → ${endDate || 'none'})`
+      );
+    }
+
     const payload: MetaCampaignsPayload = {
       data: enrichedCampaigns,
       meta: {
         adAccountId: toAccountResource(resolvedAccountId),
         insightsFallbackUsed,
+        ...(insightsFetchError ? { insightsFetchError } : {}),
+        ...(allMetricsZero ? { allMetricsZero: true } : {}),
         dateRange: {
           startDate: startDate || null,
           endDate: endDate || null,

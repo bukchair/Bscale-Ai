@@ -398,6 +398,18 @@ export async function fetchMetaCampaigns(
     };
     });
 
+    // Surface server-side diagnostics to the browser console for easier debugging.
+    const responseMeta = (payload as any)?.meta;
+    if (responseMeta?.insightsFetchError) {
+      console.error('[Meta] Server failed to fetch insights:', responseMeta.insightsFetchError);
+    }
+    if (responseMeta?.allMetricsZero && mapped.length > 0) {
+      console.warn(
+        `[Meta] All ${mapped.length} campaign(s) returned zero metrics for date range ${responseMeta?.dateRange?.startDate ?? '?'} → ${responseMeta?.dateRange?.endDate ?? '?'}. ` +
+        'Possible causes: campaigns have no delivery, billing is paused, or ads are disapproved.'
+      );
+    }
+
     saveCachedMetaCampaigns(cacheKey, mapped);
     if (mapped.length > 0) {
       lastSuccessfulMetaCampaigns = mapped;
