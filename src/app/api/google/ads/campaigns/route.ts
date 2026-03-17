@@ -85,9 +85,33 @@ export async function GET(request: Request) {
     }
 
     if (!response.ok) {
+      console.error(
+        `[Google Ads Campaigns] API error customer=${customerId} status=${response.status} message=${toErrorMessage(response.status, raw, parsed)}`
+      );
       return NextResponse.json(
         { message: toErrorMessage(response.status, raw, parsed) },
         { status: response.status }
+      );
+    }
+
+    // Server-side diagnostics — visible in Cloud Run logs.
+    const results = (parsed as { results?: unknown[] })?.results ?? [];
+    const totalImpressions = results.reduce((sum: number, row: unknown) => {
+      const r = row as { metrics?: { impressions?: string } };
+      return sum + parseInt(r?.metrics?.impressions ?? '0', 10);
+    }, 0);
+    console.log(
+      `[Google Ads Campaigns] customer=${customerId} campaigns=${results.length} totalImpressions=${totalImpressions} dateRange=${startDate || 'none'}→${endDate || 'none'}`
+    );
+    if (results.length > 0 && totalImpressions === 0) {
+      console.warn(
+        `[Google Ads Campaigns] All ${results.length} campaign(s) returned 0 impressions for ${startDate}→${endDate}. ` +
+          'Possible causes: no delivery, campaigns paused, or date range has no data.'
+      );
+    }
+    if (results.length === 0) {
+      console.warn(
+        `[Google Ads Campaigns] Zero campaigns returned for customer=${customerId} dateRange=${startDate || 'none'}→${endDate || 'none'}`
       );
     }
 

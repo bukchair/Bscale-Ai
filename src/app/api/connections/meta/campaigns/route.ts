@@ -11,6 +11,7 @@ type MetaCampaignsPayload = {
   meta: {
     adAccountId: string;
     insightsFallbackUsed: boolean;
+    allMetricsZero?: boolean;
     dateRange: { startDate: string | null; endDate: string | null };
     cached?: boolean;
     stale?: boolean;
@@ -658,11 +659,43 @@ export async function GET(request: Request) {
       }
     }
 
+    // Detect if all campaigns returned zero metrics (no delivery in the date range).
+    const allMetricsZero =
+      enrichedCampaigns.length > 0 &&
+      enrichedCampaigns.every((campaign) => {
+        const c = campaign as { insights?: { data?: Array<Record<string, unknown>> } };
+        const insightRow =
+          Array.isArray(c.insights?.data) && c.insights!.data.length > 0
+            ? c.insights!.data[0]
+            : null;
+        if (!insightRow) return true;
+        const impressions = parseFloat(String(insightRow.impressions ?? '0'));
+        const spend = parseFloat(String(insightRow.spend ?? '0'));
+        return impressions === 0 && spend === 0;
+      });
+
+    // Server-side diagnostics — visible in Cloud Run logs.
+    console.log(
+      `[Meta Campaigns] account=${toAccountResource(resolvedAccountId)} campaigns=${enrichedCampaigns.length} insightsFallbackUsed=${insightsFallbackUsed} allMetricsZero=${allMetricsZero} dateRange=${startDate || 'none'}→${endDate || 'none'}`
+    );
+    if (allMetricsZero && enrichedCampaigns.length > 0) {
+      console.warn(
+        `[Meta Campaigns] All ${enrichedCampaigns.length} campaign(s) have zero impressions/spend for ${startDate}→${endDate}. ` +
+          'Possible causes: no ad delivery, billing paused, or ads disapproved.'
+      );
+    }
+    if (enrichedCampaigns.length === 0) {
+      console.warn(
+        `[Meta Campaigns] Zero campaigns returned for account=${toAccountResource(resolvedAccountId)} dateRange=${startDate || 'none'}→${endDate || 'none'}`
+      );
+    }
+
     const payload: MetaCampaignsPayload = {
       data: enrichedCampaigns,
       meta: {
         adAccountId: toAccountResource(resolvedAccountId),
         insightsFallbackUsed,
+        allMetricsZero,
         dateRange: {
           startDate: startDate || null,
           endDate: endDate || null,
