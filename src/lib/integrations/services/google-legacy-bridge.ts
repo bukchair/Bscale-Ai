@@ -4,6 +4,7 @@ import { Ga4Provider } from '@/src/lib/integrations/providers/ga4/provider';
 import { SearchConsoleProvider } from '@/src/lib/integrations/providers/search-console/provider';
 import { GmailProvider } from '@/src/lib/integrations/providers/gmail/provider';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
+import { IntegrationError } from '@/src/lib/integrations/core/errors';
 
 type BridgePlatform = 'GOOGLE_ADS' | 'GA4' | 'SEARCH_CONSOLE' | 'GMAIL';
 
@@ -54,7 +55,7 @@ export const googleLegacyBridge = {
       }
     }
 
-    throw new Error(`No ${platform} connection is available for this user.`);
+    throw new IntegrationError('NOT_FOUND', `No ${platform} connection is available for this user.`, 404);
   },
 
   getLoginCustomerId(metadata: unknown): string | null {
