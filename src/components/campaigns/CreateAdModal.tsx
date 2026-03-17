@@ -261,7 +261,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
       className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
       dir={isHebrew ? 'rtl' : 'ltr'}
     >
-      <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl flex flex-col">
+      <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#111] shadow-2xl flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-600 to-purple-600">
@@ -280,7 +280,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
         </div>
 
         {/* Step indicator */}
-        <div className="px-5 pt-4 pb-2">
+        <div className="px-5 pt-4 pb-2 bg-white dark:bg-[#111]">
           <div className="flex items-center gap-1">
             {stepLabels.map((label, idx) => {
               const s = (idx + 1) as Step;
@@ -292,17 +292,17 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                     <div
                       className={cn(
                         'w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
-                        done ? 'bg-emerald-500 text-white' : active ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'
+                        done ? 'bg-emerald-500 text-white' : active ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-white/10 text-gray-400 dark:text-gray-500'
                       )}
                     >
                       {done ? <Check className="w-3.5 h-3.5" /> : s}
                     </div>
-                    <span className={cn('text-xs font-medium hidden sm:block', active ? 'text-indigo-700' : done ? 'text-emerald-600' : 'text-gray-400')}>
+                    <span className={cn('text-xs font-medium hidden sm:block', active ? 'text-indigo-700 dark:text-indigo-400' : done ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500')}>
                       {label}
                     </span>
                   </div>
                   {idx < stepLabels.length - 1 && (
-                    <div className={cn('flex-1 h-0.5 mx-1 rounded', done ? 'bg-emerald-400' : 'bg-gray-200')} />
+                    <div className={cn('flex-1 h-0.5 mx-1 rounded', done ? 'bg-emerald-400' : 'bg-gray-200 dark:bg-white/10')} />
                   )}
                 </React.Fragment>
               );
@@ -311,12 +311,12 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-white dark:bg-[#111]">
 
           {/* ── Step 1: Product source ──────────────────────────────────── */}
           {step === 1 && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 {isHebrew
                   ? 'בחר מאיפה תגיע המוצר שברצונך לפרסם:'
                   : 'Choose where your product will come from:'}
@@ -329,22 +329,22 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   className={cn(
                     'flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-start',
                     productSource === 'woocommerce'
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-indigo-300 bg-white'
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-gray-200 dark:border-white/10 hover:border-indigo-300 bg-white dark:bg-white/5'
                   )}
                 >
                   <ShoppingBag
-                    className={cn('w-6 h-6 mt-0.5 flex-shrink-0', productSource === 'woocommerce' ? 'text-indigo-600' : 'text-gray-400')}
+                    className={cn('w-6 h-6 mt-0.5 flex-shrink-0', productSource === 'woocommerce' ? 'text-indigo-600' : 'text-gray-400 dark:text-gray-500')}
                   />
                   <div>
-                    <p className={cn('font-semibold text-sm', productSource === 'woocommerce' ? 'text-indigo-700' : 'text-gray-700')}>
+                    <p className={cn('font-semibold text-sm', productSource === 'woocommerce' ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300')}>
                       WooCommerce
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {isHebrew ? 'בחר מוצר ישירות מהחנות המחוברת' : 'Pick a product from your connected store'}
                     </p>
                     {!isWooConnected && (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
                         {isHebrew ? 'חיבור WooCommerce נדרש' : 'WooCommerce connection required'}
                       </p>
@@ -359,18 +359,18 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   className={cn(
                     'flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-start',
                     productSource === 'manual'
-                      ? 'border-purple-500 bg-purple-50'
-                      : 'border-gray-200 hover:border-purple-300 bg-white'
+                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                      : 'border-gray-200 dark:border-white/10 hover:border-purple-300 bg-white dark:bg-white/5'
                   )}
                 >
                   <PenLine
-                    className={cn('w-6 h-6 mt-0.5 flex-shrink-0', productSource === 'manual' ? 'text-purple-600' : 'text-gray-400')}
+                    className={cn('w-6 h-6 mt-0.5 flex-shrink-0', productSource === 'manual' ? 'text-purple-600' : 'text-gray-400 dark:text-gray-500')}
                   />
                   <div>
-                    <p className={cn('font-semibold text-sm', productSource === 'manual' ? 'text-purple-700' : 'text-gray-700')}>
+                    <p className={cn('font-semibold text-sm', productSource === 'manual' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300')}>
                       {isHebrew ? 'הזנה ידנית' : 'Manual entry'}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       {isHebrew ? 'הזן פרטי מוצר/שירות ללא תלות בחנות' : 'Enter product/service details without a store'}
                     </p>
                   </div>
@@ -390,19 +390,19 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   value={wooSearch}
                   onChange={(e) => setWooSearch(e.target.value)}
                   placeholder={isHebrew ? 'חיפוש מוצר...' : 'Search product...'}
-                  className="w-full ps-9 pe-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full ps-9 pe-4 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 />
               </div>
 
               {/* Loading / Error */}
               {wooLoading && (
-                <div className="flex items-center justify-center py-8 text-gray-400 gap-2">
+                <div className="flex items-center justify-center py-8 text-gray-400 dark:text-gray-500 gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span className="text-sm">{isHebrew ? 'טוען מוצרים...' : 'Loading products...'}</span>
                 </div>
               )}
               {wooError && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {wooError}
                   <button onClick={loadWooProducts} className="ms-auto text-xs underline">
@@ -415,7 +415,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
               {!wooLoading && !wooError && (
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {filteredProducts.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-6">
+                    <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
                       {isHebrew ? 'לא נמצאו מוצרים' : 'No products found'}
                     </p>
                   ) : (
@@ -427,34 +427,34 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                         className={cn(
                           'w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-start',
                           selectedWooProduct?.id === product.id
-                            ? 'border-indigo-400 bg-indigo-50'
-                            : 'border-gray-200 hover:border-indigo-300 bg-white'
+                            ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
+                            : 'border-gray-200 dark:border-white/10 hover:border-indigo-300 bg-white dark:bg-white/5'
                         )}
                       >
                         {product.images?.[0]?.src ? (
                           <img
                             src={product.images[0].src}
                             alt={product.name}
-                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-100"
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-100 dark:border-white/10"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                            <ShoppingBag className="w-5 h-5 text-gray-400" />
+                          <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                            <ShoppingBag className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-800 truncate">{product.name}</p>
+                          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {product.price && (
-                              <span className="text-xs text-emerald-600 font-medium">₪{product.price}</span>
+                              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">₪{product.price}</span>
                             )}
                             {product.categories?.[0]?.name && (
-                              <span className="text-xs text-gray-400">{product.categories[0].name}</span>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">{product.categories[0].name}</span>
                             )}
                           </div>
                         </div>
                         {selectedWooProduct?.id === product.id && (
-                          <Check className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                          <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
                         )}
                       </button>
                     ))
@@ -467,7 +467,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
           {step === 2 && productSource === 'manual' && (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {isHebrew ? 'שם מוצר / שירות *' : 'Product / service name *'}
                 </label>
                 <input
@@ -475,11 +475,11 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   value={manualProduct.name}
                   onChange={(e) => setManualProduct((p) => ({ ...p, name: e.target.value }))}
                   placeholder={isHebrew ? 'למשל: נעלי ריצה Pro Series' : 'e.g. Pro Series Running Shoes'}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {isHebrew ? 'תיאור קצר' : 'Short description'}
                 </label>
                 <textarea
@@ -487,12 +487,12 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   value={manualProduct.description}
                   onChange={(e) => setManualProduct((p) => ({ ...p, description: e.target.value }))}
                   placeholder={isHebrew ? 'מה מיוחד במוצר/שירות הזה?' : 'What makes this product/service special?'}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {isHebrew ? 'מחיר (אופציונלי)' : 'Price (optional)'}
                   </label>
                   <input
@@ -500,11 +500,11 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                     value={manualProduct.price}
                     onChange={(e) => setManualProduct((p) => ({ ...p, price: e.target.value }))}
                     placeholder="₪149"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {isHebrew ? 'קישור לתמונה (אופציונלי)' : 'Image URL (optional)'}
                   </label>
                   <input
@@ -512,7 +512,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                     value={manualProduct.imageUrl}
                     onChange={(e) => setManualProduct((p) => ({ ...p, imageUrl: e.target.value }))}
                     placeholder="https://..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-white/5 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -523,7 +523,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {isHebrew ? 'פלטפורמות לפרסום *' : 'Target platforms *'}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -540,7 +540,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                         }
                         className={cn(
                           'px-4 py-2 rounded-full text-sm font-semibold border-2 transition-all',
-                          active ? PLATFORM_COLORS[p] + ' border-current' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                          active ? PLATFORM_COLORS[p] + ' border-current' : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-gray-300'
                         )}
                       >
                         {p}
@@ -549,14 +549,14 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   })}
                 </div>
                 {platforms.length === 0 && (
-                  <p className="text-xs text-red-500 mt-1">
+                  <p className="text-xs text-red-500 dark:text-red-400 mt-1">
                     {isHebrew ? 'יש לבחור לפחות פלטפורמה אחת' : 'Select at least one platform'}
                   </p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {isHebrew ? 'קהל יעד (אופציונלי)' : 'Target audience (optional)'}
                 </label>
                 <input
@@ -564,21 +564,21 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                   value={targetAudience}
                   onChange={(e) => setTargetAudience(e.target.value)}
                   placeholder={isHebrew ? 'למשל: נשים 25–45 שמתעניינות באופנה' : 'e.g. Women 25–45 interested in fashion'}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-white/5 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                 />
               </div>
 
               {/* Product summary card */}
-              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
-                <p className="text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+              <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
                   {isHebrew ? 'מוצר נבחר' : 'Selected product'}
                 </p>
-                <p className="text-sm font-bold text-gray-800">{effectiveProduct.name || '—'}</p>
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{effectiveProduct.name || '—'}</p>
                 {effectiveProduct.price && (
-                  <p className="text-xs text-emerald-600 font-medium mt-0.5">₪{effectiveProduct.price}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">₪{effectiveProduct.price}</p>
                 )}
                 {effectiveProduct.description && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{effectiveProduct.description}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{effectiveProduct.description}</p>
                 )}
               </div>
             </div>
@@ -589,7 +589,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
             <div className="space-y-4">
               {/* Generate button */}
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {isHebrew
                     ? 'לחץ על "צור קופי" לקבלת טקסטי מודעה מותאמים לכל פלטפורמה:'
                     : 'Click "Generate copy" to get platform-tailored ad texts:'}
@@ -614,7 +614,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
               </div>
 
               {generateError && (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
                   {generateError}
                 </div>
@@ -650,14 +650,14 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                     </div>
 
                     {generating && !draft ? (
-                      <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 py-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         {isHebrew ? 'מייצר קופי...' : 'Generating...'}
                       </div>
                     ) : draft ? (
                       <div className="space-y-2">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-0.5">
+                          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-0.5">
                             {isHebrew ? 'כותרת' : 'Headline'}
                           </label>
                           <input
@@ -669,11 +669,11 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                                 [platform]: { ...prev[platform]!, headline: e.target.value },
                               }))
                             }
-                            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-current"
+                            className="w-full px-3 py-2 text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-current"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-0.5">
+                          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-0.5">
                             {isHebrew ? 'גוף הטקסט' : 'Body text'}
                           </label>
                           <textarea
@@ -685,11 +685,11 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                                 [platform]: { ...prev[platform]!, body: e.target.value },
                               }))
                             }
-                            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-current resize-none"
+                            className="w-full px-3 py-2 text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-current resize-none"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-0.5">
+                          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-0.5">
                             CTA
                           </label>
                           <input
@@ -701,12 +701,12 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
                                 [platform]: { ...prev[platform]!, cta: e.target.value },
                               }))
                             }
-                            className="w-full px-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-current"
+                            className="w-full px-3 py-2 text-sm bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-current"
                           />
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-400 py-2 text-center">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 py-2 text-center">
                         {isHebrew ? 'לחץ על "צור קופי" להתחיל' : 'Click "Generate copy" to start'}
                       </p>
                     )}
@@ -718,7 +718,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-2 flex-wrap">
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#0b0b0b] flex items-center justify-between gap-2 flex-wrap">
           {/* Back */}
           <button
             type="button"
@@ -727,8 +727,8 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
             className={cn(
               'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors',
               step === 1
-                ? 'border-gray-200 text-gray-300 cursor-not-allowed'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                ? 'border-gray-200 dark:border-white/10 text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                : 'border-gray-300 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
             )}
           >
             {isHebrew ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -740,7 +740,7 @@ export function CreateAdModal({ open, onClose, connections, isHebrew }: CreateAd
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-100"
+              className="px-4 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-white/5"
             >
               {isHebrew ? 'סגור' : 'Close'}
             </button>
