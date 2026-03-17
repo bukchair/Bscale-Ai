@@ -31,7 +31,6 @@ steps:
       - '--image=europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
       - '--region=europe-west1'
       - '--platform=managed'
-      - '--update-env-vars=ENCRYPTION_KEY=$_ENCRYPTION_KEY,SESSION_SIGNING_SECRET=$_SESSION_SIGNING_SECRET'
 
 images:
   - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
