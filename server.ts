@@ -409,7 +409,7 @@ async function startServer() {
       return res.status(500).json({ message: "Google Ads developer token not configured" });
     }
     try {
-      const response = await axios.get("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
+      const response = await axios.get("https://googleads.googleapis.com/v22/customers:listAccessibleCustomers", {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "developer-token": developerToken,
@@ -434,7 +434,7 @@ async function startServer() {
     try {
       const formattedCustomerId = String(customerId).replace(/-/g, "");
       const response = await axios.post(
-        `https://googleads.googleapis.com/v17/customers/${formattedCustomerId}/googleAds:search`,
+        `https://googleads.googleapis.com/v22/customers/${formattedCustomerId}/googleAds:search`,
         {
           query: `
             SELECT 
