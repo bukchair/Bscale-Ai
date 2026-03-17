@@ -84,6 +84,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const { connections, overallQualityScore, connectedCount, totalCount } = useConnections();
   const [isConnectionsOpen, setIsConnectionsOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [pendingCustomRange, setPendingCustomRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [liveLeadToast, setLiveLeadToast] = useState<{ id: string; name: string; contact: string } | null>(null);
@@ -790,10 +791,18 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const handleDateClick = (range: DateRangeType) => {
     setDateRange(range);
     if (range === 'custom') {
+      setPendingCustomRange({ start: customRange.start, end: customRange.end });
       setIsDatePickerOpen(true);
     } else {
       setIsDatePickerOpen(false);
     }
+  };
+
+  const handleCustomRangeApply = () => {
+    if (pendingCustomRange.start && pendingCustomRange.end) {
+      setCustomRange(pendingCustomRange);
+    }
+    setIsDatePickerOpen(false);
   };
 
   return (
@@ -865,24 +874,44 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           </div>
 
           {isDatePickerOpen && dateRange === 'custom' && (
-            <div className="absolute top-full mt-2 left-0 w-[calc(100vw-2rem)] max-w-[520px] sm:w-auto bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4 flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{t('header.startDate')}</label>
-                <input 
-                  type="date" 
-                  className="text-sm border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  value={customRange.start ? customRange.start.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setCustomRange({ ...customRange, start: e.target.value ? new Date(e.target.value) : null })}
-                />
+            <div className="absolute top-full mt-2 left-0 w-[calc(100vw-2rem)] max-w-[560px] sm:w-auto bg-white dark:bg-[#111] border border-gray-200 dark:border-white/10 rounded-xl shadow-lg z-50 p-4 flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{t('header.startDate')}</label>
+                  <input
+                    type="date"
+                    className="text-sm border border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1"
+                    value={pendingCustomRange.start ? pendingCustomRange.start.toISOString().split('T')[0] : ''}
+                    max={pendingCustomRange.end ? pendingCustomRange.end.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setPendingCustomRange(prev => ({ ...prev, start: e.target.value ? new Date(e.target.value) : null }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{t('header.endDate')}</label>
+                  <input
+                    type="date"
+                    className="text-sm border border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1"
+                    value={pendingCustomRange.end ? pendingCustomRange.end.toISOString().split('T')[0] : ''}
+                    min={pendingCustomRange.start ? pendingCustomRange.start.toISOString().split('T')[0] : undefined}
+                    max={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setPendingCustomRange(prev => ({ ...prev, end: e.target.value ? new Date(e.target.value) : null }))}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">{t('header.endDate')}</label>
-                <input 
-                  type="date" 
-                  className="text-sm border-gray-300 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-white rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                  value={customRange.end ? customRange.end.toISOString().split('T')[0] : ''}
-                  onChange={(e) => setCustomRange({ ...customRange, end: e.target.value ? new Date(e.target.value) : null })}
-                />
+              <div className="flex justify-end gap-2 pt-1 border-t border-gray-100 dark:border-white/10">
+                <button
+                  onClick={() => setIsDatePickerOpen(false)}
+                  className="px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md transition-colors"
+                >
+                  {t('common.cancel') || 'ביטול'}
+                </button>
+                <button
+                  onClick={handleCustomRangeApply}
+                  disabled={!pendingCustomRange.start || !pendingCustomRange.end}
+                  className="px-4 py-1.5 text-xs font-bold bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {t('common.apply') || 'אישור'}
+                </button>
               </div>
             </div>
           )}

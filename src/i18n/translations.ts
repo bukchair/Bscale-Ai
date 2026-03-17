@@ -577,7 +577,8 @@ export const translations = {
       medium: "Medium",
       hard: "Hard",
       dismiss: "Dismiss",
-      applyNow: "Apply Now"
+      applyNow: "Apply Now",
+      apply: "Apply"
     }
   },
   he: {
@@ -1158,7 +1159,8 @@ export const translations = {
       medium: "בינוני",
       hard: "קשה",
       dismiss: "התעלם",
-      applyNow: "החל עכשיו"
+      applyNow: "החל עכשיו",
+      apply: "אישור"
     }
   },
   ru: {
