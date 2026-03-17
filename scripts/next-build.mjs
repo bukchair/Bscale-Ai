@@ -1,7 +1,12 @@
 import { constants } from 'node:fs';
-import { access, readFile, rename, writeFile } from 'node:fs/promises';
+import { access, cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+
+async function moveDir(src, dest) {
+  await cp(src, dest, { recursive: true });
+  await rm(src, { recursive: true, force: true });
+}
 
 const projectRoot = process.cwd();
 const pagesDir = path.join(projectRoot, 'src', 'pages');
@@ -108,7 +113,7 @@ try {
     if (await exists(backupPagesDir)) {
       throw new Error(`Temporary backup directory already exists: ${backupPagesDir}`);
     }
-    await rename(pagesDir, backupPagesDir);
+    await moveDir(pagesDir, backupPagesDir);
     movedPages = true;
     console.log('Temporarily moved src/pages for Next.js build isolation.');
 
@@ -136,7 +141,7 @@ try {
     if (await exists(pagesDir)) {
       throw new Error(`Cannot restore src/pages because destination already exists: ${pagesDir}`);
     }
-    await rename(backupPagesDir, pagesDir);
+    await moveDir(backupPagesDir, pagesDir);
     console.log('Restored src/pages after Next.js build.');
   }
 }
