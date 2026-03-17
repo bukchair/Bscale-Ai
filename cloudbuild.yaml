@@ -22,6 +22,16 @@ steps:
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:latest'
 
   # 3. Deploy to Cloud Run
+  # Secrets (ENCRYPTION_KEY, SESSION_SIGNING_SECRET, etc.) must be stored in
+  # Google Cloud Secret Manager and are injected at runtime via --set-secrets.
+  # To create them (one-time):
+  #   openssl rand -base64 32 | gcloud secrets create ENCRYPTION_KEY --data-file=-
+  #   openssl rand -base64 48 | gcloud secrets create SESSION_SIGNING_SECRET --data-file=-
+  # Grant access:
+  #   gcloud secrets add-iam-policy-binding ENCRYPTION_KEY \
+  #     --member=serviceAccount:<CLOUD_RUN_SA> --role=roles/secretmanager.secretAccessor
+  #   gcloud secrets add-iam-policy-binding SESSION_SIGNING_SECRET \
+  #     --member=serviceAccount:<CLOUD_RUN_SA> --role=roles/secretmanager.secretAccessor
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -31,6 +41,7 @@ steps:
       - '--image=europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
       - '--region=europe-west1'
       - '--platform=managed'
+      - '--set-secrets=ENCRYPTION_KEY=ENCRYPTION_KEY:latest,SESSION_SIGNING_SECRET=SESSION_SIGNING_SECRET:latest'
 
 images:
   - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
