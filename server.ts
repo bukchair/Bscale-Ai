@@ -1,21 +1,8 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import axios from "axios";
 import dotenv from "dotenv";
-import {
-  buildGoogleOAuthUrl,
-  consumeOAuthState,
-  disconnectServiceConnection,
-  exchangeCodeForServiceToken,
-  getValidServiceAccessToken,
-  googleServiceCatalog,
-  listGoogleServiceConnections,
-  resolveUserIdFromRequest,
-  saveServiceConnection,
-  toPublicGoogleServicePayload,
-} from "./src/server/google-store";
 
 dotenv.config();
 
@@ -25,41 +12,6 @@ const __dirname = path.dirname(__filename);
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
-  const getBearerToken = (req: express.Request) => req.headers.authorization?.split(" ")[1];
-
-  const getAxiosErrorMessage = (error: unknown, fallback: string) => {
-    if (axios.isAxiosError(error)) {
-      const apiMessage = (error.response?.data as any)?.error?.message || (error.response?.data as any)?.message;
-      return apiMessage || error.message || fallback;
-    }
-    return error instanceof Error ? error.message : fallback;
-  };
-
-  const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-  const formatDate = (date: Date) => date.toISOString().split("T")[0];
-  const addDays = (date: Date, days: number) => {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-  };
-  const getDateRangeFromQuery = (req: express.Request, defaultDays = 30) => {
-    const startDateQuery = req.query.start_date;
-    const endDateQuery = req.query.end_date;
-    const startDate = typeof startDateQuery === "string" && DATE_PATTERN.test(startDateQuery) ? startDateQuery : null;
-    const endDate = typeof endDateQuery === "string" && DATE_PATTERN.test(endDateQuery) ? endDateQuery : null;
-
-    if (startDate && endDate) {
-      return startDate <= endDate
-        ? { startDate, endDate }
-        : { startDate: endDate, endDate: startDate };
-    }
-
-    const today = new Date();
-    return {
-      startDate: formatDate(addDays(today, -(defaultDays - 1))),
-      endDate: formatDate(today),
-    };
-  };
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
@@ -103,7 +55,7 @@ async function startServer() {
           headers['Content-Type'] = 'application/json';
         }
 
-        console.log(`Attempting WooCommerce ${method} request to: ${urlObj.origin}${urlObj.pathname}`);
+        // debug: WooCommerce ${method} → ${urlObj.origin}${urlObj.pathname}
         
         const options: RequestInit = {
           method,
@@ -124,19 +76,18 @@ async function startServer() {
 
       // Try 2: If 405 or 404, try with index.php
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 1 failed (${response.status}), trying with index.php...`);
+        // Attempt 1 failed (${response.status}), trying with index.php...
         apiUrl = `${baseUrl}/index.php/wp-json/wc/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
       // Try 3: Legacy API if still failing
       if (response.status === 405 || response.status === 404) {
-        console.log(`Attempt 2 failed (${response.status}), trying legacy API path...`);
+        // Attempt 2 failed (${response.status}), trying legacy API path...
         apiUrl = `${baseUrl}/wc-api/v3/${endpointPath}`;
         response = await tryFetch(apiUrl);
       }
 
-      console.log(`Final WooCommerce response status: ${response.status}`);
       const text = await response.text();
       
       let data;
@@ -248,7 +199,6 @@ async function startServer() {
   app.get("/api/tiktok/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const advertiserId = req.query.advertiser_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !advertiserId) {
       return res.status(400).json({ message: "Missing access token or advertiser ID" });
@@ -258,83 +208,12 @@ async function startServer() {
       const response = await axios.get(`https://business-api.tiktok.com/open_api/v1.3/campaign/get/`, {
         params: {
           advertiser_id: advertiserId,
-          page_size: 1000,
         },
         headers: {
           "Access-Token": accessToken,
         }
       });
-
-      const campaigns = Array.isArray(response.data?.data?.list) ? response.data.data.list : [];
-      const toNumber = (value: unknown) => {
-        if (typeof value === "number" && Number.isFinite(value)) return value;
-        if (typeof value === "string") {
-          const parsed = Number.parseFloat(value);
-          return Number.isFinite(parsed) ? parsed : 0;
-        }
-        return 0;
-      };
-
-      const metricsByCampaignId = new Map<string, { spend: number; conversions: number; roas: number }>();
-      let liveMetricsAvailable = false;
-
-      try {
-        const reportResponse = await axios.get(`https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/`, {
-          params: {
-            advertiser_id: advertiserId,
-            service_type: "AUCTION",
-            report_type: "BASIC",
-            data_level: "AUCTION_CAMPAIGN",
-            dimensions: JSON.stringify(["campaign_id"]),
-            metrics: JSON.stringify(["spend", "conversion"]),
-            start_date: startDate,
-            end_date: endDate,
-            page: 1,
-            page_size: 1000,
-          },
-          headers: {
-            "Access-Token": accessToken,
-          },
-        });
-
-        const reportRows = Array.isArray(reportResponse.data?.data?.list) ? reportResponse.data.data.list : [];
-        for (const row of reportRows) {
-          const campaignId =
-            String((row as any)?.dimensions?.campaign_id || (row as any)?.campaign_id || "").trim();
-          if (!campaignId) continue;
-          const spend = toNumber((row as any)?.metrics?.spend ?? (row as any)?.spend);
-          const conversions = toNumber((row as any)?.metrics?.conversion ?? (row as any)?.conversion);
-          metricsByCampaignId.set(campaignId, {
-            spend,
-            conversions,
-            roas: 0,
-          });
-        }
-        liveMetricsAvailable = reportRows.length > 0;
-      } catch (reportError) {
-        console.warn("TikTok metrics fetch warning:", getAxiosErrorMessage(reportError, "Unknown TikTok metrics error"));
-      }
-
-      const mergedCampaigns = campaigns.map((campaign: any) => {
-        const campaignId = String(campaign?.campaign_id || campaign?.id || "").trim();
-        const liveMetrics = metricsByCampaignId.get(campaignId);
-        return {
-          ...campaign,
-          spend: liveMetrics?.spend ?? toNumber(campaign?.spend),
-          conversions: liveMetrics?.conversions ?? toNumber(campaign?.conversions ?? campaign?.conversion),
-          roas: liveMetrics?.roas ?? toNumber(campaign?.roas),
-        };
-      });
-
-      res.json({
-        ...response.data,
-        data: {
-          ...(response.data?.data || {}),
-          list: mergedCampaigns,
-          liveMetricsAvailable,
-          dateRange: { startDate, endDate },
-        },
-      });
+      res.json(response.data);
     } catch (error: any) {
       console.error("TikTok API Error:", error.response?.data || error.message);
       res.status(500).json({ message: error.message });
@@ -423,7 +302,6 @@ async function startServer() {
   app.get("/api/meta/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const adAccountId = req.query.ad_account_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !adAccountId) {
       return res.status(400).json({ message: "Missing access token or ad account ID" });
@@ -435,283 +313,24 @@ async function startServer() {
       const formattedAdAccountId = adAccountIdStr.startsWith('act_') ? adAccountIdStr : `act_${adAccountIdStr}`;
       const response = await axios.get(`https://graph.facebook.com/v19.0/${formattedAdAccountId}/campaigns`, {
         params: {
-          fields: 'id,name,status,objective,start_time,stop_time',
-          limit: 500,
+          fields: 'id,name,status,objective,start_time,stop_time,spend,insights{spend,inline_link_click_ctr,roas}',
           access_token: accessToken,
         }
       });
-
-      const campaigns = Array.isArray(response.data?.data) ? response.data.data : [];
-      const insightsByCampaignId = new Map<string, any>();
-      let liveMetricsAvailable = false;
-
-      try {
-        const insightsResponse = await axios.get(`https://graph.facebook.com/v19.0/${formattedAdAccountId}/insights`, {
-          params: {
-            level: 'campaign',
-            fields: 'campaign_id,campaign_name,spend,actions,purchase_roas,roas',
-            time_range: JSON.stringify({ since: startDate, until: endDate }),
-            limit: 500,
-            access_token: accessToken,
-          },
-        });
-
-        const insightRows = Array.isArray(insightsResponse.data?.data) ? insightsResponse.data.data : [];
-        for (const row of insightRows) {
-          const campaignId = String((row as any)?.campaign_id || '').trim();
-          if (!campaignId) continue;
-          insightsByCampaignId.set(campaignId, row);
-        }
-        liveMetricsAvailable = insightRows.length > 0;
-      } catch (insightsError) {
-        console.warn("Meta insights fetch warning:", getAxiosErrorMessage(insightsError, "Unknown Meta insights error"));
-      }
-
-      const mergedCampaigns = campaigns.map((campaign: any) => {
-        const liveInsight = insightsByCampaignId.get(String(campaign?.id || ''));
-        return {
-          ...campaign,
-          insights: {
-            data: [liveInsight || { spend: '0', actions: [], purchase_roas: [{ value: '0' }] }],
-          },
-        };
-      });
-
-      res.json({
-        ...response.data,
-        data: mergedCampaigns,
-        meta: {
-          liveMetricsAvailable,
-          dateRange: { startDate, endDate },
-        },
-      });
+      res.json(response.data);
     } catch (error: any) {
       console.error("Meta API Error:", error.response?.data || error.message);
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Backward-compatible alias used by older frontend builds.
-  app.get("/api/connections/meta/campaigns", (req, res) => {
-    const queryIndex = req.originalUrl.indexOf("?");
-    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : "";
-    res.redirect(307, `/api/meta/campaigns${query}`);
-  });
-
-  const postGooglePopupMessage = (options: {
-    type: "OAUTH_AUTH_SUCCESS" | "OAUTH_AUTH_ERROR";
-    service: string;
-    error?: string;
-  }) => `
-    <html>
-      <body>
-        <script>
-          if (window.opener) {
-            window.opener.postMessage({
-              type: '${options.type}',
-              platform: 'google-service',
-              service: '${options.service}',
-              ${options.error ? `error: ${JSON.stringify(options.error)}` : "status: 'connected'"}
-            }, '*');
-          }
-          window.close();
-        </script>
-      </body>
-    </html>
-  `;
-
-  const googleServiceSlugs = googleServiceCatalog.allSlugs();
-  for (const serviceSlug of googleServiceSlugs) {
-    const serviceKey = googleServiceCatalog.slugToService(serviceSlug);
-    const callbackPath = `/api/integrations/${serviceSlug}/callback`;
-    const redirectEnvBySlug: Record<typeof serviceSlug, string | undefined> = {
-      "google-ads": process.env.GOOGLE_ADS_REDIRECT_URI,
-      ga4: process.env.GA4_REDIRECT_URI,
-      "search-console": process.env.SEARCH_CONSOLE_REDIRECT_URI,
-      gmail: process.env.GMAIL_REDIRECT_URI,
-    };
-
-    app.get(`/api/integrations/${serviceSlug}/start`, (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
-      if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
-      }
-      if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-        return res.status(500).json({ message: "Google OAuth client is not configured" });
-      }
-
-      const host = req.get("x-forwarded-host") || req.get("host");
-      const proto = req.get("x-forwarded-proto") || req.protocol || "https";
-      const redirectUri =
-        redirectEnvBySlug[serviceSlug] || `${proto}://${host}${callbackPath}`;
-      const selectAccount = String(req.query.select_account || "") === "1";
-      const { url } = buildGoogleOAuthUrl({
-        serviceSlug,
-        redirectUri,
-        userId,
-        selectAccount,
-      });
-      return res.json({ url });
-    });
-
-    app.get(callbackPath, async (req, res) => {
-      const code = String(req.query.code || "").trim();
-      const state = String(req.query.state || "").trim();
-      if (!code || !state) {
-        return res.send(
-          postGooglePopupMessage({
-            type: "OAUTH_AUTH_ERROR",
-            service: serviceKey,
-            error: "Missing OAuth callback code or state.",
-          })
-        );
-      }
-
-      const consumed = consumeOAuthState(state, serviceSlug);
-      if (!consumed?.user_id) {
-        return res.send(
-          postGooglePopupMessage({
-            type: "OAUTH_AUTH_ERROR",
-            service: serviceKey,
-            error: "Invalid or expired OAuth state.",
-          })
-        );
-      }
-
-      try {
-        const host = req.get("x-forwarded-host") || req.get("host");
-        const proto = req.get("x-forwarded-proto") || req.protocol || "https";
-        const redirectUri =
-          redirectEnvBySlug[serviceSlug] || `${proto}://${host}${callbackPath}`;
-        const token = await exchangeCodeForServiceToken({ code, redirectUri });
-        saveServiceConnection({
-          userId: consumed.user_id,
-          serviceSlug,
-          token,
-        });
-        return res.send(
-          postGooglePopupMessage({
-            type: "OAUTH_AUTH_SUCCESS",
-            service: serviceKey,
-          })
-        );
-      } catch (error) {
-        return res.send(
-          postGooglePopupMessage({
-            type: "OAUTH_AUTH_ERROR",
-            service: serviceKey,
-            error: getAxiosErrorMessage(error, `Failed to authenticate ${serviceSlug}`),
-          })
-        );
-      }
-    });
-
-    app.post(`/api/integrations/${serviceSlug}/disconnect`, express.json(), (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
-      if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
-      }
-      disconnectServiceConnection({ userId, serviceSlug });
-      return res.json({ disconnected: true, service: serviceKey });
-    });
-
-    app.get(`/api/integrations/${serviceSlug}/access-token`, async (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
-      if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
-      }
-      try {
-        const accessToken = await getValidServiceAccessToken({ userId, service: serviceKey });
-        return res.json({ accessToken });
-      } catch (error) {
-        return res.status(400).json({
-          message: getAxiosErrorMessage(error, `Google service ${serviceSlug} is not connected.`),
-        });
-      }
-    });
-  }
-
-  app.get("/api/integrations/google/services", (req, res) => {
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) {
-      return res.status(400).json({ message: "Missing user_id" });
-    }
-    const items = listGoogleServiceConnections(userId).map(toPublicGoogleServicePayload);
-    return res.json({ items });
-  });
-
-  app.get("/api/integrations/google/discover", async (req, res) => {
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) {
-      return res.status(400).json({ message: "Missing user_id" });
-    }
-
-    const discovered: Record<string, string> = {};
-    const warnings: string[] = [];
-
-    try {
-      const ga4Token = await getValidServiceAccessToken({ userId, service: "ga4" });
-      const ga4Response = await axios.get("https://analyticsadmin.googleapis.com/v1alpha/accountSummaries", {
-        params: { pageSize: 200 },
-        headers: { Authorization: `Bearer ${ga4Token}` },
-      });
-      const firstProperty = (ga4Response.data.accountSummaries || [])
-        .flatMap((summary: any) => summary.propertySummaries || [])
-        .find((property: any) => property?.property);
-
-      if (firstProperty?.property) {
-        discovered.ga4PropertyId = String(firstProperty.property).replace("properties/", "");
-        if (firstProperty.displayName) {
-          discovered.ga4PropertyName = firstProperty.displayName;
-        }
-      }
-    } catch (error) {
-      warnings.push(`GA4 discovery failed: ${getAxiosErrorMessage(error, "Unknown GA4 error")}`);
-    }
-
-    try {
-      const gscToken = await getValidServiceAccessToken({ userId, service: "search_console" });
-      const gscResponse = await axios.get("https://www.googleapis.com/webmasters/v3/sites", {
-        headers: { Authorization: `Bearer ${gscToken}` },
-      });
-      const site = (gscResponse.data.siteEntry || []).find((entry: any) =>
-        entry.permissionLevel && entry.permissionLevel !== "siteUnverified"
-      );
-      if (site?.siteUrl) {
-        discovered.gscSiteUrl = site.siteUrl;
-      }
-    } catch (error) {
-      warnings.push(`Search Console discovery failed: ${getAxiosErrorMessage(error, "Unknown GSC error")}`);
-    }
-
-    if (process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
-      try {
-        const adsToken = await getValidServiceAccessToken({ userId, service: "google_ads" });
-        const adsResponse = await axios.get("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
-          headers: {
-            Authorization: `Bearer ${adsToken}`,
-            "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
-          }
-        });
-        const firstCustomerResource = adsResponse.data.resourceNames?.[0];
-        if (firstCustomerResource) {
-          discovered.googleAdsId = String(firstCustomerResource).replace("customers/", "");
-        }
-      } catch (error) {
-        warnings.push(`Google Ads discovery failed: ${getAxiosErrorMessage(error, "Unknown Google Ads error")}`);
-      }
-    } else {
-      warnings.push("Google Ads discovery skipped: GOOGLE_ADS_DEVELOPER_TOKEN is not configured.");
-    }
-
-    return res.json({ discovered, warnings });
-  });
-
   app.get(["/api/auth/google/url", "/api/auth/google/url/"], (req, res) => {
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
-    const forceAccountSelection = String(req.query.select_account || "") === "1";
     const scopes = [
-      "openid",
+      "https://www.googleapis.com/auth/adwords",
+      "https://www.googleapis.com/auth/analytics.readonly",
+      "https://www.googleapis.com/auth/webmasters.readonly",
+      "https://www.googleapis.com/auth/gmail.send",
       "https://www.googleapis.com/auth/userinfo.profile",
       "https://www.googleapis.com/auth/userinfo.email"
     ];
@@ -726,7 +345,7 @@ async function startServer() {
       response_type: "code",
       scope: scopes.join(" "),
       access_type: "offline",
-      prompt: forceAccountSelection ? "select_account consent" : "consent"
+      prompt: "consent"
     });
 
     res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
@@ -780,130 +399,33 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/google/refresh", express.json(), async (req, res) => {
-    const { refresh_token } = req.body || {};
-    if (!refresh_token) {
-      return res.status(400).json({ message: "Missing refresh_token" });
+  app.get("/api/google/ads/accounts", async (req, res) => {
+    const accessToken = req.headers.authorization?.split(" ")[1];
+    if (!accessToken) {
+      return res.status(400).json({ message: "Missing access token" });
     }
-
+    const developerToken = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+    if (!developerToken) {
+      return res.status(500).json({ message: "Google Ads developer token not configured" });
+    }
     try {
-      const params = new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID || "",
-        client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
-        grant_type: "refresh_token",
-        refresh_token,
-      });
-
-      const response = await axios.post("https://oauth2.googleapis.com/token", params.toString(), {
+      const response = await axios.get("https://googleads.googleapis.com/v22/customers:listAccessibleCustomers", {
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Bearer ${accessToken}`,
+          "developer-token": developerToken,
         },
       });
-
       res.json(response.data);
-    } catch (error) {
-      console.error("Google token refresh error:", (error as any)?.response?.data || (error as any)?.message || error);
-      res.status(500).json({ message: getAxiosErrorMessage(error, "Failed to refresh Google token") });
-    }
-  });
-
-  app.get("/api/google/discover", async (req, res) => {
-    const accessToken = getBearerToken(req);
-    if (!accessToken) {
-      return res.status(400).json({ message: "Missing access token" });
-    }
-
-    const discovered: Record<string, string> = {};
-    const warnings: string[] = [];
-
-    // Discover GA4 properties from account summaries
-    try {
-      const ga4Response = await axios.get("https://analyticsadmin.googleapis.com/v1alpha/accountSummaries", {
-        params: { pageSize: 200 },
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-
-      const firstProperty = (ga4Response.data.accountSummaries || [])
-        .flatMap((summary: any) => summary.propertySummaries || [])
-        .find((property: any) => property?.property);
-
-      if (firstProperty?.property) {
-        discovered.ga4PropertyId = String(firstProperty.property).replace("properties/", "");
-        if (firstProperty.displayName) {
-          discovered.ga4PropertyName = firstProperty.displayName;
-        }
-      }
-    } catch (error) {
-      warnings.push(`GA4 discovery failed: ${getAxiosErrorMessage(error, "Unknown GA4 error")}`);
-    }
-
-    // Discover Search Console verified site
-    try {
-      const gscResponse = await axios.get("https://www.googleapis.com/webmasters/v3/sites", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-      const site = (gscResponse.data.siteEntry || []).find((entry: any) =>
-        entry.permissionLevel && entry.permissionLevel !== "siteUnverified"
-      );
-      if (site?.siteUrl) {
-        discovered.gscSiteUrl = site.siteUrl;
-      }
-    } catch (error) {
-      warnings.push(`Search Console discovery failed: ${getAxiosErrorMessage(error, "Unknown GSC error")}`);
-    }
-
-    // Discover Google Ads customer if developer token is configured
-    if (process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
-      try {
-        const adsResponse = await axios.get("https://googleads.googleapis.com/v17/customers:listAccessibleCustomers", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN
-          }
-        });
-        const firstCustomerResource = adsResponse.data.resourceNames?.[0];
-        if (firstCustomerResource) {
-          discovered.googleAdsId = String(firstCustomerResource).replace("customers/", "");
-        }
-      } catch (error) {
-        warnings.push(`Google Ads discovery failed: ${getAxiosErrorMessage(error, "Unknown Google Ads error")}`);
-      }
-    } else {
-      warnings.push("Google Ads discovery skipped: GOOGLE_ADS_DEVELOPER_TOKEN is not configured.");
-    }
-
-    res.json({ discovered, warnings });
-  });
-
-  app.get("/api/google/validate", async (req, res) => {
-    const accessToken = getBearerToken(req);
-    if (!accessToken) {
-      return res.status(400).json({ message: "Missing access token" });
-    }
-
-    try {
-      const userInfoRes = await axios.get("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-
-      res.json({
-        valid: true,
-        account: {
-          sub: userInfoRes.data?.sub,
-          email: userInfoRes.data?.email,
-          name: userInfoRes.data?.name,
-          picture: userInfoRes.data?.picture,
-        }
-      });
-    } catch (error) {
-      res.status(401).json({ message: getAxiosErrorMessage(error, "Invalid Google token") });
+    } catch (error: any) {
+      const data = error.response?.data;
+      const msg = data?.error?.message || data?.message || error.message;
+      res.status(error.response?.status || 500).json({ message: msg });
     }
   });
 
   app.get("/api/google/ads/campaigns", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const customerId = req.query.customer_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !customerId) {
       return res.status(400).json({ message: "Missing access token or customer ID" });
@@ -911,9 +433,8 @@ async function startServer() {
 
     try {
       const formattedCustomerId = String(customerId).replace(/-/g, "");
-      const dateFilter = `AND segments.date BETWEEN '${startDate}' AND '${endDate}'`;
       const response = await axios.post(
-        `https://googleads.googleapis.com/v17/customers/${formattedCustomerId}/googleAds:search`,
+        `https://googleads.googleapis.com/v22/customers/${formattedCustomerId}/googleAds:search`,
         {
           query: `
             SELECT 
@@ -925,7 +446,6 @@ async function startServer() {
               metrics.absolute_top_impression_percentage
             FROM campaign 
             WHERE campaign.status != 'REMOVED'
-            ${dateFilter}
           `
         },
         {
@@ -941,175 +461,6 @@ async function startServer() {
       console.error("Google Ads API Error:", error.response?.data || error.message);
       res.status(500).json({ message: error.message });
     }
-  });
-
-  app.get("/api/google/ads/search-terms", async (req, res) => {
-    const accessToken = req.headers.authorization?.split(" ")[1];
-    const customerId = req.query.customer_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
-
-    if (!accessToken || !customerId) {
-      return res.status(400).json({ message: "Missing access token or customer ID" });
-    }
-
-    try {
-      const formattedCustomerId = String(customerId).replace(/-/g, "");
-      const dateFilter = `segments.date BETWEEN '${startDate}' AND '${endDate}'`;
-      const response = await axios.post(
-        `https://googleads.googleapis.com/v17/customers/${formattedCustomerId}/googleAds:search`,
-        {
-          query: `
-            SELECT
-              search_term_view.search_term,
-              metrics.clicks,
-              metrics.cost_micros,
-              metrics.conversions,
-              metrics.conversions_value
-            FROM search_term_view
-            WHERE ${dateFilter}
-            LIMIT 200
-          `
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN as string,
-            "login-customer-id": (req.query.login_customer_id as string) || formattedCustomerId
-          }
-        }
-      );
-      res.json(response.data);
-    } catch (error: any) {
-      console.error("Google Ads Search Terms API Error:", error.response?.data || error.message);
-      res.status(500).json({ message: getAxiosErrorMessage(error, "Failed to fetch Google Ads search terms") });
-    }
-  });
-
-  app.get("/api/google/analytics/live", async (req, res) => {
-    const accessToken = getBearerToken(req);
-    const propertyId = req.query.property_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
-
-    if (!accessToken) {
-      return res.status(400).json({ message: "Missing access token" });
-    }
-
-    const headers = { Authorization: `Bearer ${accessToken}` };
-    const dateRanges = [{ startDate, endDate }];
-    const normalizePropertyId = (value: string) => value.replace("properties/", "").trim();
-
-    const discoverFirstGa4PropertyId = async (): Promise<string | null> => {
-      try {
-        const response = await axios.get("https://analyticsadmin.googleapis.com/v1alpha/accountSummaries", {
-          params: { pageSize: 200 },
-          headers,
-        });
-        const firstProperty = (response.data.accountSummaries || [])
-          .flatMap((summary: any) => summary.propertySummaries || [])
-          .find((property: any) => property?.property);
-        if (!firstProperty?.property) return null;
-        return normalizePropertyId(String(firstProperty.property));
-      } catch {
-        return null;
-      }
-    };
-
-    const fetchGa4LiveForProperty = async (normalizedPropertyId: string) => {
-      const realtimeUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runRealtimeReport`;
-      const reportUrl = `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`;
-
-      const [activeNowRes, totalUsersRes, topPagesRes, sourcesRes] = await Promise.all([
-        axios.post(realtimeUrl, { metrics: [{ name: "activeUsers" }] }, { headers }),
-        axios.post(reportUrl, {
-          dateRanges,
-          metrics: [{ name: "totalUsers" }]
-        }, { headers }),
-        axios.post(reportUrl, {
-          dateRanges,
-          dimensions: [{ name: "unifiedPagePathScreen" }],
-          metrics: [{ name: "totalUsers" }],
-          limit: 3,
-          orderBys: [{ metric: { metricName: "totalUsers" }, desc: true }]
-        }, { headers }),
-        axios.post(reportUrl, {
-          dateRanges,
-          dimensions: [{ name: "sessionDefaultChannelGroup" }],
-          metrics: [{ name: "sessions" }],
-          limit: 5,
-          orderBys: [{ metric: { metricName: "sessions" }, desc: true }]
-        }, { headers })
-      ]);
-
-      const activeUsers = Number(activeNowRes.data.rows?.[0]?.metricValues?.[0]?.value || 0);
-      const totalUsers = Number(totalUsersRes.data.rows?.[0]?.metricValues?.[0]?.value || 0);
-
-      const topPages = (topPagesRes.data.rows || []).map((row: any) => ({
-        name: row.dimensionValues?.[0]?.value || "/",
-        users: Number(row.metricValues?.[0]?.value || 0)
-      }));
-
-      const sourceRows = (sourcesRes.data.rows || []).map((row: any) => ({
-        name: row.dimensionValues?.[0]?.value || "Other",
-        users: Number(row.metricValues?.[0]?.value || 0)
-      }));
-      const totalSourceUsers = sourceRows.reduce((sum: number, row: any) => sum + row.users, 0);
-      const trafficSources = sourceRows.map((row: any) => ({
-        name: row.name,
-        users: row.users,
-        percent: totalSourceUsers > 0 ? Math.round((row.users / totalSourceUsers) * 100) : 0
-      }));
-
-      return {
-        activeUsers,
-        totalUsers,
-        topPages,
-        trafficSources,
-        propertyIdUsed: normalizedPropertyId,
-      };
-    };
-
-    const requestedPropertyIdRaw =
-      typeof propertyId === "string" && propertyId.trim()
-        ? normalizePropertyId(String(propertyId))
-        : "";
-    const requestedLooksLikeMeasurementId = /^G-[A-Z0-9]+$/i.test(requestedPropertyIdRaw);
-    const requestedPropertyId = requestedLooksLikeMeasurementId ? "" : requestedPropertyIdRaw;
-    const candidateIds: string[] = [];
-    if (requestedPropertyId) {
-      candidateIds.push(requestedPropertyId);
-    }
-
-    const discoveredPropertyId = await discoverFirstGa4PropertyId();
-    if (discoveredPropertyId && !candidateIds.includes(discoveredPropertyId)) {
-      candidateIds.push(discoveredPropertyId);
-    }
-
-    if (!candidateIds.length) {
-      return res.status(400).json({
-        message: "No accessible GA4 property was found. Reconnect Google and select/enter a valid GA4 Property ID.",
-      });
-    }
-
-    let lastError: unknown = null;
-    for (const candidateId of candidateIds) {
-      try {
-        const payload = await fetchGa4LiveForProperty(candidateId);
-        return res.json({
-          ...payload,
-          requestedPropertyId: requestedPropertyIdRaw || undefined,
-          usedDiscoveredProperty: Boolean(discoveredPropertyId && candidateId === discoveredPropertyId),
-        });
-      } catch (error) {
-        lastError = error;
-        continue;
-      }
-    }
-
-    console.error("GA4 live API Error:", (lastError as any)?.response?.data || (lastError as any)?.message || lastError);
-    return res.status(500).json({
-      message: getAxiosErrorMessage(lastError, "Failed to fetch live GA4 data"),
-      attemptedPropertyIds: candidateIds,
-    });
   });
 
   app.post("/api/google/gmail/send", async (req, res) => {
@@ -1158,18 +509,16 @@ async function startServer() {
   app.get("/api/google/analytics/report", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const propertyId = req.query.property_id;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
 
     if (!accessToken || !propertyId) {
       return res.status(400).json({ message: "Missing access token or property ID" });
     }
 
     try {
-      const normalizedPropertyId = String(propertyId).replace("properties/", "");
       const response = await axios.post(
-        `https://analyticsdata.googleapis.com/v1beta/properties/${normalizedPropertyId}:runReport`,
+        `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
         {
-          dateRanges: [{ startDate, endDate }],
+          dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
           dimensions: [{ name: 'date' }],
           metrics: [
             { name: 'activeUsers' },
@@ -1194,8 +543,6 @@ async function startServer() {
   app.get("/api/google/search-console/query", async (req, res) => {
     const accessToken = req.headers.authorization?.split(" ")[1];
     const siteUrl = req.query.site_url;
-    const { startDate, endDate } = getDateRangeFromQuery(req, 30);
-    const rowLimit = Number(req.query.row_limit);
 
     if (!accessToken || !siteUrl) {
       return res.status(400).json({ message: "Missing access token or site URL" });
@@ -1206,10 +553,10 @@ async function startServer() {
       const response = await axios.post(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
         {
-          startDate,
-          endDate,
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
           dimensions: ['query'],
-          rowLimit: Number.isFinite(rowLimit) && rowLimit > 0 ? Math.floor(rowLimit) : 10
+          rowLimit: 10
         },
         {
           headers: {
@@ -1226,15 +573,27 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static files from the 'dist' directory in production
+    // Initialize Next.js to serve API routes under src/app/api/
+    const { default: next } = await import('next');
+    const nextApp = next({ dev: false, dir: __dirname });
+    await nextApp.prepare();
+    const nextHandler = nextApp.getRequestHandler();
+
+    // Forward unhandled /api/* to Next.js (Express routes registered above take priority)
+    app.all('/api/*', (req, res) => nextHandler(req, res));
+    // Next.js static assets
+    app.all('/_next/*', (req, res) => nextHandler(req, res));
+
+    // Serve Vite SPA static files from 'dist'
     app.use(express.static(path.join(__dirname, "dist")));
-    
+
     // Handle SPA routing: serve index.html for any unknown paths
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
@@ -1242,7 +601,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+    console.info(`Server running on port ${PORT}`);
   });
 }
 
