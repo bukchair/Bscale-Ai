@@ -162,6 +162,161 @@ export const unifiedRepo = {
     });
   },
 
+  /** Aggregate totals + per-day breakdown for a user across all platforms. */
+  async getOverview(userId: string, startDate: string, endDate: string) {
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T00:00:00.000Z`);
+
+    const rows = await prisma.unifiedCampaignMetricDaily.findMany({
+      where: { userId, date: { gte: start, lte: end } },
+      select: { date: true, impressions: true, clicks: true, spend: true, conversions: true, revenue: true },
+      orderBy: { date: 'asc' },
+    });
+
+    const totals = { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
+    const byDayMap = new Map<string, typeof totals>();
+
+    for (const row of rows) {
+      const d = row.date.toISOString().slice(0, 10);
+      const day = byDayMap.get(d) ?? { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 };
+      day.spend += Number(row.spend);
+      day.revenue += Number(row.revenue);
+      day.conversions += Number(row.conversions);
+      day.clicks += row.clicks;
+      day.impressions += row.impressions;
+      byDayMap.set(d, day);
+      totals.spend += Number(row.spend);
+      totals.revenue += Number(row.revenue);
+      totals.conversions += Number(row.conversions);
+      totals.clicks += row.clicks;
+      totals.impressions += row.impressions;
+    }
+
+    const roas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
+    return {
+      start: startDate,
+      end: endDate,
+      totals: { ...totals, roas: Math.round(roas * 100) / 100 },
+      byDay: Array.from(byDayMap.entries()).map(([date, v]) => ({ date, ...v })),
+    };
+  },
+
+  /** Paginated list of campaigns with aggregated metrics for a date range. */
+  async getCampaigns(
+    userId: string,
+    options: {
+      platform?: string;
+      startDate?: string;
+      endDate?: string;
+      cursor?: string;
+      take?: number;
+    }
+  ) {
+    const take = Math.min(options.take ?? 50, 200);
+    const campaigns = await prisma.unifiedCampaign.findMany({
+      where: {
+        userId,
+        ...(options.platform ? { platform: options.platform as any } : {}),
+      },
+      select: {
+        id: true,
+        platform: true,
+        name: true,
+        status: true,
+        objective: true,
+        externalCampaignId: true,
+        connectedAccountId: true,
+        dailyMetrics: options.startDate && options.endDate
+          ? {
+              where: {
+                date: {
+                  gte: new Date(`${options.startDate}T00:00:00.000Z`),
+                  lte: new Date(`${options.endDate}T00:00:00.000Z`),
+                },
+              },
+              select: { spend: true, revenue: true, conversions: true, clicks: true, impressions: true },
+            }
+          : { select: { spend: true, revenue: true, conversions: true, clicks: true, impressions: true }, take: 90 },
+      },
+      orderBy: { name: 'asc' },
+      take: take + 1,
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+    });
+
+    const hasMore = campaigns.length > take;
+    const page = hasMore ? campaigns.slice(0, take) : campaigns;
+
+    return {
+      data: page.map((c) => {
+        const agg = c.dailyMetrics.reduce(
+          (acc, m) => {
+            acc.spend += Number(m.spend);
+            acc.revenue += Number(m.revenue);
+            acc.conversions += Number(m.conversions);
+            acc.clicks += m.clicks;
+            acc.impressions += m.impressions;
+            return acc;
+          },
+          { spend: 0, revenue: 0, conversions: 0, clicks: 0, impressions: 0 }
+        );
+        return {
+          id: c.id,
+          platform: c.platform,
+          name: c.name,
+          status: c.status,
+          objective: c.objective,
+          externalCampaignId: c.externalCampaignId,
+          connectedAccountId: c.connectedAccountId,
+          ...agg,
+        };
+      }),
+      nextCursor: hasMore ? page[page.length - 1]?.id : null,
+      hasMore,
+    };
+  },
+
+  /** Daily metric rows for one or all campaigns in a date range. */
+  async getDailyMetrics(
+    userId: string,
+    options: { campaignId?: string; platform?: string; startDate: string; endDate: string }
+  ) {
+    const rows = await prisma.unifiedCampaignMetricDaily.findMany({
+      where: {
+        userId,
+        date: {
+          gte: new Date(`${options.startDate}T00:00:00.000Z`),
+          lte: new Date(`${options.endDate}T00:00:00.000Z`),
+        },
+        ...(options.campaignId ? { unifiedCampaignId: options.campaignId } : {}),
+        ...(options.platform
+          ? { campaign: { platform: options.platform as any } }
+          : {}),
+      },
+      select: {
+        date: true,
+        impressions: true,
+        clicks: true,
+        spend: true,
+        conversions: true,
+        revenue: true,
+        campaign: { select: { platform: true, name: true, externalCampaignId: true } },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      date: row.date.toISOString().slice(0, 10),
+      platform: row.campaign.platform,
+      campaignName: row.campaign.name,
+      externalCampaignId: row.campaign.externalCampaignId,
+      impressions: row.impressions,
+      clicks: row.clicks,
+      spend: Number(row.spend),
+      conversions: Number(row.conversions),
+      revenue: Number(row.revenue),
+    }));
+  },
+
   async upsertDailyMetricsByExternalCampaign(
     userId: string,
     platform: 'GOOGLE_ADS' | 'META' | 'TIKTOK',

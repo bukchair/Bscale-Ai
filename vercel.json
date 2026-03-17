@@ -1,12 +1,19 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "framework": "nextjs",
+  "buildCommand": "npm run next:build",
   "installCommand": "npm install",
-  "rewrites": [
+  "crons": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "path": "/api/cron/refresh-tokens",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-all",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-daily",
+      "schedule": "5 0 * * *"
     }
   ]
 }
