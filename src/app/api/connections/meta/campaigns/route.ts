@@ -137,7 +137,9 @@ const isMetaFieldCompatibilityError = (message: string) => {
   return (
     normalized.includes('invalid parameter') ||
     normalized.includes('nonexisting field') ||
-    normalized.includes('tried accessing nonexisting field')
+    normalized.includes('tried accessing nonexisting field') ||
+    normalized.includes('unsupported get request') ||
+    normalized.includes('unknown fields')
   );
 };
 
@@ -298,7 +300,7 @@ export async function GET(request: Request) {
       };
       const baseFields = fieldsByPreset[fieldPreset];
       const insightsFields =
-        'insights{spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_click_ctr,purchase_roas,roas,actions,action_values}';
+        'insights{spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,inline_link_click_ctr,purchase_roas,actions,action_values}';
       graphUrl.searchParams.set('fields', includeInsights ? `${baseFields},${insightsFields}` : baseFields);
       if (includeEffectiveStatus) {
         graphUrl.searchParams.set(
@@ -332,7 +334,7 @@ export async function GET(request: Request) {
     const loadCampaignInsights = async (accountId: string) => {
       const resource = toAccountResource(accountId);
       const fieldsVariants = [
-        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values,purchase_roas,roas',
+        'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values,purchase_roas',
         'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,action_values',
         'campaign_id,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency',
         'campaign_id,spend,impressions,clicks',
@@ -621,6 +623,9 @@ export async function GET(request: Request) {
           insightsFallbackUsed = true;
         } else {
           const insightsError = extractErrorMessage(insightsResult.response.status, insightsResult.parsed);
+          console.warn(
+            `[Meta Campaigns] Insights fallback failed: status=${insightsResult.response.status} message="${insightsError}" account=${toAccountResource(resolvedAccountId)}`
+          );
           if (isMetaRateLimitError(insightsError)) {
             // Keep campaign rows without insights when account is temporarily rate-limited.
             insightsFallbackUsed = false;

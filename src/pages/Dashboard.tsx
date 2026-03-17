@@ -278,7 +278,7 @@ const COPY = {
     roas: 'ROAS',
     noFinanceData: 'עדיין אין נתונים חיים להכנסות או הוצאות פרסום לטווח התאריכים שנבחר.',
     goOrders: 'מעבר לרשימת הזמנות',
-    ga4Card: 'מצב גולשים מהאתר GA4',
+    ga4Card: 'מצב גולשים באתר',
     ga4LiveSync: 'Live Sync · 30 דק\' אחרונות',
     activeNow: 'פעילים עכשיו',
     totalUsers: 'משתמשים ב-24 שעות אחרונות',
@@ -1366,32 +1366,6 @@ export function Dashboard() {
               <p className="text-xs text-gray-500">
                 {text.ga4Desc}
               </p>
-              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
-                <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
-                  {ga4TopPagesTitle}
-                  <SourceTag live={!isGa4UsingDemo && ga4TopPages.length > 0} />
-                </p>
-                {ga4TopPages.length > 0 ? (
-                  <ul className="mt-2 space-y-1.5">
-                    {ga4TopPages.map((page, index) => {
-                      const pageLabel = page.title || page.path || '/';
-                      return (
-                        <li
-                          key={`${page.path || page.title}-${index}`}
-                          className="flex items-center justify-between gap-2 text-xs"
-                        >
-                          <span className="truncate text-gray-700" title={page.path || pageLabel}>
-                            {pageLabel}
-                          </span>
-                          <span className="font-bold text-indigo-700">{page.views.toLocaleString()}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <p className="mt-1 text-[11px] text-gray-500">{ga4NoTopPages}</p>
-                )}
-              </div>
             </>
           ) : (
             <p className="text-xs text-gray-500">
