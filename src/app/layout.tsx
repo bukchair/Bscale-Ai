@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import '../index.css';
+
+export const metadata: Metadata = {
+  verification: {
+    google: 'ZERrQRwr8WjQaWWTfKF1eW4ZEX4OiZwcKnOkVqhVJVE',
+  },
+};
 
 type Props = {
   children: ReactNode;
