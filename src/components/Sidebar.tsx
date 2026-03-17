@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, 
-  Megaphone, 
-  ShoppingCart, 
-  LineChart, 
-  PenTool, 
+  LayoutDashboard,
+  Megaphone,
+  ShoppingCart,
+  LineChart,
+  PenTool,
   ShieldAlert,
   Settings,
   Menu,
@@ -21,6 +21,7 @@ import {
   Mail,
   LifeBuoy,
   ChevronDown,
+  ScrollText,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -127,6 +128,7 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
         ...(isAdmin ? [
           { id: 'users', label: t('nav.users'), icon: Users },
           { id: 'system-mail', label: 'דואר מערכת', icon: Mail },
+          { id: 'cloud-run-logs', label: 'לוגי Cloud Run', icon: ScrollText },
         ] : []),
         { id: 'settings', label: t('nav.settings'), icon: Settings },
       ] as NavItem[]
