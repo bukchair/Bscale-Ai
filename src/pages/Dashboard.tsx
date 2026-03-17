@@ -282,8 +282,8 @@ const COPY = {
     ga4LiveSync: 'Live Sync · 30 דק\' אחרונות',
     activeNow: 'פעילים עכשיו',
     totalUsers: 'משתמשים ב-24 שעות אחרונות',
-    topPagesLabel: 'עמודים נצפים (30 דק\' אחרונות)',
-    ga4Desc: 'חלון חי: פעילים עכשיו + משתמשים ב-24 שעות אחרונות + 7 עמודים מובילים מתוך 30 הדקות האחרונות.',
+    topPagesLabel: 'עמודים פעילים כרגע (30 דק\' אחרונות)',
+    ga4Desc: 'חלון חי בלבד: מציג גולשים פעילים עכשיו, משתמשים ב-24 שעות האחרונות, ועמודים פעילים ב-30 הדקות האחרונות — ללא קשר לטווח התאריכים שנבחר.',
     noGa4: 'אין כרגע נתוני GA4 חיים להצגה.',
     latestOrdersCard: '5 הזמנות אחרונות',
     customerFallback: 'לקוח',
@@ -337,8 +337,8 @@ const COPY = {
     ga4LiveSync: 'Live Sync · last 30 min',
     activeNow: 'Active now',
     totalUsers: 'Users in last 24 hours',
-    topPagesLabel: 'Pages viewed (last 30 min)',
-    ga4Desc: 'Live window: active now + users in last 24 hours + top 7 pages from the last 30 minutes.',
+    topPagesLabel: 'Active pages now (last 30 min)',
+    ga4Desc: 'Live window only: shows active users now, users in last 24h, and active pages in last 30 min — independent of the selected date range.',
     noGa4: 'No live GA4 data to display right now.',
     latestOrdersCard: 'Latest 5 orders',
     customerFallback: 'Customer',
@@ -392,8 +392,8 @@ const COPY = {
     ga4LiveSync: 'Live Sync · последние 30 мин',
     activeNow: 'Сейчас активны',
     totalUsers: 'Пользователи за последние 24 часа',
-    topPagesLabel: 'Страницы (последние 30 мин)',
-    ga4Desc: 'Live окно: активны сейчас + пользователи за 24 часа + топ-7 страниц за последние 30 минут.',
+    topPagesLabel: 'Активные страницы сейчас (30 мин)',
+    ga4Desc: 'Только live-окно: активные пользователи сейчас, пользователи за 24 часа и активные страницы за 30 минут — не зависит от выбранного диапазона дат.',
     noGa4: 'Сейчас нет live данных GA4.',
     latestOrdersCard: 'Последние 5 заказов',
     customerFallback: 'Клиент',
@@ -447,8 +447,8 @@ const COPY = {
     ga4LiveSync: 'Live Sync · últimos 30 min',
     activeNow: 'Ativos agora',
     totalUsers: 'Usuários nas últimas 24 horas',
-    topPagesLabel: 'Páginas visualizadas (últimos 30 min)',
-    ga4Desc: 'Janela ao vivo: ativos agora + usuários nas últimas 24h + top 7 páginas dos últimos 30 minutos.',
+    topPagesLabel: 'Páginas ativas agora (30 min)',
+    ga4Desc: 'Janela ao vivo apenas: usuários ativos agora, usuários em 24h e páginas ativas nos últimos 30 min — independente do período selecionado.',
     noGa4: 'Não há dados GA4 ao vivo para mostrar no momento.',
     latestOrdersCard: '5 pedidos mais recentes',
     customerFallback: 'Cliente',
@@ -502,8 +502,8 @@ const COPY = {
     ga4LiveSync: 'Live Sync · 30 dernières min',
     activeNow: 'Actifs maintenant',
     totalUsers: 'Utilisateurs des 24 dernières heures',
-    topPagesLabel: 'Pages vues (30 dernières min)',
-    ga4Desc: 'Fenêtre live : actifs maintenant + utilisateurs sur 24h + top 7 pages des 30 dernières minutes.',
+    topPagesLabel: 'Pages actives maintenant (30 dernières min)',
+    ga4Desc: 'Fenêtre live uniquement : utilisateurs actifs maintenant, utilisateurs sur 24h et pages actives sur 30 min — indépendant de la plage de dates sélectionnée.',
     noGa4: 'Aucune donnée GA4 en direct à afficher pour le moment.',
     latestOrdersCard: '5 dernières commandes',
     customerFallback: 'Client',
@@ -785,14 +785,16 @@ export function Dashboard() {
           ga4SnapshotLoaded = true;
         } catch (error) {
           console.warn('Failed to load GA4 stats', error);
-          setGa4TopPages([]);
+          // keep existing topPages on error — don't clear them
         }
 
         try {
           const realtime = await fetchGA4Realtime(token, google.settings.ga4Id || undefined);
           if (realtime.users24h > 0 || realtime.topPages.length > 0) {
-            setGa4Users24h(realtime.users24h);
-            setGa4TopPages(realtime.topPages.length > 0 ? realtime.topPages.slice(0, 7) : []);
+            if (realtime.users24h > 0) setGa4Users24h(realtime.users24h);
+            if (realtime.topPages.length > 0) {
+              setGa4TopPages(realtime.topPages.slice(0, 7));
+            }
             setIsGa4TopPagesDemo(false);
           }
         } catch (error) {
@@ -985,12 +987,12 @@ export function Dashboard() {
         setGa4Stats(DEMO_GA4_STATS);
         setIsGa4UsingDemo(true);
         setHasGa4LiveSnapshot(false);
-        setGa4TopPages([]);
+        setGa4TopPages((prev) => prev.length > 0 ? prev : DEMO_GA4_TOP_PAGES);
       } else {
         setGa4Stats({ activeNow: 0, totalUsers: 0 });
         setIsGa4UsingDemo(false);
         setHasGa4LiveSnapshot(false);
-        setGa4TopPages([]);
+        // keep existing topPages if already loaded — don't clear them
       }
 
       if (hasGscLive) {
@@ -1349,15 +1351,23 @@ export function Dashboard() {
               </div>
 
               {ga4TopPages.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-3 space-y-1">
-                  <p className="text-[11px] font-semibold text-gray-600 inline-flex items-center gap-1.5 mb-2">
-                    {text.topPagesLabel}
-                    <SourceTag live={!isGa4TopPagesDemo} />
-                  </p>
+                <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-3 space-y-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 inline-flex items-center gap-1.5">
+                      {text.topPagesLabel}
+                      <SourceTag live={!isGa4TopPagesDemo} />
+                    </p>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{isHebrew ? 'גולשים פעילים' : 'active users'}</span>
+                  </div>
                   {ga4TopPages.slice(0, 7).map((page, i) => (
                     <div key={i} className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-gray-700 truncate flex-1">{page.title || page.path}</p>
-                      <span className="text-xs font-bold text-indigo-600 shrink-0">{page.views.toLocaleString()}</span>
+                      <p className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">
+                        <span className="text-gray-400 dark:text-gray-500 me-1">{i + 1}.</span>
+                        {page.title || page.path}
+                      </p>
+                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-full">
+                        {page.views > 0 ? page.views.toLocaleString() : '—'}
+                      </span>
                     </div>
                   ))}
                 </div>
