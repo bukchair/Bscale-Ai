@@ -30,6 +30,7 @@ import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { Guide } from './pages/Guide';
 import { MarketingArticles } from './pages/MarketingArticles';
 import { SystemMail } from './pages/SystemMail';
+import { CloudRunLogs } from './pages/CloudRunLogs';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SalesBot } from './components/SalesBot';
 import { PublicTopNav } from './components/PublicTopNav';
@@ -85,6 +86,8 @@ export default function App() {
         return 'settings';
       case 'support':
         return 'support';
+      case 'cloud-run-logs':
+        return 'cloud-run-logs';
       default:
         return 'dashboard';
     }
@@ -223,6 +226,9 @@ export default function App() {
       case 'support':
         desiredPath = '/support';
         break;
+      case 'cloud-run-logs':
+        desiredPath = '/cloud-run-logs';
+        break;
       default:
         desiredPath = '/app';
     }
@@ -350,6 +356,8 @@ export default function App() {
         return userProfile?.role === 'admin' ? <Users /> : <Dashboard />;
       case 'system-mail':
         return userProfile?.role === 'admin' ? <SystemMail /> : <Dashboard />;
+      case 'cloud-run-logs':
+        return userProfile?.role === 'admin' ? <CloudRunLogs /> : <Dashboard />;
       case 'settings':
         return <Settings userProfile={userProfile} />;
       case 'support':
