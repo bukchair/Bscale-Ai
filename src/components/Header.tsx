@@ -16,6 +16,8 @@ type UserProfile = {
   trialEndsAt?: string;
   trialStartedAt?: string;
   createdAt?: string;
+  name?: string;
+  email?: string;
 };
 
 interface HeaderProps {

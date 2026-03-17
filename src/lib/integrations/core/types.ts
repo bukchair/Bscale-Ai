@@ -47,7 +47,8 @@ export type ApiErrorCode =
   | 'NO_ACCOUNTS'
   | 'UNSUPPORTED_CAPABILITY'
   | 'EXTERNAL_API_ERROR'
-  | 'INTERNAL_ERROR';
+  | 'INTERNAL_ERROR'
+  | 'CONFIGURATION_ERROR';
 
 export type ApiResponse<T> =
   | {

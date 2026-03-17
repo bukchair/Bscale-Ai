@@ -60,7 +60,6 @@ type Ga4TopPage = {
 };
 
 const DEMO_GA4_STATS = { activeNow: 42, totalUsers: 1247 };
-type Ga4TopPage = { title: string; path: string; views: number };
 const DEMO_GA4_TOP_PAGES: Ga4TopPage[] = [
   { title: 'דף הבית', path: '/', views: 18 },
   { title: 'מוצרים', path: '/products', views: 11 },
@@ -735,7 +734,7 @@ export function Dashboard() {
           const metricHeaders = Array.isArray((report as any).metricHeaders)
             ? (report as any).metricHeaders
             : [];
-          const metricIndexByName = metricHeaders.reduce<Record<string, number>>((acc, header, index) => {
+          const metricIndexByName = (metricHeaders as any[]).reduce<Record<string, number>>((acc, header, index) => {
             const name = String(header?.name || '').trim();
             if (name) acc[name] = index;
             return acc;

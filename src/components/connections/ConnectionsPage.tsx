@@ -122,7 +122,7 @@ export function ConnectionsPage() {
       const response = await fetch('/api/connections', { method: 'GET', cache: 'no-store' });
       const payload = await parseResponse<ConnectionsPayload>(response);
       if (!payload.success) {
-        if (payload.errorCode === 'UNAUTHORIZED') {
+        if ((payload as ApiFailure).errorCode === 'UNAUTHORIZED') {
           setAuthHint('Please sign in to your account first, then click Refresh.');
         }
         throw new Error(payload.message);

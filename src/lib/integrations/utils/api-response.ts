@@ -30,14 +30,15 @@ export const toErrorResponse = (error: unknown, fallbackMessage = 'Unexpected se
   }
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === 'P2021' || error.code === 'P2022') {
+    const code = (error as { code?: string }).code;
+    if (code === 'P2021' || code === 'P2022') {
       return fail(
         'CONFIGURATION_ERROR',
         'Database schema is not initialized. Run Prisma migrations.',
         500
       );
     }
-    if (error.code === 'P1001' || error.code === 'P1002') {
+    if (code === 'P1001' || code === 'P1002') {
       return fail('CONFIGURATION_ERROR', 'Database is unreachable. Check DATABASE_URL and network.', 503);
     }
   }
