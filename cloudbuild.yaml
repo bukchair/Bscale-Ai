@@ -21,23 +21,7 @@ steps:
       - 'push'
       - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:latest'
 
-  # 3. Enable Secret Manager API and grant access to Cloud Run SA (idempotent)
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: bash
-    args:
-      - '-c'
-      - |
-        gcloud services enable secretmanager.googleapis.com
-        PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
-        SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-        for SECRET in ENCRYPTION_KEY SESSION_SIGNING_SECRET; do
-          gcloud secrets add-iam-policy-binding $$SECRET \
-            --member="serviceAccount:$$SA" \
-            --role=roles/secretmanager.secretAccessor \
-            --project=$PROJECT_ID || true
-        done
-
-  # 4. Deploy to Cloud Run
+  # 3. Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -47,8 +31,7 @@ steps:
       - '--image=europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
       - '--region=europe-west1'
       - '--platform=managed'
-      - '--remove-env-vars=ENCRYPTION_KEY,SESSION_SIGNING_SECRET'
-      - '--set-secrets=ENCRYPTION_KEY=ENCRYPTION_KEY:latest,SESSION_SIGNING_SECRET=SESSION_SIGNING_SECRET:latest'
+      - '--update-env-vars=ENCRYPTION_KEY=$_ENCRYPTION_KEY,SESSION_SIGNING_SECRET=$_SESSION_SIGNING_SECRET'
 
 images:
   - 'europe-west1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/bscale-ai/bscale:$COMMIT_SHA'
