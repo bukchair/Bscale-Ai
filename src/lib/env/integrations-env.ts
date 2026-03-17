@@ -94,6 +94,7 @@ export const integrationsEnv = {
   META_APP_ID: process.env.META_APP_ID ?? '',
   META_APP_SECRET: process.env.META_APP_SECRET ?? '',
   META_REDIRECT_URI: toUrl(process.env.META_REDIRECT_URI, `${appBaseUrl}/api/connections/meta/callback`),
+  TIKTOK_APP_ID: process.env.TIKTOK_APP_ID ?? '',
   TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY ?? '',
   TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET ?? '',
   TIKTOK_REDIRECT_URI: toUrl(

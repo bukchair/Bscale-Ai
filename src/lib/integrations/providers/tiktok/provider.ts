@@ -65,13 +65,13 @@ export class TikTokProvider implements IntegrationProvider {
   }
 
   async getAuthorizationUrl(context: ProviderContext): Promise<string> {
-    if (!integrationsEnv.TIKTOK_CLIENT_KEY || !integrationsEnv.TIKTOK_CLIENT_SECRET) {
+    if (!integrationsEnv.TIKTOK_APP_ID || !integrationsEnv.TIKTOK_CLIENT_SECRET) {
       throw new ProviderConfigError('TikTok client credentials are missing.');
     }
 
     const issued = await issueOAuthState(context.userId, this.platform, '/connections');
     const url = new URL(TIKTOK_AUTH_URL);
-    url.searchParams.set('app_id', integrationsEnv.TIKTOK_CLIENT_KEY);
+    url.searchParams.set('app_id', integrationsEnv.TIKTOK_APP_ID);
     url.searchParams.set('state', issued.state);
     url.searchParams.set('redirect_uri', this.callbackUrl);
     url.searchParams.set('scope', this.oauthScopes.join(','));
@@ -104,7 +104,7 @@ export class TikTokProvider implements IntegrationProvider {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        app_id: integrationsEnv.TIKTOK_CLIENT_KEY,
+        app_id: integrationsEnv.TIKTOK_APP_ID,
         secret: integrationsEnv.TIKTOK_CLIENT_SECRET,
         refresh_token: refreshToken,
       }),
@@ -260,7 +260,7 @@ export class TikTokProvider implements IntegrationProvider {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        app_id: integrationsEnv.TIKTOK_CLIENT_KEY,
+        app_id: integrationsEnv.TIKTOK_APP_ID,
         secret: integrationsEnv.TIKTOK_CLIENT_SECRET,
         auth_code: code,
       }),
