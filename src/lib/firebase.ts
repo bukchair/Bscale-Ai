@@ -212,10 +212,11 @@ export async function upsertUserSharedAccess(
     { merge: true }
   );
 
-  // Create/update invitation document in the invitations collection
-  const invRef = doc(db, 'invitations', inviteToken);
-  const invSnap = await getDoc(invRef);
-  if (!invSnap.exists()) {
+  // Create invitation document only when the token is new (existing entries already have one).
+  // We skip the getDoc check because Firestore denies reads on non-existent documents
+  // under the current security rules (resource.data is null → rule evaluates to false).
+  if (!existing?.inviteToken) {
+    const invRef = doc(db, 'invitations', inviteToken);
     await setDoc(invRef, {
       token: inviteToken,
       ownerUid: uid,

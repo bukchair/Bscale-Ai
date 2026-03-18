@@ -286,28 +286,48 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
       });
       setSharedAccessList(next);
 
+      // Mirror the invitation into the managed (Prisma) layer so the accept endpoint can verify it.
+      await fetch('/api/invitations/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteToken, invitedEmail: shareEmail.trim().toLowerCase(), role: shareRole }),
+      }).catch((err) => {
+        console.error('[Settings] Failed to mirror invitation to managed layer:', err);
+      });
+
       // Refresh invitations list
       getOwnerInvitations(uid).then(setInvitations).catch((err) => {
-      console.error('[Settings] Failed to load invitations:', err);
-    });
+        console.error('[Settings] Failed to load invitations:', err);
+      });
 
-      // Send invitation email via connected Gmail account
+      // Send invitation email via connected Gmail account.
       const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://bscale.co.il';
       const acceptUrl = `${appOrigin}?accept_invite=${inviteToken}`;
       const ownerEmailAddr = currentUser?.email || '';
       const { subject, html } = buildInvitationEmail(language, ownerEmailAddr, shareEmail.trim().toLowerCase(), shareRole, acceptUrl);
 
-      fetch('/api/connections/google/gmail-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: shareEmail.trim(), subject, body: html }),
-      }).catch((err) => {
-        // Email send is best-effort — don't block the UI
-        console.error('[Settings] Invitation email send failed:', err);
-      });
+      let emailSent = false;
+      try {
+        const emailRes = await fetch('/api/connections/google/gmail-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: shareEmail.trim(), subject, body: html }),
+        });
+        emailSent = emailRes.ok;
+      } catch {
+        emailSent = false;
+      }
 
       setShareEmail('');
-      showSharingMessage(isHebrew ? 'הרשאת השיתוף נשמרה ומייל הזמנה נשלח.' : 'Sharing permission saved and invitation email sent.');
+      if (emailSent) {
+        showSharingMessage(isHebrew ? 'הרשאת השיתוף נשמרה ומייל הזמנה נשלח.' : 'Sharing permission saved and invitation email sent.');
+      } else {
+        showSharingMessage(
+          isHebrew
+            ? 'המשתמש נוסף, אך שליחת המייל נכשלה. שלח את קישור ההזמנה ידנית: ' + acceptUrl
+            : 'User added, but email delivery failed. Share this invite link manually: ' + acceptUrl
+        );
+      }
     } catch (err) {
       console.error('Failed to add shared access:', err);
       const errMsg = err instanceof Error ? err.message : '';

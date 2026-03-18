@@ -220,6 +220,15 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  // Returns the X-Owner-UID header when the current user is operating in a shared workspace.
+  const getWorkspaceHeaders = (): Record<string, string> => {
+    const currentUid = auth.currentUser?.uid;
+    if (dataOwnerUid && currentUid && dataOwnerUid !== currentUid) {
+      return { 'X-Owner-UID': dataOwnerUid };
+    }
+    return {};
+  };
+
   const ensureManagedApiSession = async () => {
     // If session cookie already exists and is valid, skip bootstrap.
     const sessionCheck = await fetch('/api/connections', {
@@ -443,7 +452,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const fetchManagedConnections = async (): Promise<ManagedApiConnection[] | null> => {
     await ensureManagedApiSession();
-    const response = await fetch('/api/connections', { method: 'GET', cache: 'no-store' });
+    const response = await fetch('/api/connections', { method: 'GET', cache: 'no-store', headers: getWorkspaceHeaders() });
     const text = await response.text();
     const payload = parseManagedPayload(text);
     if (!response.ok || !payload?.success || !Array.isArray(payload?.data?.connections)) {

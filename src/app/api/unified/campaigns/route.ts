@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
+import { resolveEffectiveOwnerUserId, getRequestedOwnerUid } from '@/src/lib/auth/workspace';
 import { unifiedRepo } from '@/src/lib/sync/repository/unifiedRepo';
 import { cacheClient } from '@/src/lib/sync/cache/cache-client';
 import { cacheKeys } from '@/src/lib/sync/cache/keys';
@@ -11,6 +12,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export async function GET(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
+    const effectiveUserId = await resolveEffectiveOwnerUserId(
+      user.id,
+      getRequestedOwnerUid(request, user.id)
+    );
     const url = new URL(request.url);
 
     const platform = (url.searchParams.get('platform') || '').trim().toUpperCase() || undefined;
@@ -30,15 +35,16 @@ export async function GET(request: Request) {
       .update(JSON.stringify({ platform, start, end }))
       .digest('hex')
       .slice(0, 8);
-    const cacheKey = cacheKeys.unifiedCampaigns(user.id, platform ?? 'all', '', cursor ?? '', take, queryHash);
+    const cacheKey = cacheKeys.unifiedCampaigns(effectiveUserId, platform ?? 'all', '', cursor ?? '', take, queryHash);
 
     const cached = await cacheClient.getJson<ReturnType<typeof unifiedRepo.getCampaigns>>(cacheKey);
     if (cached) {
       return NextResponse.json({ ...cached, cached: true });
     }
 
-    const result = await unifiedRepo.getCampaigns(user.id, { platform, startDate: start, endDate: end, cursor, take });
+    const result = await unifiedRepo.getCampaigns(effectiveUserId, { platform, startDate: start, endDate: end, cursor, take });
     await cacheClient.setJson(cacheKey, result, CAMPAIGNS_CACHE_TTL);
+
 
     return NextResponse.json(result);
   } catch (error: unknown) {

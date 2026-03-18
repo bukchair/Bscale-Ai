@@ -160,10 +160,18 @@ export default function App() {
         const urlParams = new URLSearchParams(window.location.search);
         const inviteToken = urlParams.get('accept_invite');
         if (inviteToken) {
+          // Call the managed API to record acceptance in Prisma (grants real data access).
+          fetch('/api/invitations/accept', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          }).catch((err) => {
+            console.error('[App] Failed to accept invitation in managed layer:', err);
+          });
+          // Also update Firestore status for UI badge display.
           acceptInvitationByToken(inviteToken).catch(() => {});
           // Clean up URL param
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, '', cleanUrl);
+          window.history.replaceState({}, '', window.location.pathname);
         }
       } else {
         setUserProfile(null);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
+import { resolveEffectiveOwnerUserId, getRequestedOwnerUid } from '@/src/lib/auth/workspace';
 import { unifiedRepo } from '@/src/lib/sync/repository/unifiedRepo';
 import { cacheClient } from '@/src/lib/sync/cache/cache-client';
 import { cacheKeys } from '@/src/lib/sync/cache/keys';
@@ -12,6 +13,10 @@ const DATA_RATE_LIMIT = { limit: 60, windowMs: 60_000 };
 export async function GET(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
+    const effectiveUserId = await resolveEffectiveOwnerUserId(
+      user.id,
+      getRequestedOwnerUid(request, user.id)
+    );
 
     const rl = rateLimit(`metrics:${user.id}`, DATA_RATE_LIMIT);
     if (!rl.allowed) {
@@ -43,13 +48,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const cacheKey = cacheKeys.unifiedMetrics(user.id, start, end, platform ?? 'all', campaignId ?? 'all');
+    const cacheKey = cacheKeys.unifiedMetrics(effectiveUserId, start, end, platform ?? 'all', campaignId ?? 'all');
     const cached = await cacheClient.getJson<ReturnType<typeof unifiedRepo.getDailyMetrics>>(cacheKey);
     if (cached) {
       return NextResponse.json({ data: cached, cached: true });
     }
 
-    const data = await unifiedRepo.getDailyMetrics(user.id, { campaignId, platform, startDate: start, endDate: end });
+    const data = await unifiedRepo.getDailyMetrics(effectiveUserId, { campaignId, platform, startDate: start, endDate: end });
     await cacheClient.setJson(cacheKey, data, METRICS_CACHE_TTL);
 
     return NextResponse.json({ data });

@@ -82,9 +82,31 @@ model User {
   syncErrorLogs       SyncErrorLog[]
   actionRequests               ActionRequest[]
   oneClickCampaignRequests     OneClickCampaignRequest[]
+  ownedSharedAccess            SharedAccess[] @relation("OwnerSharedAccess")
+  receivedSharedAccess         SharedAccess[] @relation("SharedWithAccess")
 
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+// Tracks which users have been granted shared workspace access to another user's data.
+// A row is created when the owner invites a user; sharedUserId is populated on acceptance.
+model SharedAccess {
+  id            String    @id @default(cuid())
+  ownerUserId   String
+  sharedUserId  String?
+  role          String    @default("viewer")   // "manager" | "viewer"
+  status        String    @default("pending")  // "pending" | "accepted" | "revoked"
+  inviteToken   String    @unique
+  invitedEmail  String
+  createdAt     DateTime  @default(now())
+  acceptedAt    DateTime?
+  owner         User      @relation("OwnerSharedAccess", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  sharedUser    User?     @relation("SharedWithAccess", fields: [sharedUserId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, status])
+  @@index([sharedUserId])
+  @@index([invitedEmail])
 }
 
 model PlatformConnection {
