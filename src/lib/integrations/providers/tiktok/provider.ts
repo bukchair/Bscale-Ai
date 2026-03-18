@@ -27,6 +27,13 @@ import { auditService } from '@/src/lib/integrations/services/audit-service';
 const TIKTOK_AUTH_URL = 'https://ads.tiktok.com/marketing_api/auth';
 const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
 
+/** TikTok returns scope as either a comma-separated string or a string array. */
+const parseTikTokScope = (scope: string | string[] | undefined, fallback: readonly string[]): string[] => {
+  if (!scope) return [...fallback];
+  if (Array.isArray(scope)) return scope.map(String).filter(Boolean);
+  return scope.split(',').map((s) => s.trim()).filter(Boolean);
+};
+
 type TikTokEnvelope<T> = {
   code?: number;
   message?: string;
@@ -41,7 +48,7 @@ type TikTokTokenData = {
   refresh_expires_in?: number;
   advertiser_ids?: string[];
   open_id?: string;
-  scope?: string;
+  scope?: string | string[];
 };
 
 export class TikTokProvider implements IntegrationProvider {
@@ -122,7 +129,7 @@ export class TikTokProvider implements IntegrationProvider {
       accessToken: envelope.data.access_token,
       refreshToken: envelope.data.refresh_token || refreshToken,
       tokenType: 'bearer',
-      scopes: envelope.data.scope ? envelope.data.scope.split(',') : [...this.oauthScopes],
+      scopes: parseTikTokScope(envelope.data.scope, this.oauthScopes),
       expiresAt: envelope.data.expires_in
         ? new Date(Date.now() + envelope.data.expires_in * 1000)
         : undefined,
@@ -279,7 +286,7 @@ export class TikTokProvider implements IntegrationProvider {
       accessToken: envelope.data.access_token,
       refreshToken: envelope.data.refresh_token,
       tokenType: 'bearer',
-      scopes: envelope.data.scope ? envelope.data.scope.split(',') : [...this.oauthScopes],
+      scopes: parseTikTokScope(envelope.data.scope, this.oauthScopes),
       expiresAt: envelope.data.expires_in
         ? new Date(Date.now() + envelope.data.expires_in * 1000)
         : undefined,
