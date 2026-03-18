@@ -401,7 +401,7 @@ const createMetaCampaign = async (
     }
 
     const provider = new MetaProvider();
-    const accessToken = await provider.getAccessTokenForConnection(connection.id);
+    const accessToken = await provider.getAccessTokenForConnection(connection.id, userId);
     const accountResource = account.externalAccountId.startsWith('act_')
       ? account.externalAccountId
       : `act_${account.externalAccountId}`;

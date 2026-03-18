@@ -28,19 +28,21 @@ service cloud.firestore {
     }
     
     function hasStoreAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds);
+      let userRef = /databases/$(database)/documents/users/$(request.auth.uid);
+      let storeRef = /databases/$(database)/documents/stores/$(storeId);
+      return isAdmin() ||
+             (exists(userRef) && exists(storeRef) &&
+              ((get(userRef).data.role == 'agency' && get(storeRef).data.agencyId == request.auth.uid) ||
+               (storeId in get(userRef).data.storeIds)));
     }
-    
+
     function hasStoreEditAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds && user.role in ['owner', 'editor']);
+      let userRef = /databases/$(database)/documents/users/$(request.auth.uid);
+      let storeRef = /databases/$(database)/documents/stores/$(storeId);
+      return isAdmin() ||
+             (exists(userRef) && exists(storeRef) &&
+              ((get(userRef).data.role == 'agency' && get(storeRef).data.agencyId == request.auth.uid) ||
+               (storeId in get(userRef).data.storeIds && get(userRef).data.role in ['owner', 'editor'])));
     }
 
     function isValidUser(data) {
@@ -64,11 +66,17 @@ service cloud.firestore {
                     ((isOwner(userId) && request.resource.data.role == 'owner') || isAdmin());
                     
       // Only admins can change roles or email. Users can update their own name only.
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
-                    ((isOwner(userId) &&
-                      request.resource.data.role == resource.data.role &&
-                      request.resource.data.uid == resource.data.uid &&
-                      request.resource.data.email == resource.data.email) || isAdmin());
+      // Owners may also update sharedAccess fields without a full profile validation.
+      allow update: if isAuthenticated() && (
+                      (isValidUser(request.resource.data) &&
+                        ((isOwner(userId) &&
+                          request.resource.data.role == resource.data.role &&
+                          request.resource.data.uid == resource.data.uid &&
+                          request.resource.data.email == resource.data.email) || isAdmin())) ||
+                      (isOwner(userId) &&
+                        request.resource.data.diff(resource.data).changedKeys()
+                          .hasOnly(['sharedAccess', 'sharedAccessEmails', 'sharedEditorsEmails']))
+                    );
                     
       allow delete: if isAdmin();
 

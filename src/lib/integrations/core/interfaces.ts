@@ -29,7 +29,7 @@ export interface IntegrationProvider {
   getAuthorizationUrl(context: ProviderContext): Promise<string>;
   handleCallback(context: ProviderContext, params: CallbackParams): Promise<CallbackResult>;
   refreshToken(context: RefreshTokenContext): Promise<ProviderTokenSet>;
-  discoverAccounts(connectionId: string): Promise<DiscoveredAccount[]>;
-  testConnection(connectionId: string, accountId?: string): Promise<TestResult>;
-  disconnect(connectionId: string): Promise<void>;
+  discoverAccounts(connectionId: string, userId: string): Promise<DiscoveredAccount[]>;
+  testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult>;
+  disconnect(connectionId: string, userId: string): Promise<void>;
 }

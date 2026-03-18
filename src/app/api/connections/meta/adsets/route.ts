@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       if (!managedConnection) {
         return NextResponse.json({ message: 'Meta connection not available.' }, { status: 400 });
       }
-      accessToken = await new MetaProvider().getAccessTokenForConnection(managedConnection.id);
+      accessToken = await new MetaProvider().getAccessTokenForConnection(managedConnection.id, user.id);
       if (!resolvedAccountId) {
         resolvedAccountId =
           managedConnection.connectedAccounts.find((a) => a.isSelected && a.status !== 'ARCHIVED')?.externalAccountId ||

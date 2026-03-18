@@ -83,9 +83,9 @@ export abstract class BaseGoogleProvider {
     return tokenSet;
   }
 
-  protected async getValidAccessToken(connectionId: string): Promise<string> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  protected async getValidAccessToken(connectionId: string, userId: string): Promise<string> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: {
         id: true,
         userId: true,
@@ -129,13 +129,13 @@ export abstract class BaseGoogleProvider {
     return tokenService.getAccessToken(connectionId, connection.userId);
   }
 
-  async getAccessTokenForConnection(connectionId: string): Promise<string> {
-    return this.getValidAccessToken(connectionId);
+  async getAccessTokenForConnection(connectionId: string, userId: string): Promise<string> {
+    return this.getValidAccessToken(connectionId, userId);
   }
 
-  async disconnect(connectionId: string): Promise<void> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  async disconnect(connectionId: string, userId: string): Promise<void> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: { userId: true },
     });
     if (!connection) return;

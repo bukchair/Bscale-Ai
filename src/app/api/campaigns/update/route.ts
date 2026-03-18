@@ -272,7 +272,7 @@ const updateMetaCampaign = async (
   }
 
   const provider = new MetaProvider();
-  const accessToken = await provider.getAccessTokenForConnection(connection.id);
+  const accessToken = await provider.getAccessTokenForConnection(connection.id, userId);
   const campaignId = normalizeCampaignId(body.campaignId);
   if (!campaignId) {
     throw new Error('Invalid Meta campaign id.');
@@ -284,12 +284,12 @@ const updateMetaCampaign = async (
   if (typeof body.dailyBudget === 'number' && Number.isFinite(body.dailyBudget) && body.dailyBudget > 0) {
     form.set('daily_budget', String(Math.round(body.dailyBudget * 100)));
   }
-  form.set('access_token', accessToken);
 
   const response = await fetch(`${META_GRAPH_BASE}/${campaignId}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/x-www-form-urlencoded',
+      authorization: `Bearer ${accessToken}`,
     },
     body: form.toString(),
   });
@@ -301,12 +301,13 @@ const updateMetaCampaign = async (
   let updatedAdsCount = 0;
   let adsUpdateFailures = 0;
   if (body.applyToAds) {
-    const adsResponse = await fetch(
-      `${META_GRAPH_BASE}/${campaignId}/ads?fields=id,status&limit=200&access_token=${encodeURIComponent(
-        accessToken
-      )}`,
-      { method: 'GET' }
-    );
+    const adsUrl = new URL(`${META_GRAPH_BASE}/${campaignId}/ads`);
+    adsUrl.searchParams.set('fields', 'id,status');
+    adsUrl.searchParams.set('limit', '200');
+    const adsResponse = await fetch(adsUrl, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
     if (adsResponse.ok) {
       const adsPayload = (await adsResponse.json().catch(() => ({}))) as Record<string, any>;
       const adIds = (Array.isArray(adsPayload?.data) ? adsPayload.data : [])
@@ -315,11 +316,11 @@ const updateMetaCampaign = async (
       for (const adId of adIds) {
         const adForm = new URLSearchParams();
         adForm.set('status', toMetaStatus(body.status));
-        adForm.set('access_token', accessToken);
         const adUpdateResponse = await fetch(`${META_GRAPH_BASE}/${adId}`, {
           method: 'POST',
           headers: {
             'content-type': 'application/x-www-form-urlencoded',
+            authorization: `Bearer ${accessToken}`,
           },
           body: adForm.toString(),
         });

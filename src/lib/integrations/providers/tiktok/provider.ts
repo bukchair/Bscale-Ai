@@ -133,12 +133,13 @@ export class TikTokProvider implements IntegrationProvider {
     };
   }
 
-  async discoverAccounts(connectionId: string): Promise<DiscoveredAccount[]> {
-    const { accessToken } = await this.getValidAccessToken(connectionId);
+  async discoverAccounts(connectionId: string, userId: string): Promise<DiscoveredAccount[]> {
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     const url = new URL(`${TIKTOK_API_BASE}/oauth2/advertiser/get/`);
-    url.searchParams.set('access_token', accessToken);
 
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { 'Access-Token': accessToken },
+    });
     const envelope = (await response.json()) as TikTokEnvelope<{
       list?: Array<{ advertiser_id?: string; advertiser_name?: string; status?: string }>;
       advertiser_ids?: string[];
@@ -178,15 +179,15 @@ export class TikTokProvider implements IntegrationProvider {
     return merged;
   }
 
-  async testConnection(connectionId: string, accountId?: string): Promise<TestResult> {
+  async testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult> {
     if (!this.supports('REPORTING_TEST')) {
       throw new UnsupportedCapabilityError(
         'REPORTING_TEST (set TIKTOK_REPORTING_ENABLED=true after app review approval)'
       );
     }
 
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       include: { connectedAccounts: true },
     });
     if (!connection) {
@@ -201,7 +202,7 @@ export class TikTokProvider implements IntegrationProvider {
       throw new NoAccountsFoundError('No selected TikTok advertiser account.');
     }
 
-    const { accessToken } = await this.getValidAccessToken(connectionId);
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     const response = await fetch(`${TIKTOK_API_BASE}/report/integrated/get/`, {
       method: 'POST',
       headers: {
@@ -244,9 +245,9 @@ export class TikTokProvider implements IntegrationProvider {
     };
   }
 
-  async disconnect(connectionId: string): Promise<void> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  async disconnect(connectionId: string, userId: string): Promise<void> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: { userId: true },
     });
     if (!connection) return;
@@ -289,9 +290,9 @@ export class TikTokProvider implements IntegrationProvider {
     };
   }
 
-  private async getValidAccessToken(connectionId: string): Promise<{ accessToken: string }> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  private async getValidAccessToken(connectionId: string, userId: string): Promise<{ accessToken: string }> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: { userId: true, tokenExpiresAt: true },
     });
     if (!connection) throw new ExternalApiError('TikTok connection not found.');
