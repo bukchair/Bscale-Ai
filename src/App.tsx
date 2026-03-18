@@ -36,7 +36,7 @@ import { SalesBot } from './components/SalesBot';
 import { PublicTopNav } from './components/PublicTopNav';
 import { SiteLegalNotice } from './components/SiteLegalNotice';
 import { useLanguage } from './contexts/LanguageContext';
-import { auth, onAuthStateChanged, resolveWorkspaceScope, syncUserProfile } from './lib/firebase';
+import { auth, onAuthStateChanged, resolveWorkspaceScope, syncUserProfile, acceptInvitationByToken } from './lib/firebase';
 import { runAutoAdsIfNeeded } from './lib/autoAdsRunner';
 
 export default function App() {
@@ -155,6 +155,16 @@ export default function App() {
           scopeOwnerUid = user.uid;
         }
         runAutoAdsIfNeeded(scopeOwnerUid).catch(() => {});
+
+        // Handle invitation acceptance from email link
+        const urlParams = new URLSearchParams(window.location.search);
+        const inviteToken = urlParams.get('accept_invite');
+        if (inviteToken) {
+          acceptInvitationByToken(inviteToken).catch(() => {});
+          // Clean up URL param
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, '', cleanUrl);
+        }
       } else {
         setUserProfile(null);
         // Only go back to landing if we were in the app

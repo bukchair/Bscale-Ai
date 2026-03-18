@@ -105,6 +105,7 @@ export async function syncUserProfile(user: FirebaseUser | null) {
 }
 
 export type SharedAccessRole = 'manager' | 'viewer';
+export type InvitationStatus = 'pending' | 'accepted';
 
 export interface SharedAccessEntry {
   email: string;
@@ -112,6 +113,17 @@ export interface SharedAccessEntry {
   createdAt: string;
   invitedByUid?: string;
   invitedByEmail?: string;
+  inviteToken?: string;
+}
+
+export interface InvitationDoc {
+  token: string;
+  ownerUid: string;
+  invitedEmail: string;
+  role: SharedAccessRole;
+  status: InvitationStatus;
+  createdAt: string;
+  acceptedAt?: string;
 }
 
 export interface WorkspaceScope {
@@ -139,6 +151,7 @@ const normalizeSharedAccessList = (raw: unknown): SharedAccessEntry[] => {
       createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date().toISOString(),
       invitedByUid: typeof row.invitedByUid === 'string' ? row.invitedByUid : undefined,
       invitedByEmail: typeof row.invitedByEmail === 'string' ? row.invitedByEmail : undefined,
+      inviteToken: typeof row.inviteToken === 'string' ? row.inviteToken : undefined,
     });
   });
   return entries;
@@ -156,7 +169,7 @@ export async function upsertUserSharedAccess(
   invitedEmail: string,
   role: SharedAccessRole,
   inviter?: { uid?: string; email?: string | null }
-): Promise<SharedAccessEntry[]> {
+): Promise<{ list: SharedAccessEntry[]; inviteToken: string }> {
   const email = normalizeEmail(invitedEmail);
   if (!EMAIL_REGEX.test(email)) {
     throw new Error('Invalid email');
@@ -171,12 +184,17 @@ export async function upsertUserSharedAccess(
 
   const current = normalizeSharedAccessList(snap.data()?.sharedAccess);
   const existing = current.find((entry) => entry.email === email);
+
+  // Generate a new token for new invites, preserve for existing
+  const inviteToken = existing?.inviteToken || crypto.randomUUID();
+
   const nextEntry: SharedAccessEntry = {
     email,
     role,
     createdAt: existing?.createdAt || new Date().toISOString(),
     invitedByUid: inviter?.uid || existing?.invitedByUid,
     invitedByEmail: normalizeEmail(inviter?.email) || existing?.invitedByEmail,
+    inviteToken,
   };
   const next = [...current.filter((entry) => entry.email !== email), nextEntry];
   const sharedAccessEmails = Array.from(new Set(next.map((entry) => entry.email)));
@@ -193,7 +211,22 @@ export async function upsertUserSharedAccess(
     },
     { merge: true }
   );
-  return next;
+
+  // Create/update invitation document in the invitations collection
+  const invRef = doc(db, 'invitations', inviteToken);
+  const invSnap = await getDoc(invRef);
+  if (!invSnap.exists()) {
+    await setDoc(invRef, {
+      token: inviteToken,
+      ownerUid: uid,
+      invitedEmail: email,
+      role,
+      status: 'pending',
+      createdAt: nextEntry.createdAt,
+    } as InvitationDoc);
+  }
+
+  return { list: next, inviteToken };
 }
 
 export async function removeUserSharedAccess(uid: string, invitedEmail: string): Promise<SharedAccessEntry[]> {
@@ -201,6 +234,7 @@ export async function removeUserSharedAccess(uid: string, invitedEmail: string):
   const userRef = doc(db, 'users', uid);
   const snap = await getDoc(userRef);
   const current = normalizeSharedAccessList(snap.data()?.sharedAccess);
+  const removed = current.find((entry) => entry.email === email);
   const next = current.filter((entry) => entry.email !== email);
   const sharedAccessEmails = Array.from(new Set(next.map((entry) => entry.email)));
   const sharedEditorsEmails = Array.from(
@@ -215,7 +249,35 @@ export async function removeUserSharedAccess(uid: string, invitedEmail: string):
     },
     { merge: true }
   );
+
+  // Also remove the invitation document
+  if (removed?.inviteToken) {
+    try {
+      await deleteDoc(doc(db, 'invitations', removed.inviteToken));
+    } catch {
+      // best-effort cleanup
+    }
+  }
+
   return next;
+}
+
+export async function acceptInvitationByToken(token: string): Promise<boolean> {
+  try {
+    const invRef = doc(db, 'invitations', token);
+    const snap = await getDoc(invRef);
+    if (!snap.exists()) return false;
+    await setDoc(invRef, { status: 'accepted', acceptedAt: new Date().toISOString() }, { merge: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getOwnerInvitations(ownerUid: string): Promise<InvitationDoc[]> {
+  const q = query(collection(db, 'invitations'), where('ownerUid', '==', ownerUid));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data() as InvitationDoc);
 }
 
 export async function resolveWorkspaceScope(user: { uid: string; email?: string | null } | null): Promise<WorkspaceScope | null> {

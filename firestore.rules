@@ -86,6 +86,23 @@ service cloud.firestore {
       }
     }
     
+    // ===============================================================
+    // Invitations - for user sharing/access
+    // ===============================================================
+    match /invitations/{token} {
+      // Owner can read their sent invitations
+      allow read: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      // Owner can create invitations
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.ownerUid;
+      // Invited user can accept their invitation (only status + acceptedAt may change)
+      allow update: if isAuthenticated() &&
+        resource.data.invitedEmail == request.auth.token.email &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['status', 'acceptedAt']) &&
+        request.resource.data.status == 'accepted';
+      // Owner can delete their invitations
+      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+    }
+
     match /stores/{storeId} {
       allow read: if hasStoreAccess(storeId);
       allow create: if isAuthenticated() && (isAdmin() || isAgency() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner');
