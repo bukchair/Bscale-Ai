@@ -160,7 +160,14 @@ export default function App() {
         const urlParams = new URLSearchParams(window.location.search);
         const inviteToken = urlParams.get('accept_invite');
         if (inviteToken) {
+          // Mark accepted in Firebase (updates status + acceptedAt).
           acceptInvitationByToken(inviteToken).catch(() => {});
+          // Create the PostgreSQL access grant so the guest sees the owner's data.
+          fetch('/api/invite/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: inviteToken }),
+          }).catch(() => {});
           // Clean up URL param
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, '', cleanUrl);

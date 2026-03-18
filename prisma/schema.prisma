@@ -82,6 +82,9 @@ model User {
   syncErrorLogs       SyncErrorLog[]
   actionRequests               ActionRequest[]
   oneClickCampaignRequests     OneClickCampaignRequest[]
+  issuedInvitations            WorkspaceInvitation[]      @relation("IssuedInvitations")
+  guestAccess                  UserWorkspaceAccess[]      @relation("GuestWorkspaceAccess")
+  ownedAccess                  UserWorkspaceAccess[]      @relation("OwnedWorkspaceAccess")
 
   @@index([createdAt])
   @@index([updatedAt])
@@ -359,4 +362,37 @@ model OneClickCampaignRequest {
 
   @@index([userId, createdAt])
   @@index([idempotencyKey])
+}
+
+// Invitation record stored server-side for secure token validation on accept.
+model WorkspaceInvitation {
+  id           String   @id @default(cuid())
+  inviteToken  String   @unique
+  ownerUserId  String
+  invitedEmail String
+  role         String   @default("viewer") // "manager" | "viewer"
+  status       String   @default("pending") // "pending" | "accepted"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  ownerUser    User     @relation("IssuedInvitations", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId])
+  @@index([invitedEmail])
+}
+
+// Accepted access grants — guest user reads owner's data via resolveEffectiveUserId.
+model UserWorkspaceAccess {
+  id          String   @id @default(cuid())
+  guestUserId String
+  ownerUserId String
+  role        String   @default("viewer") // "manager" | "viewer"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  guestUser   User     @relation("GuestWorkspaceAccess", fields: [guestUserId], references: [id], onDelete: Cascade)
+  ownerUser   User     @relation("OwnedWorkspaceAccess", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([guestUserId, ownerUserId])
+  @@index([guestUserId])
 }

@@ -288,8 +288,21 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
 
       // Refresh invitations list
       getOwnerInvitations(uid).then(setInvitations).catch((err) => {
-      console.error('[Settings] Failed to load invitations:', err);
-    });
+        console.error('[Settings] Failed to load invitations:', err);
+      });
+
+      // Persist invitation server-side for secure accept validation.
+      fetch('/api/invite/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inviteToken,
+          invitedEmail: shareEmail.trim().toLowerCase(),
+          role: shareRole,
+        }),
+      }).catch((err) => {
+        console.error('[Settings] Failed to persist invitation server-side:', err);
+      });
 
       // Send invitation email via connected Gmail account
       const appOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://bscale.co.il';
@@ -330,8 +343,18 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
       const next = await removeUserSharedAccess(uid, email);
       setSharedAccessList(next);
       getOwnerInvitations(uid).then(setInvitations).catch((err) => {
-      console.error('[Settings] Failed to load invitations:', err);
-    });
+        console.error('[Settings] Failed to load invitations:', err);
+      });
+
+      // Remove server-side invitation and access grant so the guest loses access immediately.
+      fetch('/api/invite/revoke', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitedEmail: email }),
+      }).catch((err) => {
+        console.error('[Settings] Failed to revoke server-side access:', err);
+      });
+
       showSharingMessage(isHebrew ? 'הרשאת השיתוף הוסרה.' : 'Sharing permission removed.');
     } catch (err) {
       console.error('Failed to remove shared access:', err);
