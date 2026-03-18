@@ -53,25 +53,3 @@ export const prisma = new Proxy({} as PrismaClient, {
     return true;
   },
 }) as PrismaClient;
-
-
-function getPrismaClient() {
-  if (!globalThis.__bscalePrisma__) {
-    globalThis.__bscalePrisma__ = createPrismaClient();
-  }
-  return globalThis.__bscalePrisma__;
-}
-
-// Lazy proxy prevents Prisma constructor from running during module evaluation in Next build.
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, property) {
-    const client = getPrismaClient() as unknown as Record<PropertyKey, unknown>;
-    const value = client[property];
-    return typeof value === 'function' ? (value as Function).bind(client) : value;
-  },
-  set(_target, property, value) {
-    const client = getPrismaClient() as unknown as Record<PropertyKey, unknown>;
-    client[property] = value;
-    return true;
-  },
-}) as PrismaClient;
