@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { auth } from '../lib/firebase';
+import { auth, onAuthStateChanged } from '../lib/firebase';
 
 type ManagedGoogleAdsAccount = {
   externalAccountId: string;
@@ -502,7 +502,27 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   };
 
   const bootstrapManagedSession = async () => {
-    const currentUser = auth.currentUser;
+    // Wait for Firebase auth to initialize before reading currentUser.
+    // A plain auth.currentUser check races with Firebase's async initialization
+    // and returns null immediately after a redirect, causing 401s on the next API call.
+    const currentUser =
+      auth.currentUser ||
+      (await new Promise<typeof auth.currentUser>((resolve) => {
+        let settled = false;
+        const timeoutId = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          unsubscribe();
+          resolve(auth.currentUser);
+        }, 3000);
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve(nextUser);
+        });
+      }));
     if (!currentUser) return;
     const idToken = await currentUser.getIdToken();
     await fetch(`${API_BASE}/api/auth/session/bootstrap`, {

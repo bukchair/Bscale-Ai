@@ -189,7 +189,8 @@ export class TikTokProvider implements IntegrationProvider {
   async testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult> {
     if (!this.supports('REPORTING_TEST')) {
       throw new UnsupportedCapabilityError(
-        'REPORTING_TEST (set TIKTOK_REPORTING_ENABLED=true after app review approval)'
+        'REPORTING_TEST',
+        'TikTok reporting access requires app review approval. Please contact support to enable it.'
       );
     }
 

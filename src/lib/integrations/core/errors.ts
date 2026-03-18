@@ -62,10 +62,10 @@ export class NoAccountsFoundError extends IntegrationError {
 }
 
 export class UnsupportedCapabilityError extends IntegrationError {
-  constructor(capability: string) {
+  constructor(capability: string, userMessage?: string) {
     super(
       'UNSUPPORTED_CAPABILITY',
-      `Provider does not support requested capability: ${capability}`,
+      userMessage ?? `Provider does not support requested capability: ${capability}`,
       400,
       { capability }
     );
