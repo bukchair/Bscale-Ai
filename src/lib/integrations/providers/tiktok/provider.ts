@@ -187,13 +187,6 @@ export class TikTokProvider implements IntegrationProvider {
   }
 
   async testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult> {
-    if (!this.supports('REPORTING_TEST')) {
-      throw new UnsupportedCapabilityError(
-        'REPORTING_TEST',
-        'TikTok reporting access requires app review approval. Please contact support to enable it.'
-      );
-    }
-
     const connection = await prisma.platformConnection.findFirst({
       where: { id: connectionId, userId },
       include: { connectedAccounts: true },
@@ -208,6 +201,27 @@ export class TikTokProvider implements IntegrationProvider {
       connection.connectedAccounts[0]?.externalAccountId;
     if (!advertiserId) {
       throw new NoAccountsFoundError('No selected TikTok advertiser account.');
+    }
+
+    // If reporting scope isn't approved yet, do a lightweight advertiser info ping instead.
+    if (!this.supports('REPORTING_TEST')) {
+      const { accessToken } = await this.getValidAccessToken(connectionId, userId);
+      const url = new URL(`${TIKTOK_API_BASE}/advertiser/info/`);
+      url.searchParams.set('advertiser_ids', JSON.stringify([advertiserId]));
+      const response = await fetch(url, {
+        headers: { 'Access-Token': accessToken },
+      });
+      const envelope = (await response.json()) as TikTokEnvelope<{
+        list?: Array<{ advertiser_id?: string; advertiser_name?: string; status?: string }>;
+      }>;
+      if (!response.ok || envelope.code !== 0) {
+        throw this.mapTikTokError(envelope, 'TikTok connection test failed. Please reconnect your account.');
+      }
+      return {
+        ok: true,
+        message: 'TikTok connection is valid.',
+        summary: { advertiserId, accounts: envelope.data?.list ?? [] },
+      };
     }
 
     const { accessToken } = await this.getValidAccessToken(connectionId, userId);
