@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execFileSync } from "child_process";
 import axios from "axios";
 import dotenv from "dotenv";
 
@@ -9,7 +10,28 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function runMigrations() {
+  if (!process.env.DATABASE_URL) {
+    console.warn('[startup] DATABASE_URL not set — skipping prisma migrate deploy.');
+    return;
+  }
+  try {
+    console.info('[startup] Running prisma migrate deploy...');
+    execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
+      stdio: 'inherit',
+      cwd: __dirname,
+      env: process.env,
+    });
+    console.info('[startup] Prisma migrations applied successfully.');
+  } catch (err) {
+    console.error('[startup] prisma migrate deploy failed:', err instanceof Error ? err.message : err);
+    // Non-fatal: server continues, but DB-dependent APIs will fail until fixed.
+  }
+}
+
 async function startServer() {
+  await runMigrations();
+
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
 
