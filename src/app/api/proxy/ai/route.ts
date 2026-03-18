@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
+import { rateLimit } from '@/src/lib/rate-limit';
+
+// 20 AI requests per user per minute
+const AI_RATE_LIMIT = { limit: 20, windowMs: 60_000 };
 
 type ProxyBody = {
   provider?: string;
@@ -8,10 +12,27 @@ type ProxyBody = {
 };
 
 export async function POST(request: Request) {
+  let user: Awaited<ReturnType<typeof requireAuthenticatedUser>>;
   try {
-    await requireAuthenticatedUser();
+    user = await requireAuthenticatedUser();
   } catch {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
+
+  const rl = rateLimit(user.id, AI_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { message: 'Too many requests. Please wait before sending more AI prompts.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+          'X-RateLimit-Limit': String(AI_RATE_LIMIT.limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(rl.resetAt),
+        },
+      }
+    );
   }
 
   let body: ProxyBody;

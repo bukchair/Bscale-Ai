@@ -3,16 +3,11 @@ import { prisma } from '@/src/lib/db/prisma';
 import { syncEnv } from '@/src/lib/sync/env';
 import { enqueueSyncJob } from '@/src/lib/sync/queue/enqueue';
 import { JOBS } from '@/src/lib/sync/queue/job-names';
+import { verifyCronRequest } from '@/src/lib/sync/cron-auth';
 
 const AD_PLATFORMS = ['GOOGLE_ADS', 'META', 'TIKTOK'] as const;
 const METRIC_PLATFORMS = [...AD_PLATFORMS, 'GA4', 'SEARCH_CONSOLE'] as const;
 type MetricPlatform = (typeof METRIC_PLATFORMS)[number];
-
-function isCronAuthorised(request: Request): boolean {
-  const secret = syncEnv.CRON_SECRET;
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
 
 function defaultDateRange(): { startDate: string; endDate: string } {
   const end = new Date();
@@ -34,7 +29,7 @@ function defaultDateRange(): { startDate: string; endDate: string } {
  * Called by Vercel Cron once per hour.
  */
 export async function POST(request: Request) {
-  if (!isCronAuthorised(request)) {
+  if (!(await verifyCronRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 

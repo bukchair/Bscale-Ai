@@ -20,8 +20,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
-        ((request.auth.token.email == "asher205@gmail.com" && request.auth.token.email_verified == true) || hasAdminRole());
+      return hasAdminRole();
     }
     
     function isAgency() {
@@ -64,9 +63,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
                     ((isOwner(userId) && request.resource.data.role == 'owner') || isAdmin());
                     
-      // Only admins can change roles. Users can update their own name.
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ((isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.uid == resource.data.uid) || isAdmin());
+      // Only admins can change roles or email. Users can update their own name only.
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
+                    ((isOwner(userId) &&
+                      request.resource.data.role == resource.data.role &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.email == resource.data.email) || isAdmin());
                     
       allow delete: if isAdmin();
 

@@ -8,6 +8,27 @@ const toBool = (value: string | undefined, fallback = false): boolean => {
   return value === 'true' || value === '1';
 };
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const IS_NEXT_BUILD = process.env.NEXT_PHASE === 'phase-production-build';
+
+if (IS_PRODUCTION && !IS_NEXT_BUILD) {
+  if (!process.env.CRON_SECRET || process.env.CRON_SECRET.length < 32) {
+    throw new Error(
+      '[sync-env] CRON_SECRET must be set and at least 32 characters in production.'
+    );
+  }
+} else if (process.env.NODE_ENV !== 'test' && !IS_NEXT_BUILD) {
+  if (!process.env.CRON_SECRET) {
+    console.warn(
+      '[sync-env] CRON_SECRET is not set. Cron endpoints will reject all requests. Set this variable before deploying.'
+    );
+  } else if (process.env.CRON_SECRET.length < 32) {
+    console.warn(
+      '[sync-env] CRON_SECRET is too short (< 32 chars). Use a strong random secret in production.'
+    );
+  }
+}
+
 export const syncEnv = {
   REDIS_URL: process.env.REDIS_URL || '',
   REDIS_HOST: process.env.REDIS_HOST || '',
