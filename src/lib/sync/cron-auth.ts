@@ -27,6 +27,13 @@ import { syncEnv } from './env';
 const TIMESTAMP_TOLERANCE_SECONDS = 300; // 5 minutes
 const REQUIRE_HMAC = process.env.CRON_REQUIRE_HMAC === 'true';
 
+if (process.env.NODE_ENV === 'production' && !REQUIRE_HMAC) {
+  console.warn(
+    '[cron-auth] SECURITY WARNING: CRON_REQUIRE_HMAC is not enabled in production. ' +
+      'Bearer token mode is active. Set CRON_REQUIRE_HMAC=true for HMAC-signed requests.'
+  );
+}
+
 /**
  * Verify a cron request using Bearer token or HMAC-SHA256 signature.
  *

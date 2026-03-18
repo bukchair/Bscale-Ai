@@ -305,7 +305,14 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
       showSharingMessage(isHebrew ? 'הרשאת השיתוף נשמרה ומייל הזמנה נשלח.' : 'Sharing permission saved and invitation email sent.');
     } catch (err) {
       console.error('Failed to add shared access:', err);
-      showSharingMessage(isHebrew ? 'לא הצלחנו לשמור הרשאת שיתוף. בדוק את האימייל ונסה שוב.' : 'Could not save sharing permission. Check the email and try again.');
+      const errMsg = err instanceof Error ? err.message : '';
+      if (errMsg === 'Cannot share with yourself') {
+        showSharingMessage(isHebrew ? 'לא ניתן לשתף עם עצמך.' : 'You cannot share with yourself.');
+      } else if (errMsg === 'Invalid email') {
+        showSharingMessage(isHebrew ? 'כתובת האימייל שגויה.' : 'Invalid email address.');
+      } else {
+        showSharingMessage(isHebrew ? 'לא הצלחנו לשמור הרשאת שיתוף. בדוק את האימייל ונסה שוב.' : 'Could not save sharing permission. Check the email and try again.');
+      }
     } finally {
       setIsSavingSharing(false);
     }

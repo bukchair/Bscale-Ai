@@ -226,7 +226,7 @@ export const integrationOrchestrator = {
     });
 
     try {
-      const result = await provider.testConnection(connection.id, accountId);
+      const result = await provider.testConnection(connection.id, userId, accountId);
       await syncService.finishRun({
         syncRunId: run.id,
         status: 'SUCCESS',
@@ -267,7 +267,7 @@ export const integrationOrchestrator = {
 
     try {
       const accounts = await accountDiscoveryService.run(userId, connection.id, provider);
-      const testResult = await provider.testConnection(connection.id, accountId);
+      const testResult = await provider.testConnection(connection.id, userId, accountId);
       await syncService.finishRun({
         syncRunId: run.id,
         status: 'SUCCESS',
@@ -320,7 +320,7 @@ export const integrationOrchestrator = {
     const connection = await connectionService.getByUserPlatform(userId, platform);
     if (!connection) return;
     const provider = providerFactory.get(platform);
-    await provider.disconnect(connection.id);
+    await provider.disconnect(connection.id, userId);
     await auditService.log({
       userId,
       action: 'disconnect',

@@ -115,9 +115,9 @@ export class MetaProvider implements IntegrationProvider {
     };
   }
 
-  private async getValidAccessToken(connectionId: string): Promise<{ accessToken: string; connectionUserId: string }> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  private async getValidAccessToken(connectionId: string, userId: string): Promise<{ accessToken: string; connectionUserId: string }> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: { userId: true, tokenExpiresAt: true, status: true },
     });
     if (!connection) {
@@ -158,8 +158,8 @@ export class MetaProvider implements IntegrationProvider {
     };
   }
 
-  async discoverAccounts(connectionId: string): Promise<DiscoveredAccount[]> {
-    const { accessToken } = await this.getValidAccessToken(connectionId);
+  async discoverAccounts(connectionId: string, userId: string): Promise<DiscoveredAccount[]> {
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     const url = new URL(`${META_GRAPH_BASE}/me/adaccounts`);
     url.searchParams.set(
       'fields',
@@ -212,14 +212,14 @@ export class MetaProvider implements IntegrationProvider {
     return discovered;
   }
 
-  async getAccessTokenForConnection(connectionId: string): Promise<string> {
-    const { accessToken } = await this.getValidAccessToken(connectionId);
+  async getAccessTokenForConnection(connectionId: string, userId: string): Promise<string> {
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     return accessToken;
   }
 
-  async testConnection(connectionId: string, accountId?: string): Promise<TestResult> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  async testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       include: { connectedAccounts: true },
     });
     if (!connection) throw new ExternalApiError('Meta connection not found.');
@@ -232,7 +232,7 @@ export class MetaProvider implements IntegrationProvider {
       throw new NoAccountsFoundError('No selected Meta ad account.');
     }
 
-    const { accessToken } = await this.getValidAccessToken(connectionId);
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     const accountResource = selectedAccountId.startsWith('act_')
       ? selectedAccountId
       : `act_${selectedAccountId}`;
@@ -276,9 +276,9 @@ export class MetaProvider implements IntegrationProvider {
     };
   }
 
-  async disconnect(connectionId: string): Promise<void> {
-    const connection = await prisma.platformConnection.findUnique({
-      where: { id: connectionId },
+  async disconnect(connectionId: string, userId: string): Promise<void> {
+    const connection = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
       select: { userId: true },
     });
     if (!connection) return;

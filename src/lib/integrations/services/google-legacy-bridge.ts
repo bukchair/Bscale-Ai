@@ -36,7 +36,7 @@ export const googleLegacyBridge = {
 
     if (primaryConnection) {
       const provider = providers[platform];
-      const accessToken = await provider.getAccessTokenForConnection(primaryConnection.id);
+      const accessToken = await provider.getAccessTokenForConnection(primaryConnection.id, userId);
       return { connection: primaryConnection, accessToken, resolvedPlatform: platform as BridgePlatform };
     }
 
@@ -46,7 +46,7 @@ export const googleLegacyBridge = {
         'GOOGLE_ADS'
       )) as BridgeConnection | null;
       if (fallbackConnection) {
-        const accessToken = await providers.GOOGLE_ADS.getAccessTokenForConnection(fallbackConnection.id);
+        const accessToken = await providers.GOOGLE_ADS.getAccessTokenForConnection(fallbackConnection.id, userId);
         return {
           connection: fallbackConnection,
           accessToken,

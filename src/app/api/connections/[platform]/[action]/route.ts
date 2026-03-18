@@ -60,7 +60,7 @@ const handleMetaAssets = async (userId: string) => {
     );
   }
 
-  const accessToken = await new MetaProvider().getAccessTokenForConnection(connection.id);
+  const accessToken = await new MetaProvider().getAccessTokenForConnection(connection.id, userId);
   const warnings: string[] = [];
 
   let adAccounts = connection.connectedAccounts
@@ -73,7 +73,7 @@ const handleMetaAssets = async (userId: string) => {
 
   if (!adAccounts.length) {
     try {
-      const discovered = await new MetaProvider().discoverAccounts(connection.id);
+      const discovered = await new MetaProvider().discoverAccounts(connection.id, userId);
       if (discovered.length > 0) {
         await connectionService.saveDiscoveredAccounts(userId, connection.id, 'META', discovered);
         await connectionService.setSelectedAccounts(userId, connection.id, [discovered[0].externalAccountId]);
@@ -408,10 +408,18 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     return await runAction(request, context);
   } catch (error) {
-    if (error instanceof Error && String(error.message || '').toLowerCase().includes('callback')) {
+    const { action } = await context.params;
+    // Any error during the OAuth callback should redirect gracefully rather than return 500.
+    if (
+      action === 'callback' ||
+      (error instanceof Error && String(error.message || '').toLowerCase().includes('callback'))
+    ) {
       const redirect = new URL('/connections', integrationsEnv.APP_BASE_URL);
       redirect.searchParams.set('connected', '0');
-      redirect.searchParams.set('error', error.message);
+      redirect.searchParams.set(
+        'error',
+        error instanceof Error ? error.message : 'Connection failed.'
+      );
       return NextResponse.redirect(redirect);
     }
     return toErrorResponse(error, 'Failed to execute action.');

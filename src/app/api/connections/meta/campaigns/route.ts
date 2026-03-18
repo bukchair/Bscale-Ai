@@ -229,13 +229,13 @@ export async function GET(request: Request) {
       if (!resolvedAccountId) {
         resolvedAccountId = pickSelectedAccountId(managedConnection);
       }
-      accessToken = await new MetaProvider().getAccessTokenForConnection(managedConnection.id);
+      accessToken = await new MetaProvider().getAccessTokenForConnection(managedConnection.id, managedUserId);
     }
 
     // Fallback: if connected account wasn't selected/saved, auto-discover and select first.
     if (!resolvedAccountId && managedConnection && managedUserId) {
       try {
-        const discovered = await new MetaProvider().discoverAccounts(managedConnection.id);
+        const discovered = await new MetaProvider().discoverAccounts(managedConnection.id, managedUserId);
         if (discovered.length > 0) {
           await connectionService.saveDiscoveredAccounts(managedUserId, managedConnection.id, 'META', discovered);
           await connectionService.setSelectedAccounts(managedUserId, managedConnection.id, [
@@ -541,7 +541,7 @@ export async function GET(request: Request) {
 
         if (!fallbackAccountId) {
           try {
-            const discovered = await new MetaProvider().discoverAccounts(managedConnection.id);
+            const discovered = await new MetaProvider().discoverAccounts(managedConnection.id, managedUserId);
             if (discovered.length > 0) {
               await connectionService.saveDiscoveredAccounts(
                 managedUserId,

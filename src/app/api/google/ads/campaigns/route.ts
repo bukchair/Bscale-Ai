@@ -28,6 +28,9 @@ export async function GET(request: Request) {
     const startDate = normalizeDateParam(url.searchParams.get('start_date'));
     const endDate = normalizeDateParam(url.searchParams.get('end_date'));
     // Dates are validated above against /^\d{4}-\d{2}-\d{2}$/ — no injection risk.
+    if (startDate && endDate && startDate > endDate) {
+      return NextResponse.json({ message: 'start_date must not be after end_date.' }, { status: 400 });
+    }
     const dateFilter =
       startDate && endDate ? `\n              AND segments.date BETWEEN '${startDate}' AND '${endDate}'` : '';
 

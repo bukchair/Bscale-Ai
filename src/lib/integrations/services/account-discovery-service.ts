@@ -3,7 +3,7 @@ import { connectionService } from '@/src/lib/integrations/services/connection-se
 
 export const accountDiscoveryService = {
   async run(userId: string, connectionId: string, provider: IntegrationProvider) {
-    const discovered = await provider.discoverAccounts(connectionId);
+    const discovered = await provider.discoverAccounts(connectionId, userId);
     await connectionService.saveDiscoveredAccounts(userId, connectionId, provider.platform, discovered);
     return discovered;
   },
