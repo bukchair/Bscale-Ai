@@ -290,14 +290,27 @@ export function OneClickWizard({ open, onClose, onSuccess }: OneClickWizardProps
           country,
           language: language2,
           product: activeProduct.name ? activeProduct : undefined,
-          previewOnly: true, // note: API ignores this; strategy is always returned
+          previewOnly: true,
         }),
       });
-      const data = (await res.json()) as OneClickResult;
+      const rawText = await res.text();
+      if (!rawText.trim()) {
+        throw new Error(isHebrew ? 'השרת החזיר תגובה ריקה. נסה שוב.' : 'Server returned an empty response. Please try again.');
+      }
+      let data: OneClickResult;
+      try {
+        data = JSON.parse(rawText) as OneClickResult;
+      } catch {
+        throw new Error(isHebrew ? 'תגובת שרת לא תקינה. נסה שוב.' : 'Invalid server response. Please try again.');
+      }
+      if (!res.ok) {
+        const errMsg = (data as unknown as Record<string, unknown>)?.error;
+        throw new Error(typeof errMsg === 'string' ? errMsg : `Server error ${res.status}.`);
+      }
       if (data.strategy) {
         setPreviewStrategy(data.strategy);
       } else {
-        setPreviewError('Failed to generate AI strategy.');
+        setPreviewError(isHebrew ? 'לא התקבלה אסטרטגיית AI. נסה שוב.' : 'Failed to generate AI strategy. Please try again.');
       }
     } catch (err) {
       setPreviewError(err instanceof Error ? err.message : 'AI strategy generation failed.');
@@ -326,7 +339,20 @@ export function OneClickWizard({ open, onClose, onSuccess }: OneClickWizardProps
           product: activeProduct.name ? activeProduct : undefined,
         }),
       });
-      const data = (await res.json()) as OneClickResult;
+      const rawText = await res.text();
+      if (!rawText.trim()) {
+        throw new Error(isHebrew ? 'השרת החזיר תגובה ריקה. נסה שוב.' : 'Server returned an empty response. Please try again.');
+      }
+      let data: OneClickResult;
+      try {
+        data = JSON.parse(rawText) as OneClickResult;
+      } catch {
+        throw new Error(isHebrew ? 'תגובת שרת לא תקינה.' : 'Invalid server response.');
+      }
+      if (!res.ok) {
+        const errMsg = (data as unknown as Record<string, unknown>)?.error;
+        throw new Error(typeof errMsg === 'string' ? errMsg : `Server error ${res.status}.`);
+      }
       setResult(data);
       if (data.status !== 'FAILED') {
         onSuccess?.(data);

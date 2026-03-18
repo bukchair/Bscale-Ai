@@ -444,6 +444,26 @@ export async function POST(request: Request) {
       : undefined,
   };
 
+  // ── Preview-only: return AI strategy without DB or platform creation ──────
+  const previewOnly = (body as Record<string, unknown>).previewOnly === true;
+  if (previewOnly) {
+    try {
+      const strategy = await generateAiStrategy(input);
+      return NextResponse.json({
+        requestId: 'preview',
+        idempotencyKey,
+        status: 'SUCCESS',
+        strategy,
+        results: {},
+      } satisfies OneClickResult);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'AI strategy generation failed.' },
+        { status: 500 }
+      );
+    }
+  }
+
   // ── Idempotency: return cached result if already succeeded ────────────────
   const existing = await prisma.oneClickCampaignRequest.findUnique({
     where: { idempotencyKey },
