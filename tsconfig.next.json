@@ -23,6 +23,13 @@
   ],
   "exclude": [
     "node_modules",
-    "src/pages/**"
+    "src/pages/**",
+    "src/lib/firebase.ts",
+    "src/lib/autoAdsRunner.ts",
+    "src/lib/unified-data/**",
+    "src/lib/dataUtils.ts",
+    "src/lib/gemini.ts",
+    "src/contexts/**",
+    "src/services/**"
   ]
 }
