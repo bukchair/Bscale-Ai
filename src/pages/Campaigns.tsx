@@ -31,6 +31,7 @@ import {
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
+import { OneClickWizard } from '../components/campaigns/OneClickWizard';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
@@ -425,6 +426,7 @@ export function Campaigns() {
   const [editingCampaign, setEditingCampaign] = useState<EditCampaignDraft | null>(null);
   const [editApplyToAds, setEditApplyToAds] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [oneClickOpen, setOneClickOpen] = useState(false);
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
   const [selectedCopyPlatform, setSelectedCopyPlatform] = useState<PlatformName>('Google');
@@ -2092,6 +2094,13 @@ export function Campaigns() {
         </div>
         <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
           <button
+            onClick={() => setOneClickOpen(true)}
+            className="inline-flex w-full sm:w-auto justify-center items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Sparkles className="w-4 h-4" />
+            {isHebrew ? 'קמפיין בלחיצה אחת' : 'One Click Campaign'}
+          </button>
+          <button
             onClick={scrollToBuilderSection}
             className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-indigo-200 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
@@ -3582,6 +3591,7 @@ export function Campaigns() {
         </div>
       )}
 
+      <OneClickWizard open={oneClickOpen} onClose={() => setOneClickOpen(false)} />
     </div>
   );
 }
