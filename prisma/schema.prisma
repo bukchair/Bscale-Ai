@@ -80,7 +80,8 @@ model User {
   unifiedCampaignMetricHourly UnifiedCampaignMetricHourly[]
   unifiedSnapshotsDaily UnifiedSnapshotDaily[]
   syncErrorLogs       SyncErrorLog[]
-  actionRequests      ActionRequest[]
+  actionRequests               ActionRequest[]
+  oneClickCampaignRequests     OneClickCampaignRequest[]
 
   @@index([createdAt])
   @@index([updatedAt])
