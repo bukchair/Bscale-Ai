@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/db/prisma';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { IntegrationError } from '@/src/lib/integrations/core/errors';
@@ -34,6 +35,69 @@ export const issueSessionToken = async (user: Pick<AuthenticatedUser, 'id' | 'em
     .sign(getSessionSecret());
 };
 
+/** True when a Prisma error is caused by a missing column (migration not yet applied). */
+function isMissingColumnError(err: unknown): boolean {
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    return err.code === 'P2022' || err.code === 'P2021';
+  }
+  // Raw DB error message as fallback
+  if (err instanceof Error) {
+    return err.message.includes('column') && err.message.includes('does not exist');
+  }
+  return false;
+}
+
+async function findUser(id: string) {
+  try {
+    return await prisma.user.findFirst({
+      where: { id },
+      select: { id: true, email: true, name: true, role: true },
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err)) throw err;
+    // role column missing — migration pending; fall back to query without it
+    const row = await prisma.user.findFirst({
+      where: { id },
+      select: { id: true, email: true, name: true },
+    });
+    return row ? { ...row, role: 'user' as const } : null;
+  }
+}
+
+async function createUser(id: string, email: string, name: string | null) {
+  try {
+    return await prisma.user.create({
+      data: { id, email, name },
+      select: { id: true, email: true, name: true, role: true },
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err)) throw err;
+    const row = await prisma.user.create({
+      data: { id, email, name },
+      select: { id: true, email: true, name: true },
+    });
+    return { ...row, role: 'user' as const };
+  }
+}
+
+async function updateUser(id: string, email: string, name: string | null) {
+  try {
+    return await prisma.user.update({
+      where: { id },
+      data: { email, name },
+      select: { id: true, email: true, name: true, role: true },
+    });
+  } catch (err) {
+    if (!isMissingColumnError(err)) throw err;
+    const row = await prisma.user.update({
+      where: { id },
+      data: { email, name },
+      select: { id: true, email: true, name: true },
+    });
+    return { ...row, role: 'user' as const };
+  }
+}
+
 export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => {
   const cookieStore = await cookies();
   const rawToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -60,23 +124,12 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
     throw new IntegrationError('UNAUTHORIZED', 'Session payload is missing user claims.', 401);
   }
 
-  let user = await prisma.user.findFirst({
-    where: { id: payload.sub },
-    select: { id: true, email: true, name: true, role: true },
-  });
+  let user = await findUser(payload.sub);
 
   if (!user) {
-    user = await prisma.user.create({
-      data: { id: payload.sub, email: payload.email, name: payload.name ?? null },
-      select: { id: true, email: true, name: true, role: true },
-    });
+    user = await createUser(payload.sub, payload.email, payload.name ?? null);
   } else if (user.email !== payload.email || user.name !== (payload.name ?? null)) {
-    // Keep email and name in sync with the JWT session on change only.
-    user = await prisma.user.update({
-      where: { id: payload.sub },
-      data: { email: payload.email, name: payload.name ?? null },
-      select: { id: true, email: true, name: true, role: true },
-    });
+    user = await updateUser(payload.sub, payload.email, payload.name ?? null);
   }
 
   return user;
