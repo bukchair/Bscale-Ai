@@ -193,7 +193,6 @@ const WIZARD_FIELDS: Record<WizardPlatform, WizardField[]> = {
   tiktok: [
     { key: 'tiktokAdvertiserId', labelHe: 'Advertiser ID', labelEn: 'Advertiser ID', placeholder: '7012345678901234567', required: true },
     { key: 'tiktokPixelId', labelHe: 'Pixel ID', labelEn: 'Pixel ID', placeholder: 'TT-PIXEL-123' },
-    { key: 'tiktokToken', labelHe: 'TikTok Access Token', labelEn: 'TikTok Access Token', placeholder: 'act_...' },
   ],
   woocommerce: [
     { key: 'storeUrl', labelHe: 'כתובת החנות', labelEn: 'Store URL', placeholder: 'https://mystore.com', type: 'url', required: true },
@@ -524,6 +523,40 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     });
   };
 
+  const loadManagedTikTokAccounts = async (seedValues?: Record<string, string>) => {
+    await bootstrapManagedSession();
+    try {
+      const response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
+        method: 'GET',
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
+      });
+      if (!response.ok) return;
+      const payload = await response.json() as { data?: { accounts?: Array<{ externalAccountId: string; name?: string }> } };
+      const accounts = payload?.data?.accounts ?? [];
+      if (!accounts.length) return;
+      setFormValues((prev) => {
+        const source = seedValues || prev;
+        if (String(source.tiktokAdvertiserId || '').trim()) return prev;
+        // Auto-fill the first discovered advertiser ID.
+        return { ...prev, tiktokAdvertiserId: accounts[0].externalAccountId };
+      });
+    } catch {
+      // Non-fatal: user can enter Advertiser ID manually.
+    }
+  };
+
+  const persistManagedTikTokSelection = async (advertiserId: string) => {
+    const id = String(advertiserId || '').trim();
+    if (!id) return;
+    await bootstrapManagedSession();
+    await fetch(`${API_BASE}/api/connections/tiktok/select-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountIds: [id] }),
+    });
+  };
+
   const loadManagedMetaAssets = async (seedValues?: Record<string, string>) => {
     await bootstrapManagedSession();
     setMetaAssetsLoading(true);
@@ -789,17 +822,6 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
       
       if (!isAllowedOrigin) return;
 
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'tiktok') {
-        const { data } = event.data;
-        // Update connection settings with the new token
-        handleSave('tiktok', { 
-          tiktokToken: data.access_token,
-        });
-        setWizardValues((prev) => ({ ...prev, tiktokToken: data.access_token || '' }));
-        setToast({ message: "Successfully connected to TikTok Ads!", type: 'success' });
-        setTimeout(() => setToast(null), 3000);
-      }
-
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS' && event.data?.platform === 'meta') {
         const { data } = event.data;
         // Update connection settings with the new token
@@ -852,6 +874,9 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
         setMetaAssets(null);
         setMetaAssetsError(null);
       }
+      if (integration.id === 'tiktok' && integration.status === 'connected') {
+        void loadManagedTikTokAccounts(integration.settings || {});
+      }
     }
   };
 
@@ -868,6 +893,13 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     try {
       // Show a more realistic verification process
       await updateConnectionSettings(id, settingsToSave);
+      if (id === 'tiktok' && settingsToSave.tiktokAdvertiserId) {
+        try {
+          await persistManagedTikTokSelection(settingsToSave.tiktokAdvertiserId);
+        } catch (selectionError) {
+          console.warn('Failed to persist TikTok advertiser selection:', selectionError);
+        }
+      }
       if (id === 'google' && settingsToSave.googleAdsId) {
         try {
           await persistManagedGoogleSelection(settingsToSave.googleAdsId);
@@ -1401,16 +1433,22 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                     </div>
                   )}
                   {isConnected && (
-                    <>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
-                        <input type="text" placeholder="7012345678901234567" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.tiktokAdvertiserId || ""} onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)} />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.accessToken')}</label>
-                        <input type="password" placeholder="act_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.tiktokToken || ""} readOnly />
-                      </div>
-                    </>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
+                      <input
+                        type="text"
+                        placeholder="7012345678901234567"
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
+                        dir="ltr"
+                        value={formValues.tiktokAdvertiserId || ""}
+                        onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)}
+                      />
+                      <p className="mt-1 text-[10px] text-gray-400">
+                        {isHebrew
+                          ? 'הטוקן נשאב אוטומטית דרך OAuth — רק ה-Advertiser ID נדרש.'
+                          : 'Access token is fetched automatically via OAuth — only the Advertiser ID is required.'}
+                      </p>
+                    </div>
                   )}
                 </>
               )}
@@ -1800,7 +1838,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const oauthTokenKey: Record<WizardPlatform, string | null> = {
     google: 'googleAccessToken',
     meta: 'metaToken',
-    tiktok: 'tiktokToken',
+    tiktok: null, // Token is stored server-side via OAuth, not in client settings.
     woocommerce: null,
     shopify: null,
   };
