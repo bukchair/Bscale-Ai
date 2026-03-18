@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server';
-import { syncEnv } from '@/src/lib/sync/env';
 import { enqueueSyncJob } from '@/src/lib/sync/queue/enqueue';
 import { JOBS } from '@/src/lib/sync/queue/job-names';
-
-function isCronAuthorised(request: Request): boolean {
-  const secret = syncEnv.CRON_SECRET;
-  if (!secret) return false;
-  return request.headers.get('authorization') === `Bearer ${secret}`;
-}
+import { verifyCronRequest } from '@/src/lib/sync/cron-auth';
 
 /**
  * POST /api/cron/refresh-tokens
@@ -17,7 +11,7 @@ function isCronAuthorised(request: Request): boolean {
  * Called by Vercel Cron every 15 minutes.
  */
 export async function POST(request: Request) {
-  if (!isCronAuthorised(request)) {
+  if (!(await verifyCronRequest(request))) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 

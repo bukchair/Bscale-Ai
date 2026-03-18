@@ -26,6 +26,8 @@ export const processRefreshTokens = async (payload: RefreshTokensPayload) => {
     },
   });
 
+  console.info(`[refresh-tokens] Starting token refresh. scope=${payload.scope} total=${connections.length}`);
+
   let refreshed = 0;
   let failed = 0;
   for (const connection of connections) {
@@ -37,13 +39,16 @@ export const processRefreshTokens = async (payload: RefreshTokensPayload) => {
       });
       await tokenService.saveTokenSet(connection.userId, connection.id, tokenSet);
       refreshed += 1;
+      console.info(`[refresh-tokens] OK  platform=${connection.platform} connectionId=${connection.id}`);
     } catch (error) {
       failed += 1;
+      const message = error instanceof Error ? error.message : 'Token refresh failed.';
+      console.error(`[refresh-tokens] FAIL platform=${connection.platform} connectionId=${connection.id} error=${message}`);
       await prisma.platformConnection.update({
         where: { id: connection.id },
         data: {
           status: 'EXPIRED',
-          lastError: error instanceof Error ? error.message : 'Token refresh failed.',
+          lastError: message,
         },
       });
       await prisma.syncErrorLog.create({
@@ -52,11 +57,12 @@ export const processRefreshTokens = async (payload: RefreshTokensPayload) => {
           platform: connection.platform,
           connectionId: connection.id,
           category: 'TOKEN_REFRESH',
-          message: error instanceof Error ? error.message : 'Token refresh failed.',
+          message,
         },
       });
     }
   }
 
+  console.info(`[refresh-tokens] Done. refreshed=${refreshed} failed=${failed} total=${connections.length}`);
   return { refreshed, failed, total: connections.length };
 };

@@ -921,19 +921,19 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
           )}
 
           {activeTab === 'sharing' && (
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-lg font-bold text-gray-900">{isHebrew ? 'שיתוף מידע עם משתמשים נוספים' : 'Share workspace access'}</h2>
-                <p className="text-sm text-gray-500 mt-1">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-gray-200 dark:border-white/10">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">{isHebrew ? 'שיתוף מידע עם משתמשים נוספים' : 'Share workspace access'}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {isHebrew
                     ? 'בעל החנות יכול לשתף את נתוני המערכת עם מנהל חנות או עובד נוסף לפי אימייל.'
                     : 'The store owner can share workspace data with managers or team members by email.'}
                 </p>
               </div>
               <div className="p-6 space-y-5">
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
-                  <p className="text-xs font-bold text-indigo-900">{isHebrew ? 'איך זה עובד' : 'How it works'}</p>
-                  <p className="text-xs text-indigo-800 mt-1 leading-relaxed">
+                <div className="rounded-xl border border-indigo-100 dark:border-indigo-700/40 bg-indigo-50/50 dark:bg-indigo-900/20 p-4">
+                  <p className="text-xs font-bold text-indigo-900 dark:text-indigo-300">{isHebrew ? 'איך זה עובד' : 'How it works'}</p>
+                  <p className="text-xs text-indigo-800 dark:text-indigo-400 mt-1 leading-relaxed">
                     {isHebrew
                       ? 'הזן אימייל של המשתמש שצריך גישה. ברגע שהוא יתחבר עם אותו אימייל, הוא יעבוד על נתוני החנות שלך.'
                       : 'Enter the user email that needs access. Once they sign in with that email, they will work on your store data.'}
@@ -942,22 +942,22 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
                   <div className="md:col-span-2 space-y-1">
-                    <label className="text-xs font-medium text-gray-700">{isHebrew ? 'אימייל משתמש לשיתוף' : 'User email to share'}</label>
+                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300">{isHebrew ? 'אימייל משתמש לשיתוף' : 'User email to share'}</label>
                     <input
                       type="email"
                       dir="ltr"
                       value={shareEmail}
                       onChange={(e) => setShareEmail(e.target.value)}
                       placeholder="manager@store.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-700">{isHebrew ? 'הרשאה' : 'Permission'}</label>
+                    <label className="text-xs font-medium text-gray-700 dark:text-gray-300">{isHebrew ? 'הרשאה' : 'Permission'}</label>
                     <select
                       value={shareRole}
                       onChange={(e) => setShareRole(e.target.value as SharedAccessRole)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="manager">{isHebrew ? 'Manager - יכול לערוך ולנהל' : 'Manager - can edit and manage'}</option>
                       <option value="viewer">{isHebrew ? 'Viewer - צפייה בלבד ללא שינוי נתונים' : 'Viewer - view only, no edits'}</option>
@@ -978,17 +978,17 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
                 </div>
 
                 {sharingMessage && (
-                  <div className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  <div className="text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-700/40 rounded-lg px-3 py-2">
                     {sharingMessage}
                   </div>
                 )}
 
-                <div className="border-t border-gray-100 pt-4">
-                  <h3 className="text-sm font-bold text-gray-900 mb-3">{isHebrew ? 'משתמשים עם גישה' : 'Users with access'}</h3>
+                <div className="border-t border-gray-100 dark:border-white/10 pt-4">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">{isHebrew ? 'משתמשים עם גישה' : 'Users with access'}</h3>
                   {isLoadingSharing ? (
-                    <p className="text-sm text-gray-500">{isHebrew ? 'טוען הרשאות שיתוף...' : 'Loading sharing permissions...'}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{isHebrew ? 'טוען הרשאות שיתוף...' : 'Loading sharing permissions...'}</p>
                   ) : !sharedAccessList.length ? (
-                    <p className="text-sm text-gray-500">{isHebrew ? 'עדיין לא הוגדרו משתמשים לשיתוף.' : 'No shared users configured yet.'}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{isHebrew ? 'עדיין לא הוגדרו משתמשים לשיתוף.' : 'No shared users configured yet.'}</p>
                   ) : (
                     <div className="space-y-2">
                       {sharedAccessList.map((entry) => {
