@@ -362,7 +362,8 @@ const runAction = async (request: Request, context: RouteContext) => {
     const url = new URL(request.url);
     const result = await integrationOrchestrator.handleCallback(user.id, platform, {
       state: url.searchParams.get('state'),
-      code: url.searchParams.get('code'),
+      // TikTok sends auth_code as the primary param; other providers use code.
+      code: url.searchParams.get('auth_code') || url.searchParams.get('code'),
       error: url.searchParams.get('error'),
       error_description: url.searchParams.get('error_description'),
     });

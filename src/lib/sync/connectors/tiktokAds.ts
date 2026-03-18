@@ -19,7 +19,10 @@ export const tiktokAdsConnector = {
         'Access-Token': accessToken,
       },
     });
-    const payload = (await response.json().catch(() => ({}))) as any;
+    const payload = (await response.json().catch(() => null)) as any;
+    if (!response.ok || Number(payload?.code) !== 0) {
+      throw new Error(payload?.message || `TikTok campaigns fetch failed (${response.status})`);
+    }
     const rows = Array.isArray(payload?.data?.list) ? payload.data.list : [];
     return rows.map((row: any) => ({
       id: String(row?.campaign_id || row?.id || ''),
@@ -57,7 +60,10 @@ export const tiktokAdsConnector = {
         page_size: 1000,
       }),
     });
-    const payload = (await response.json().catch(() => ({}))) as any;
+    const payload = (await response.json().catch(() => null)) as any;
+    if (!response.ok || Number(payload?.code) !== 0) {
+      throw new Error(payload?.message || `TikTok metrics fetch failed (${response.status})`);
+    }
     const rows = Array.isArray(payload?.data?.list) ? payload.data.list : [];
     return rows.map((row: any) => ({
       campaignId: String(row?.dimensions?.campaign_id || row?.campaign_id || ''),
