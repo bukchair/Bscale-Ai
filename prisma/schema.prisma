@@ -333,3 +333,29 @@ model ActionRequest {
 
   @@index([userId, platform, createdAt])
 }
+
+// ─── One Click Campaign ──────────────────────────────────────────────────────
+// Stores every one-click campaign request for idempotency, audit, and retry.
+model OneClickCampaignRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  // SHA-256(userId + canonicalised inputs) prevents duplicate launches.
+  idempotencyKey  String   @unique
+  platforms       Json     // string[] — e.g. ["Google","Meta"]
+  objective       String   // "sales" | "leads" | "traffic"
+  dailyBudget     Float
+  country         String
+  language        String
+  productInfo     Json?    // { name, description, price, url }
+  aiStrategy      Json?    // OneClickStrategy — stored after generation
+  // "PENDING" | "RUNNING" | "SUCCESS" | "PARTIAL" | "FAILED"
+  status          String   @default("PENDING")
+  results         Json?    // Partial<Record<Platform, PlatformResult>>
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([idempotencyKey])
+}
