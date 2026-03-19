@@ -1,4 +1,4 @@
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 # Install dependencies (all, including devDeps needed for vite/tsx build)
@@ -18,7 +18,7 @@ RUN npm run build
 RUN npm run next:build
 
 # ── Production image ────────────────────────────────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
