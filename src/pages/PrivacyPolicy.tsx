@@ -378,22 +378,22 @@ const policyByLang: Record<string, PolicyContent> = {
         ]
       },
       {
-        title: ‘8. Modifications de la politique’,
+        title: '8. Modifications de la politique',
         paragraphs: [
-          ‘Nous pouvons mettre à jour cette politique de temps à autre ; la date de la dernière mise à jour figure en haut de la page.’,
-          ‘La poursuite de l’utilisation de la plateforme après modification vaut acceptation de la version mise à jour.’
+          'Nous pouvons mettre à jour cette politique de temps à autre ; la date de la dernière mise à jour figure en haut de la page.',
+          'La poursuite de l’utilisation de la plateforme après modification vaut acceptation de la version mise à jour.'
         ]
       },
       {
-        title: ‘9. Responsabilité pour les actions sur les plateformes externes’,
+        title: '9. Responsabilité pour les actions sur les plateformes externes',
         paragraphs: [
-          ‘La plateforme permet d’effectuer des actions (telles que la modification de campagnes, la révision de budgets, la mise à jour de paramètres de compte, etc.) directement sur les plateformes externes connectées — notamment Google Ads, Meta, TikTok et toute autre plateforme que vous connectez.’,
-          ‘Ces actions modifiant des données réelles dans vos comptes publicitaires, vous devez faire preuve de prudence et de discernement pour chaque action effectuée via la plateforme.’,
-          ‘bscale.co.il décline toute responsabilité pour tout résultat — direct, indirect, intentionnel ou non intentionnel — découlant d’actions réalisées par l’utilisateur sur des comptes publicitaires externes via la plateforme.’
+          'La plateforme permet d’effectuer des actions (telles que la modification de campagnes, la révision de budgets, la mise à jour de paramètres de compte, etc.) directement sur les plateformes externes connectées — notamment Google Ads, Meta, TikTok et toute autre plateforme que vous connectez.',
+          'Ces actions modifiant des données réelles dans vos comptes publicitaires, vous devez faire preuve de prudence et de discernement pour chaque action effectuée via la plateforme.',
+          'bscale.co.il décline toute responsabilité pour tout résultat — direct, indirect, intentionnel ou non intentionnel — découlant d’actions réalisées par l’utilisateur sur des comptes publicitaires externes via la plateforme.'
         ]
       }
     ],
-    backLink: ‘Retour au site’
+    backLink: 'Retour au site'
   }
 };
 
