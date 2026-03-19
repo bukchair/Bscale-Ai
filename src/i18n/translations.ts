@@ -315,7 +315,22 @@ export const translations = {
       noAccountsFound: "No accounts found for this platform.",
       saveSelection: "Save selection",
       selected: "Selected",
-      notSelected: "Not selected"
+      notSelected: "Not selected",
+      tabs: {
+        overview: "Overview",
+        google: "Google",
+        meta: "Meta",
+        tiktok: "TikTok",
+        whatsapp: "WhatsApp",
+        more: "More"
+      },
+      aiEngine: "AI Engine",
+      googleWorkspace: "Google Ecosystem",
+      socialMedia: "Social & Paid",
+      ecommerce: "E-commerce",
+      overviewTitle: "All Connections",
+      whatsappComingSoon: "WhatsApp integration — coming soon",
+      readOnlyWorkspace: "View-only mode is active for this user."
     },
     campaigns: {
       title: "Campaign Management & Optimization",
@@ -908,7 +923,22 @@ export const translations = {
       noAccountsFound: "לא נמצאו חשבונות לפלטפורמה זו.",
       saveSelection: "שמור בחירה",
       selected: "נבחר",
-      notSelected: "לא נבחר"
+      notSelected: "לא נבחר",
+      tabs: {
+        overview: "סקירה כללית",
+        google: "Google",
+        meta: "Meta",
+        tiktok: "TikTok",
+        whatsapp: "WhatsApp",
+        more: "עוד"
+      },
+      aiEngine: "מנוע AI",
+      googleWorkspace: "סביבת Google",
+      socialMedia: "רשתות חברתיות",
+      ecommerce: "מסחר אלקטרוני",
+      overviewTitle: "כל החיבורים",
+      whatsappComingSoon: "אינטגרציית WhatsApp — בקרוב",
+      readOnlyWorkspace: "מצב צפייה בלבד פעיל עבור משתמש זה."
     },
     campaigns: {
       title: "ניהול קמפיינים ואופטימיזציה",
