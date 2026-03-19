@@ -506,14 +506,14 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     }
   };
 
-  const bootstrapManagedSession = async () => {
+  const bootstrapManagedSession = async (timeoutMs = 3000): Promise<boolean> => {
     // Fast-path: if the server session cookie is already valid, skip bootstrap.
     try {
       const sessionCheck = await fetch(`${API_BASE}/api/connections`, {
         method: 'GET',
         cache: 'no-store',
       });
-      if (sessionCheck.ok) return;
+      if (sessionCheck.ok) return true;
     } catch {
       // Ignore network errors and proceed to re-bootstrap below.
     }
@@ -530,7 +530,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
           settled = true;
           unsubscribe();
           resolve(auth.currentUser);
-        }, 3000);
+        }, timeoutMs);
         const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
           if (settled) return;
           settled = true;
@@ -539,14 +539,15 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
           resolve(nextUser);
         });
       }));
-    if (!currentUser) return;
+    if (!currentUser) return false;
     // Force-refresh the Firebase ID token to avoid using a stale cached token.
     const idToken = await currentUser.getIdToken(true);
-    await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+    const bootstrapRes = await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ idToken }),
     });
+    return bootstrapRes.ok;
   };
 
   const persistManagedGoogleSelection = async (googleAdsId: string) => {
@@ -565,11 +566,21 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     setTiktokAccountsLoading(true);
     setTiktokAccountsError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
+      let response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
         method: 'GET',
         headers: { accept: 'application/json' },
         cache: 'no-store',
       });
+      // If the session was not yet ready (e.g. right after an OAuth redirect),
+      // re-bootstrap with a longer timeout and retry once.
+      if (response.status === 401) {
+        await bootstrapManagedSession(8000);
+        response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
+          method: 'GET',
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
+      }
       const payload = await response.json() as { success?: boolean; message?: string; data?: { accounts?: Array<{ externalAccountId: string; name?: string }> } };
       if (!response.ok || !payload?.success) {
         setTiktokAccountsError(payload?.message || 'Failed to load TikTok advertiser accounts.');
