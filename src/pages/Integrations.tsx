@@ -502,6 +502,17 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   };
 
   const bootstrapManagedSession = async () => {
+    // Fast-path: if the server session cookie is already valid, skip bootstrap.
+    try {
+      const sessionCheck = await fetch(`${API_BASE}/api/connections`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (sessionCheck.ok) return;
+    } catch {
+      // Ignore network errors and proceed to re-bootstrap below.
+    }
+
     // Wait for Firebase auth to initialize before reading currentUser.
     // A plain auth.currentUser check races with Firebase's async initialization
     // and returns null immediately after a redirect, causing 401s on the next API call.
@@ -524,7 +535,8 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
         });
       }));
     if (!currentUser) return;
-    const idToken = await currentUser.getIdToken();
+    // Force-refresh the Firebase ID token to avoid using a stale cached token.
+    const idToken = await currentUser.getIdToken(true);
     await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

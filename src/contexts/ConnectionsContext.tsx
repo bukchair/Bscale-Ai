@@ -1046,6 +1046,8 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         const fallbackAccountId =
           id === 'google' && connection.settings?.googleAdsId
             ? connection.settings.googleAdsId.replace(/-/g, '').trim()
+            : id === 'tiktok' && connection.settings?.tiktokAdvertiserId
+            ? String(connection.settings.tiktokAdvertiserId).trim()
             : undefined;
         const result = await postManagedTest(managedPlatformSlug, fallbackAccountId);
         await syncManagedConnectionsToLocal();
