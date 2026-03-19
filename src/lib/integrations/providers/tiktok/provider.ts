@@ -141,8 +141,20 @@ export class TikTokProvider implements IntegrationProvider {
   }
 
   async discoverAccounts(connectionId: string, userId: string): Promise<DiscoveredAccount[]> {
+    // Load advertiser_ids saved during token exchange as a fallback source.
+    const conn = await prisma.platformConnection.findFirst({
+      where: { id: connectionId, userId },
+      select: { metadata: true },
+    });
+    const rawMeta = (conn?.metadata as Record<string, unknown> | null) ?? {};
+    const metadataIds: string[] = Array.isArray(rawMeta.advertiserIds)
+      ? (rawMeta.advertiserIds as unknown[]).map(String).filter(Boolean)
+      : [];
+
     const { accessToken } = await this.getValidAccessToken(connectionId, userId);
     const url = new URL(`${TIKTOK_API_BASE}/oauth2/advertiser/get/`);
+    url.searchParams.set('app_id', integrationsEnv.TIKTOK_APP_ID ?? '');
+    url.searchParams.set('secret', integrationsEnv.TIKTOK_CLIENT_SECRET ?? '');
 
     const response = await fetch(url, {
       headers: { 'Access-Token': accessToken },
@@ -153,6 +165,14 @@ export class TikTokProvider implements IntegrationProvider {
     }>;
 
     if (!response.ok || envelope.code !== 0) {
+      // Fall back to metadata IDs saved during OAuth token exchange.
+      if (metadataIds.length) {
+        return metadataIds.map((id) => ({
+          externalAccountId: id,
+          name: `TikTok Advertiser ${id}`,
+          status: 'active',
+        }));
+      }
       throw this.mapTikTokError(
         envelope,
         'Unable to discover TikTok advertisers. The app may require additional approvals.'
@@ -173,7 +193,11 @@ export class TikTokProvider implements IntegrationProvider {
       status: 'active',
     }));
 
-    const merged = [...fromList, ...fallbackIds].filter(
+    const merged = [...fromList, ...fallbackIds, ...metadataIds.map((id) => ({
+      externalAccountId: id,
+      name: `TikTok Advertiser ${id}`,
+      status: 'active' as const,
+    }))].filter(
       (item, index, array) => array.findIndex((v) => v.externalAccountId === item.externalAccountId) === index
     );
 

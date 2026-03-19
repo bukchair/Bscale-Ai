@@ -18,7 +18,7 @@ const policyByLang: Record<string, PolicyContent> = {
   he: {
     title: 'מדיניות פרטיות - BScale AI',
     lastUpdatedLabel: 'תוקף אחרון',
-    lastUpdatedDate: '12.03.2026',
+    lastUpdatedDate: '19.03.2026',
     sections: [
       {
         title: '1. מי אנחנו וכיצד ליצור קשר',
@@ -79,6 +79,14 @@ const policyByLang: Record<string, PolicyContent> = {
           'אנו עשויים לעדכן מדיניות זו מעת לעת. תאריך העדכון האחרון מופיע בראש הדף.',
           'המשך שימושך במערכת לאחר שינוי המדיניות מהווה הסכמה לנוסח המעודכן.'
         ]
+      },
+      {
+        title: '9. אחריות לפעולות בפלטפורמות חיצוניות',
+        paragraphs: [
+          'הפלטפורמה מאפשרת ביצוע פעולות (כגון עריכת קמפיינים, שינוי תקציבים, עדכון נתוני חשבון ועוד) ישירות במקורות החיצוניים המחוברים — לרבות Google Ads, Meta, TikTok וכל פלטפורמה אחרת שתחבר.',
+          'הואיל ופעולות אלו משנות נתונים ממשיים בחשבונות הפרסום שלך, עליך לנהוג בזהירות ובשיקול דעת בכל פעולה שתבצע דרך המערכת.',
+          'האתר bscale.co.il אינו אחראי לכל תוצאה — ישירה, עקיפה, מכוונת או בלתי מכוונת — הנובעת מפעולות שבוצעו על ידי המשתמש דרך הפלטפורמה בחשבונות הפרסום החיצוניים.'
+        ]
       }
     ],
     backLink: 'חזרה לאתר'
@@ -86,7 +94,7 @@ const policyByLang: Record<string, PolicyContent> = {
   en: {
     title: 'Privacy Policy - BScale AI',
     lastUpdatedLabel: 'Last updated',
-    lastUpdatedDate: '2026-03-12',
+    lastUpdatedDate: '2026-03-19',
     sections: [
       {
         title: '1. Who we are and contact details',
@@ -147,6 +155,14 @@ const policyByLang: Record<string, PolicyContent> = {
           'We may update this policy from time to time. The date of the latest version appears at the top of the page.',
           'Your continued use of the platform after changes means you accept the updated policy.'
         ]
+      },
+      {
+        title: '9. Liability for actions on external platforms',
+        paragraphs: [
+          'The platform enables actions (such as editing campaigns, changing budgets, updating account settings and more) directly on connected external platforms — including Google Ads, Meta, TikTok and any other platform you connect.',
+          'Since these actions modify real data in your advertising accounts, you must exercise caution and judgment with every action you perform through the platform.',
+          'bscale.co.il is not responsible for any outcome — direct, indirect, intended or unintended — arising from actions carried out by the user through the platform on external advertising accounts.'
+        ]
       }
     ],
     backLink: 'Back to site'
@@ -154,7 +170,7 @@ const policyByLang: Record<string, PolicyContent> = {
   ru: {
     title: 'Политика конфиденциальности — BScale AI',
     lastUpdatedLabel: 'Дата обновления',
-    lastUpdatedDate: '12.03.2026',
+    lastUpdatedDate: '19.03.2026',
     sections: [
       {
         title: '1. Кто мы и как связаться',
@@ -215,6 +231,14 @@ const policyByLang: Record<string, PolicyContent> = {
           'Мы можем время от времени обновлять данную политику; дата последнего обновления указывается вверху страницы.',
           'Продолжая пользоваться платформой после изменений, вы соглашаетесь с обновлённой версией политики.'
         ]
+      },
+      {
+        title: '9. Ответственность за действия на внешних платформах',
+        paragraphs: [
+          'Платформа позволяет выполнять действия (редактирование кампаний, изменение бюджетов, обновление настроек аккаунта и др.) непосредственно на подключённых внешних платформах — включая Google Ads, Meta, TikTok и любые другие подключённые вами платформы.',
+          'Поскольку эти действия изменяют реальные данные в ваших рекламных аккаунтах, вы должны проявлять осторожность и взвешенность при каждом действии, совершаемом через платформу.',
+          'bscale.co.il не несёт ответственности за какие-либо последствия — прямые, косвенные, намеренные или непреднамеренные — возникшие в результате действий пользователя на внешних рекламных аккаунтах через платформу.'
+        ]
       }
     ],
     backLink: 'Назад на сайт'
@@ -222,7 +246,7 @@ const policyByLang: Record<string, PolicyContent> = {
   pt: {
     title: 'Política de Privacidade — BScale AI',
     lastUpdatedLabel: 'Última atualização',
-    lastUpdatedDate: '12/03/2026',
+    lastUpdatedDate: '19/03/2026',
     sections: [
       {
         title: '1. Quem somos e contato',
@@ -283,6 +307,14 @@ const policyByLang: Record<string, PolicyContent> = {
           'Podemos atualizar esta política periodicamente; a data da última versão aparece no topo da página.',
           'O uso contínuo da plataforma após alterações significa que você aceita a versão atualizada.'
         ]
+      },
+      {
+        title: '9. Responsabilidade por ações em plataformas externas',
+        paragraphs: [
+          'A plataforma permite realizar ações (como editar campanhas, alterar orçamentos, atualizar configurações de conta e mais) diretamente nas plataformas externas conectadas — incluindo Google Ads, Meta, TikTok e qualquer outra plataforma que você conectar.',
+          'Como essas ações modificam dados reais em suas contas de publicidade, você deve agir com cautela e julgamento em cada ação realizada por meio da plataforma.',
+          'bscale.co.il não se responsabiliza por nenhum resultado — direto, indireto, intencional ou não intencional — decorrente de ações realizadas pelo usuário nas contas de publicidade externas por meio da plataforma.'
+        ]
       }
     ],
     backLink: 'Voltar ao site'
@@ -290,7 +322,7 @@ const policyByLang: Record<string, PolicyContent> = {
   fr: {
     title: 'Politique de Confidentialité — BScale AI',
     lastUpdatedLabel: 'Dernière mise à jour',
-    lastUpdatedDate: '12/03/2026',
+    lastUpdatedDate: '19/03/2026',
     sections: [
       {
         title: '1. Qui nous sommes et contact',
@@ -346,14 +378,22 @@ const policyByLang: Record<string, PolicyContent> = {
         ]
       },
       {
-        title: '8. Modifications de la politique',
+        title: ‘8. Modifications de la politique’,
         paragraphs: [
-          'Nous pouvons mettre à jour cette politique de temps à autre ; la date de la dernière mise à jour figure en haut de la page.',
-          'La poursuite de l’utilisation de la plateforme après modification vaut acceptation de la version mise à jour.'
+          ‘Nous pouvons mettre à jour cette politique de temps à autre ; la date de la dernière mise à jour figure en haut de la page.’,
+          ‘La poursuite de l’utilisation de la plateforme après modification vaut acceptation de la version mise à jour.’
+        ]
+      },
+      {
+        title: ‘9. Responsabilité pour les actions sur les plateformes externes’,
+        paragraphs: [
+          ‘La plateforme permet d’effectuer des actions (telles que la modification de campagnes, la révision de budgets, la mise à jour de paramètres de compte, etc.) directement sur les plateformes externes connectées — notamment Google Ads, Meta, TikTok et toute autre plateforme que vous connectez.’,
+          ‘Ces actions modifiant des données réelles dans vos comptes publicitaires, vous devez faire preuve de prudence et de discernement pour chaque action effectuée via la plateforme.’,
+          ‘bscale.co.il décline toute responsabilité pour tout résultat — direct, indirect, intentionnel ou non intentionnel — découlant d’actions réalisées par l’utilisateur sur des comptes publicitaires externes via la plateforme.’
         ]
       }
     ],
-    backLink: 'Retour au site'
+    backLink: ‘Retour au site’
   }
 };
 
