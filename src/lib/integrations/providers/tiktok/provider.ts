@@ -339,13 +339,23 @@ export class TikTokProvider implements IntegrationProvider {
   private async getValidAccessToken(connectionId: string, userId: string): Promise<{ accessToken: string }> {
     const connection = await prisma.platformConnection.findFirst({
       where: { id: connectionId, userId },
-      select: { userId: true, tokenExpiresAt: true },
+      select: { userId: true, tokenExpiresAt: true, encryptedRefreshToken: true },
     });
     if (!connection) throw new ExternalApiError('TikTok connection not found.');
 
     const expiresSoon =
       !connection.tokenExpiresAt || connection.tokenExpiresAt.getTime() <= Date.now() + 60_000;
     if (expiresSoon) {
+      // If there is no refresh token stored, we cannot silently refresh.
+      // Mark the connection as EXPIRED so the UI surfaces a reconnect prompt.
+      if (!connection.encryptedRefreshToken) {
+        await prisma.platformConnection.updateMany({
+          where: { id: connectionId, userId: connection.userId },
+          data: { status: 'EXPIRED', lastError: 'TikTok session expired. Please reconnect to continue.' },
+        });
+        throw new TokenRefreshError('TikTok session expired. Please reconnect to continue.');
+      }
+
       try {
         const refreshed = await this.refreshToken({
           connectionId,
