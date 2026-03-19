@@ -3,7 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { generateAIRecommendations } from '../services/geminiService';
-import { getAIKeysFromConnections, hasAnyAIKey } from '../lib/multiAI';
+import { getAIKeysFromConnections, hasAnyAIKey } from '../lib/gemini';
 import { Lightbulb, TrendingUp, AlertTriangle, ArrowRight, ArrowLeft, CheckCircle2, BarChart2, Facebook, Video, Megaphone, Zap, Loader2, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
 

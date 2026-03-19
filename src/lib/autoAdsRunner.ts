@@ -2,7 +2,7 @@ import { getDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { getAutoAdsSchedule, setAutoAdsSchedule, saveAdToFirestore, type AutoAdsSchedule } from './firebase';
 import { fetchWooCommerceProducts } from '../services/woocommerceService';
-import { getAIKeysFromConnections } from './multiAI';
+import { getAIKeysFromConnections } from './gemini';
 import { generateCreativeCopy } from './gemini';
 
 function nextRunAt(schedule: AutoAdsSchedule): string {
