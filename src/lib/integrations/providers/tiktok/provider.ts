@@ -231,16 +231,18 @@ export class TikTokProvider implements IntegrationProvider {
       throw new NoAccountsFoundError('No selected TikTok advertiser account.');
     }
 
-    // If reporting scope isn't approved yet, do a lightweight advertiser info ping instead.
+    // If reporting scope isn't approved yet, do a lightweight advertiser list ping instead.
     if (!this.supports('REPORTING_TEST')) {
       const { accessToken } = await this.getValidAccessToken(connectionId, userId);
-      const url = new URL(`${TIKTOK_API_BASE}/advertiser/info/`);
-      url.searchParams.set('advertiser_ids', JSON.stringify([advertiserId]));
+      const url = new URL(`${TIKTOK_API_BASE}/oauth2/advertiser/get/`);
+      url.searchParams.set('app_id', integrationsEnv.TIKTOK_APP_ID ?? '');
+      url.searchParams.set('secret', integrationsEnv.TIKTOK_CLIENT_SECRET ?? '');
       const response = await fetch(url, {
         headers: { 'Access-Token': accessToken },
       });
       const envelope = (await response.json()) as TikTokEnvelope<{
         list?: Array<{ advertiser_id?: string; advertiser_name?: string; status?: string }>;
+        advertiser_ids?: string[];
       }>;
       if (!response.ok || envelope.code !== 0) {
         throw this.mapTikTokError(envelope, 'TikTok connection test failed. Please reconnect your account.');
@@ -248,7 +250,7 @@ export class TikTokProvider implements IntegrationProvider {
       return {
         ok: true,
         message: 'TikTok connection is valid.',
-        summary: { advertiserId, accounts: envelope.data?.list ?? [] },
+        summary: { advertiserId, accounts: envelope.data?.list ?? envelope.data?.advertiser_ids ?? [] },
       };
     }
 
