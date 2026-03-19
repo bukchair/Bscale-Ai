@@ -230,6 +230,9 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
   const [metaAssets, setMetaAssets] = useState<MetaAssetsPayload | null>(null);
   const [metaAssetsLoading, setMetaAssetsLoading] = useState(false);
   const [metaAssetsError, setMetaAssetsError] = useState<string | null>(null);
+  const [tiktokAccounts, setTiktokAccounts] = useState<Array<{ externalAccountId: string; name?: string }>>([]);
+  const [tiktokAccountsLoading, setTiktokAccountsLoading] = useState(false);
+  const [tiktokAccountsError, setTiktokAccountsError] = useState<string | null>(null);
   const [reinstallingManagedPlatform, setReinstallingManagedPlatform] = useState<
     'google' | 'meta' | 'tiktok' | null
   >(null);
@@ -557,15 +560,21 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
 
   const loadManagedTikTokAccounts = async (seedValues?: Record<string, string>) => {
     await bootstrapManagedSession();
+    setTiktokAccountsLoading(true);
+    setTiktokAccountsError(null);
     try {
       const response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
         method: 'GET',
         headers: { accept: 'application/json' },
         cache: 'no-store',
       });
-      if (!response.ok) return;
-      const payload = await response.json() as { data?: { accounts?: Array<{ externalAccountId: string; name?: string }> } };
+      const payload = await response.json() as { success?: boolean; message?: string; data?: { accounts?: Array<{ externalAccountId: string; name?: string }> } };
+      if (!response.ok || !payload?.success) {
+        setTiktokAccountsError(payload?.message || 'Failed to load TikTok advertiser accounts.');
+        return;
+      }
       const accounts = payload?.data?.accounts ?? [];
+      setTiktokAccounts(accounts);
       if (!accounts.length) return;
       setFormValues((prev) => {
         const source = seedValues || prev;
@@ -573,8 +582,10 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
         // Auto-fill the first discovered advertiser ID.
         return { ...prev, tiktokAdvertiserId: accounts[0].externalAccountId };
       });
-    } catch {
-      // Non-fatal: user can enter Advertiser ID manually.
+    } catch (err) {
+      setTiktokAccountsError(err instanceof Error ? err.message : 'Failed to load TikTok advertiser accounts.');
+    } finally {
+      setTiktokAccountsLoading(false);
     }
   };
 
@@ -908,6 +919,9 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
       }
       if (integration.id === 'tiktok' && integration.status === 'connected') {
         void loadManagedTikTokAccounts(integration.settings || {});
+      } else {
+        setTiktokAccounts([]);
+        setTiktokAccountsError(null);
       }
     }
   };
@@ -1465,22 +1479,53 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
                     </div>
                   )}
                   {isConnected && (
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
-                      <input
-                        type="text"
-                        placeholder="7012345678901234567"
-                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
-                        dir="ltr"
-                        value={formValues.tiktokAdvertiserId || ""}
-                        onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)}
-                      />
-                      <p className="mt-1 text-[10px] text-gray-400">
-                        {isHebrew
-                          ? 'הטוקן נשאב אוטומטית דרך OAuth — רק ה-Advertiser ID נדרש.'
-                          : 'Access token is fetched automatically via OAuth — only the Advertiser ID is required.'}
-                      </p>
-                    </div>
+                    <>
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => void loadManagedTikTokAccounts(formValues)}
+                          disabled={tiktokAccountsLoading}
+                          className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg text-xs font-bold hover:bg-blue-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {tiktokAccountsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                          {isHebrew ? 'טען/רענן חשבונות מפרסם מ-TikTok' : 'Load/refresh TikTok advertiser accounts'}
+                        </button>
+                        {tiktokAccountsError && (
+                          <p className="mt-1 text-[11px] text-red-600">{tiktokAccountsError}</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
+                        {tiktokAccounts.length > 0 ? (
+                          <select
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                            value={formValues.tiktokAdvertiserId || ''}
+                            onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)}
+                          >
+                            <option value="">{isHebrew ? 'בחר חשבון מפרסם' : 'Select advertiser account'}</option>
+                            {tiktokAccounts.map((account) => (
+                              <option key={account.externalAccountId} value={account.externalAccountId}>
+                                {account.name || account.externalAccountId} ({account.externalAccountId})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="7012345678901234567"
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
+                            dir="ltr"
+                            value={formValues.tiktokAdvertiserId || ""}
+                            onChange={(e) => handleInputChange('tiktokAdvertiserId', e.target.value)}
+                          />
+                        )}
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          {isHebrew
+                            ? 'הטוקן נשאב אוטומטית דרך OAuth — רק ה-Advertiser ID נדרש.'
+                            : 'Access token is fetched automatically via OAuth — only the Advertiser ID is required.'}
+                        </p>
+                      </div>
+                    </>
                   )}
                 </>
               )}
