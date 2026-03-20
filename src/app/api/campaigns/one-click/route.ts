@@ -276,7 +276,10 @@ export async function POST(request: Request) {
       platform: undefined,
       connectionId: undefined,
       details: { requestId: record.id, platforms, objective, dailyBudget, status: finalStatus, results },
-    }).catch(() => {});
+    }).catch((err) => {
+      // Non-fatal: audit log failure must not block the campaign response.
+      console.error('[one-click] auditService.log failed:', err);
+    });
 
     const responseBody: OneClickResult = {
       requestId: record.id,

@@ -88,10 +88,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         try {
           const scope = await resolveWorkspaceScope({ uid: user.uid, email: user.email });
           scopeOwnerUid = scope?.ownerUid || user.uid;
-        } catch {
+        } catch (err) {
+          console.error('[AppShell] resolveWorkspaceScope failed, falling back to user uid:', err);
           scopeOwnerUid = user.uid;
         }
-        runAutoAdsIfNeeded(scopeOwnerUid).catch(() => {});
+        runAutoAdsIfNeeded(scopeOwnerUid).catch((err) => {
+          console.error('[AppShell] runAutoAdsIfNeeded failed:', err);
+        });
 
         // Handle invitation acceptance from email link
         const urlParams = new URLSearchParams(window.location.search);

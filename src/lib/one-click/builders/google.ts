@@ -190,7 +190,10 @@ export const createGoogleDraft = async (
             },
           }],
         }),
-      }).catch(() => {});
+      }).catch((err) => {
+        // Non-fatal: geo-targeting is best-effort; campaign continues without it.
+        console.warn('[one-click/google] geo-targeting failed (non-fatal):', err);
+      });
     }
 
     // 4. Create Ad Group

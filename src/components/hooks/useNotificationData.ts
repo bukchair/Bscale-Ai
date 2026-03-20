@@ -341,7 +341,7 @@ export function useNotificationData({
       unreadLeads.map((l) =>
         updateDoc(doc(db, 'salesLeads', l.id), {
           [`readBy.${currentUid}`]: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => console.error('[useNotificationData] markLead read failed:', err))
       )
     );
     const unreadPending = pendingUserApprovals.filter((u) => !u.approvalReadBy?.[currentUid]);
@@ -349,7 +349,7 @@ export function useNotificationData({
       unreadPending.map((u) =>
         updateDoc(doc(db, 'users', u.uid), {
           [`approvalReadBy.${currentUid}`]: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => console.error('[useNotificationData] markApproval read failed:', err))
       )
     );
     const unreadSupport = supportNotifications.filter((t) => {
@@ -361,7 +361,7 @@ export function useNotificationData({
       unreadSupport.map((t) =>
         updateDoc(doc(db, 'users', t.ownerUid, 'settings', t.docId), {
           adminSeenAt: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => console.error('[useNotificationData] markSupport seen failed:', err))
       )
     );
   };
