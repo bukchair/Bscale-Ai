@@ -44,13 +44,28 @@ import type {
 
 const sanitize = (v: string, maxLen = 120) => String(v || '').trim().slice(0, maxLen);
 
+// Country code → Google Geo Target Constant ID
+const GOOGLE_GEO: Record<string, number> = {
+  IL: 2376, US: 2840, GB: 2826, DE: 2276, FR: 2250,
+  CA: 2124, AU: 2036, NL: 2528, ES: 2510, IT: 2380,
+};
+
+// Country code → TikTok location ID (GeoNames-based)
+const TIKTOK_GEO: Record<string, string> = {
+  US: '6252001', GB: '2635167', DE: '2921044', FR: '3017382',
+  CA: '6251999', AU: '2077456', NL: '2750405', IL: '294640',
+  ES: '2510769', IT: '3175395',
+};
+
 const extractError = async (res: Response): Promise<string> => {
   const raw = await res.text().catch(() => '');
   if (!raw) return `HTTP ${res.status}`;
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const e = parsed?.error as Record<string, unknown> | undefined;
+    const d = parsed?.data as Record<string, unknown> | undefined;
     return (
-      String(parsed?.error?.message || parsed?.message || parsed?.data?.message || '').trim() ||
+      String(e?.message || parsed?.message || d?.message || '').trim() ||
       raw.slice(0, 260)
     );
   } catch {
@@ -80,7 +95,8 @@ const createGoogleDraft = async (
   objective: OneClickObjective,
   dailyBudget: number,
   _strategy: OneClickStrategy,
-  activateImmediately = false
+  activateImmediately = false,
+  country = 'US'
 ): Promise<PlatformResult> => {
   try {
     if (!integrationsEnv.GOOGLE_ADS_DEVELOPER_TOKEN) {
@@ -174,6 +190,23 @@ const createGoogleDraft = async (
     );
     const campaignId = resourceName.split('/').pop() || resourceName;
 
+    // 3. Add geo-targeting (non-fatal)
+    const geoCriteriaId = GOOGLE_GEO[country.toUpperCase()];
+    if (geoCriteriaId && resourceName) {
+      await fetch(`${GOOGLE_ADS_API_BASE}/customers/${customerId}/campaignCriteria:mutate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          operations: [{
+            create: {
+              campaign: resourceName,
+              location: { geoTargetConstant: `geoTargetConstants/${geoCriteriaId}` },
+            },
+          }],
+        }),
+      }).catch(() => {}); // non-fatal
+    }
+
     return {
       ok: true,
       campaignId,
@@ -195,7 +228,8 @@ const createMetaDraft = async (
   objective: OneClickObjective,
   dailyBudget: number,
   _strategy: OneClickStrategy,
-  activateImmediately = false
+  activateImmediately = false,
+  country = 'US'
 ): Promise<PlatformResult> => {
   try {
     const connection = await connectionService.getByUserPlatform(userId, 'META');
@@ -248,7 +282,12 @@ const createMetaDraft = async (
     adSetForm.set('optimization_goal', metaOptGoal);
     adSetForm.set('daily_budget', String(Math.round(Math.max(dailyBudget, 1) * 100))); // in cents
     adSetForm.set('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');
-    adSetForm.set('targeting', JSON.stringify({ age_min: 18, age_max: 65, publisher_platforms: ['facebook', 'instagram'] }));
+    adSetForm.set('targeting', JSON.stringify({
+      age_min: 18,
+      age_max: 65,
+      publisher_platforms: ['facebook', 'instagram'],
+      geo_locations: { countries: [country.toUpperCase()] },
+    }));
 
     const adSetRes = await fetch(`${META_GRAPH_BASE}/${accountResource}/adsets`, {
       method: 'POST',
@@ -285,7 +324,8 @@ const createTikTokDraft = async (
   objective: OneClickObjective,
   dailyBudget: number,
   _strategy: OneClickStrategy,
-  activateImmediately = false
+  activateImmediately = false,
+  country = 'US'
 ): Promise<PlatformResult> => {
   try {
     const connection = await connectionService.getByUserPlatform(userId, 'TIKTOK');
@@ -364,6 +404,7 @@ const createTikTokDraft = async (
         optimization_goal: toTikTokOptimizationGoal(objective),
         billing_event: toTikTokBillingEvent(objective),
         operation_status: activateImmediately ? 'ENABLE' : 'DISABLE',
+        ...(TIKTOK_GEO[country.toUpperCase()] ? { location_ids: [TIKTOK_GEO[country.toUpperCase()]] } : {}),
       }),
     });
 
@@ -568,9 +609,9 @@ export async function POST(request: Request) {
   // ── Run platform creators in parallel ─────────────────────────────────────
   const campaignName = strategy.campaignName;
   const creatorMap: Record<OneClickPlatform, () => Promise<PlatformResult>> = {
-    Google: () => createGoogleDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately),
-    Meta: () => createMetaDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately),
-    TikTok: () => createTikTokDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately),
+    Google: () => createGoogleDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately, input.country),
+    Meta: () => createMetaDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately, input.country),
+    TikTok: () => createTikTokDraft(user.id, campaignName, objective, dailyBudget, strategy, activateImmediately, input.country),
   };
 
   const settled = await Promise.allSettled(
