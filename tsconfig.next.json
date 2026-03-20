@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "strict": false,
-    "strictNullChecks": true,
+    "strict": true,
     "incremental": true,
     "plugins": [
       {
@@ -14,22 +13,11 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "src/app/**/*.ts",
-    "src/app/**/*.tsx",
-    "src/components/connections/**/*.ts",
-    "src/components/connections/**/*.tsx",
-    "src/lib/**/*.ts",
-    "src/lib/**/*.tsx"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "server.ts"
   ],
   "exclude": [
-    "node_modules",
-    "src/pages/**",
-    "src/lib/firebase.ts",
-    "src/lib/autoAdsRunner.ts",
-    "src/lib/unified-data/**",
-    "src/lib/dataUtils.ts",
-    "src/lib/gemini.ts",
-    "src/contexts/**",
-    "src/services/**"
+    "node_modules"
   ]
 }
