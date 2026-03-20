@@ -39,5 +39,5 @@ export const syncEnv = {
   WORKER_INSTANCE_ID: process.env.WORKER_INSTANCE_ID || 'local-worker',
   SYNC_METRICS_DEFAULT_LOOKBACK_DAYS: toInt(process.env.SYNC_METRICS_DEFAULT_LOOKBACK_DAYS, 30),
   SYNC_HOURLY_LOOKBACK_HOURS: toInt(process.env.SYNC_HOURLY_LOOKBACK_HOURS, 48),
-  TIKTOK_SYNC_ENABLED: toBool(process.env.TIKTOK_SYNC_ENABLED, false),
+  TIKTOK_SYNC_ENABLED: toBool(process.env.TIKTOK_SYNC_ENABLED, true),
 } as const;
