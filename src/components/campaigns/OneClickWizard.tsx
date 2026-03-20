@@ -349,7 +349,8 @@ export function OneClickWizard({ open, onClose, onSuccess }: OneClickWizardProps
       } catch {
         throw new Error(isHebrew ? 'תגובת שרת לא תקינה.' : 'Invalid server response.');
       }
-      if (!res.ok) {
+      // 422 = all platforms failed but we still have per-platform error details
+      if (!res.ok && res.status !== 422) {
         const errMsg = (data as unknown as Record<string, unknown>)?.error;
         throw new Error(typeof errMsg === 'string' ? errMsg : `Server error ${res.status}.`);
       }

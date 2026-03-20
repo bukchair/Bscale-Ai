@@ -573,14 +573,14 @@ export async function POST(request: Request) {
   for (const item of settled) {
     if (item.status === 'fulfilled') {
       results[item.value.platform] = item.value.result;
+      if (!item.value.result.ok) {
+        console.error(`[one-click] ${item.value.platform} failed:`, item.value.result.message);
+      }
     } else {
-      // Promise itself rejected (should not happen given try/catch inside)
       const platform = platforms[settled.indexOf(item)];
-      results[platform] = {
-        ok: false,
-        message: item.reason instanceof Error ? item.reason.message : 'Unexpected error.',
-        campaignStatus: 'Error',
-      };
+      const msg = item.reason instanceof Error ? item.reason.message : 'Unexpected error.';
+      console.error(`[one-click] ${platform} rejected:`, msg);
+      results[platform] = { ok: false, message: msg, campaignStatus: 'Error' };
     }
   }
 
