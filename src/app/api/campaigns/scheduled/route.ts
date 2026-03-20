@@ -471,7 +471,7 @@ const createTikTokCampaign = async (
   body: CreateScheduledCampaignBody
 ): Promise<PlatformCreateResult> => {
   const activeNow = isHourActiveForPlatform(body.weeklySchedule, 'TikTok');
-  const defaultBudget = 20;
+  const defaultBudget = 50; // TikTok minimum daily budget is $50
   try {
     const connection = await connectionService.getByUserPlatform(userId, 'TIKTOK');
     if (!connection || connection.status !== 'CONNECTED') {
