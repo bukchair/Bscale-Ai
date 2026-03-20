@@ -1,7 +1,7 @@
 'use client';
 
-import { SystemMail } from '@/src/pages/SystemMail';
-import { Dashboard } from '@/src/pages/Dashboard';
+import { SystemMail } from '@/src/views/SystemMail';
+import { Dashboard } from '@/src/views/Dashboard';
 import { useUserProfile } from '@/src/contexts/UserProfileContext';
 
 export default function SystemMailPage() {

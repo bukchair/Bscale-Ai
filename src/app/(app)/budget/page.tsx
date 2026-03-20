@@ -1,3 +1,3 @@
 'use client';
-import { Budget } from '@/src/pages/Budget';
+import { Budget } from '@/src/views/Budget';
 export default function BudgetPage() { return <Budget />; }

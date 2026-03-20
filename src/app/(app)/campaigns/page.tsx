@@ -1,3 +1,3 @@
 'use client';
-import { Campaigns } from '@/src/pages/Campaigns';
+import { Campaigns } from '@/src/views/Campaigns';
 export default function CampaignsPage() { return <Campaigns />; }

@@ -1,0 +1,10 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/google/ads/accounts/route.js")
+R.c("server/chunks/[root-of-the-server]__ad49f5e2._.js")
+R.c("server/chunks/src_lib_integrations_ac6b8366._.js")
+R.c("server/chunks/[root-of-the-server]__5c6bca5a._.js")
+R.c("server/chunks/_33e904a7._.js")
+R.c("server/chunks/[root-of-the-server]__e07da153._.js")
+R.c("server/chunks/[root-of-the-server]__6ac8ec31._.js")
+R.c("server/chunks/_next-internal_server_app_api_google_ads_accounts_route_actions_aee8bcc0.js")
+R.m(33546)
+module.exports=R.m(33546).exports

@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Manages all real-time Firebase notification subscriptions for the Header:
  *   - Sales leads

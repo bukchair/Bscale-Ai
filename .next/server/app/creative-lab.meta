@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/(app)/layout,_N_T_/(app)/creative-lab/layout,_N_T_/(app)/creative-lab/page,_N_T_/creative-lab"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/!KGFwcCk/creative-lab/__PAGE__",
+    "/!KGFwcCk/creative-lab",
+    "/!KGFwcCk",
+    "/_index",
+    "/_head"
+  ]
+}

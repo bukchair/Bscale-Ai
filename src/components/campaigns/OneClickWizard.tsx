@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * OneClickWizard — simplified 5-step campaign creation wizard.
  *
