@@ -58,3 +58,6 @@ export const orderStatusBadgeClass = (status: string) => {
 };
 
 export const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '—');
+
+export const orderStatusLabel = (status: string) =>
+  (status || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
