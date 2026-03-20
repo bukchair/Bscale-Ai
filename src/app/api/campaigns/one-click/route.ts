@@ -706,6 +706,7 @@ export async function POST(request: Request) {
           description: sanitize(body.product.description || '', 500),
           price: String(body.product.price || '').slice(0, 30),
           url: String(body.product.url || '').slice(0, 500),
+          imageUrl: String(body.product.imageUrl || '').slice(0, 1000) || undefined,
         }
       : undefined,
   };

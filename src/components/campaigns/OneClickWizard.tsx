@@ -57,6 +57,7 @@ interface WizardProduct {
   description: string;
   price: string;
   url: string;
+  imageUrl?: string;
 }
 
 interface OneClickWizardProps {
@@ -176,7 +177,7 @@ export function OneClickWizard({ open, onClose, onSuccess }: OneClickWizardProps
   // Step 3 — Product & targeting
   const [productSource, setProductSource] = useState<ProductSource>('manual');
   const [manualProduct, setManualProduct] = useState<WizardProduct>({ name: '', description: '', price: '', url: '' });
-  const [wooProducts, setWooProducts] = useState<Array<{ id: number; name: string; price?: string; short_description?: string; sku?: string }>>([]);
+  const [wooProducts, setWooProducts] = useState<Array<{ id: number; name: string; price?: string; short_description?: string; sku?: string; permalink?: string; images?: Array<{ src: string }> }>>([]);
   const [wooLoading, setWooLoading] = useState(false);
   const [selectedWooId, setSelectedWooId] = useState<string>('');
   const [country, setCountry] = useState('IL');
@@ -221,7 +222,8 @@ export function OneClickWizard({ open, onClose, onSuccess }: OneClickWizardProps
         name: selectedWooProduct.name || '',
         description: stripHtml(selectedWooProduct.short_description || ''),
         price: selectedWooProduct.price || '',
-        url: '',
+        url: selectedWooProduct.permalink || '',
+        imageUrl: selectedWooProduct.images?.[0]?.src || undefined,
       };
     }
     return manualProduct;
