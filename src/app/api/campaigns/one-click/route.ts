@@ -311,9 +311,8 @@ const createGoogleDraft = async (
       return { ok: false, message: 'Google budget created without resource name.', campaignStatus: 'Error' };
     }
 
-    // 2. Create campaign
-    const channelType =
-      objective === 'traffic' ? 'DISPLAY' : objective === 'leads' ? 'SEARCH' : 'SEARCH';
+    // 2. Create campaign — always SEARCH (simplest, no pixel/form requirements)
+    const channelType = 'SEARCH';
 
     const campaignRes = await fetch(
       `${GOOGLE_ADS_API_BASE}/customers/${customerId}/campaigns:mutate`,
@@ -328,11 +327,11 @@ const createGoogleDraft = async (
                 status: activateImmediately ? 'ENABLED' : 'PAUSED',
                 advertisingChannelType: channelType,
                 campaignBudget: budgetResourceName,
-                targetSpend: {},
+                maximizeClicks: {},
                 networkSettings: {
                   targetGoogleSearch: true,
-                  targetSearchNetwork: false,
-                  targetContentNetwork: channelType === 'DISPLAY',
+                  targetSearchNetwork: true,
+                  targetContentNetwork: false,
                 },
                 startDate: new Date().toISOString().slice(0, 10),
               },
@@ -548,8 +547,8 @@ const createMetaDraft = async (
     const campaignPayload = (await campaignRes.json()) as Record<string, unknown>;
     const campaignId = String(campaignPayload?.id || '');
 
-    // Create ad set with daily budget
-    const metaOptGoal = objective === 'leads' ? 'LEAD_GENERATION' : objective === 'traffic' ? 'LINK_CLICKS' : 'OFFSITE_CONVERSIONS';
+    // Create ad set with daily budget — use LINK_CLICKS for all (no pixel/lead form required)
+    const metaOptGoal = 'LINK_CLICKS';
     const adSetForm = new URLSearchParams();
     adSetForm.set('name', `${sanitize(name)} – Ad Set`);
     adSetForm.set('campaign_id', campaignId);
@@ -704,17 +703,21 @@ const createTikTokDraft = async (
       return { ok: false, message: 'No selected TikTok advertiser found.', campaignStatus: 'Error' };
     }
 
-    // Refresh token if expiring
+    // Refresh token if expiring (only when a refresh token is available)
     const provider = new TikTokProvider();
     const expiresSoon =
       !connection.tokenExpiresAt || connection.tokenExpiresAt.getTime() <= Date.now() + 60_000;
-    if (expiresSoon) {
-      const refreshed = await provider.refreshToken({
-        connectionId: connection.id,
-        userId,
-        encryptedRefreshToken: connection.encryptedRefreshToken,
-      });
-      await tokenService.saveTokenSet(userId, connection.id, refreshed);
+    if (expiresSoon && connection.encryptedRefreshToken) {
+      try {
+        const refreshed = await provider.refreshToken({
+          connectionId: connection.id,
+          userId,
+          encryptedRefreshToken: connection.encryptedRefreshToken,
+        });
+        await tokenService.saveTokenSet(userId, connection.id, refreshed);
+      } catch (refreshErr) {
+        console.warn('[one-click] TikTok token refresh failed, attempting with existing token:', refreshErr);
+      }
     }
     const accessToken = await tokenService.getAccessToken(connection.id, userId);
 
