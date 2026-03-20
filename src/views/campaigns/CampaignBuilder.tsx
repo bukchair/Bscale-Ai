@@ -6,10 +6,11 @@ import { cn } from '../../lib/utils';
 import type {
   ContentType, ObjectiveType, PlatformName, ProductType, RuleAction,
   WooPublishScope, UploadedAsset, TimeRule, WeeklySchedule, PlatformCopyDraft, DayKey,
+  MediaLimits, WooCampaignProduct,
 } from './types';
 import { DAY_KEYS } from './types';
 
-type WooProduct = { id: number; name: string; price?: string; category?: string; categories?: string[]; imageUrl?: string; url?: string; description?: string; shortDescription?: string };
+type WooProduct = WooCampaignProduct & { imageUrl?: string; url?: string; category?: string };
 
 type CampaignBuilderProps = {
   // refs
@@ -55,7 +56,7 @@ type CampaignBuilderProps = {
   contentTypeOptions: Array<{ value: ContentType; label: string }>;
   dayLabels: Record<string, string>;
   draftPlatforms: string[];
-  effectiveMediaLimits: Record<string, { maxImages: number; maxVideos: number; maxFileSizeMB: number }>;
+  effectiveMediaLimits: MediaLimits;
   hourOptions: number[];
   objectiveOptions: Array<{ value: ObjectiveType; label: string }>;
   platformCopyDrafts: Partial<Record<PlatformName, PlatformCopyDraft>>;
@@ -83,11 +84,11 @@ type CampaignBuilderProps = {
   setRuleAction: (v: RuleAction) => void;
   setRuleEndHour: (v: number) => void;
   setRuleMinRoas: (v: number) => void;
-  setRulePlatform: (v: string) => void;
+  setRulePlatform: React.Dispatch<React.SetStateAction<PlatformName>>;
   setRuleReason: (v: string) => void;
   setRuleStartHour: (v: number) => void;
-  setSelectedCopyPlatform: (v: string) => void;
-  setSelectedPreviewPlatform: (v: string) => void;
+  setSelectedCopyPlatform: React.Dispatch<React.SetStateAction<PlatformName>>;
+  setSelectedPreviewPlatform: React.Dispatch<React.SetStateAction<PlatformName>>;
   setSelectedScheduleDay: (v: DayKey) => void;
   setSelectedSchedulePlatform: (v: string) => void;
   setSelectedWooCategory: (v: string) => void;
@@ -99,23 +100,23 @@ type CampaignBuilderProps = {
   // handlers
   addCustomAudience: () => void;
   addTimeRule: () => void;
-  applyPlatformCopyToFields: (platform: string) => void;
+  applyPlatformCopyToFields: (platform: PlatformName) => void;
   disableWooImportMode: () => void;
   formatHour: (hour: number) => string;
   formatHourRange: (start: number, end: number) => string;
   formatSmartElapsed: (ms: number) => string;
   getActiveSlotsCount: (platform: string) => number;
-  getPlatformDescriptionLimit: (platform: string) => number;
-  getPlatformTitleLimit: (platform: string) => number;
+  getPlatformDescriptionLimit: (platform: PlatformName) => number;
+  getPlatformTitleLimit: (platform: PlatformName) => number;
   handleAssetUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleAutoAudienceAndStrategy: () => void;
   handleCreateScheduledCampaign: () => void;
-  importWooProductToBuilder: (product: WooProduct, opts?: { overwriteExisting?: boolean; notify?: boolean }) => void;
-  isFullDaySelected: (day: string, platform: string) => boolean;
+  importWooProductToBuilder: (product: WooCampaignProduct, opts?: { overwriteExisting?: boolean; notify?: boolean }) => void;
+  isFullDaySelected: (platform: string, day: DayKey) => boolean;
   removeAsset: (id: string) => void;
   removeTimeRule: (id: string) => void;
   toggleAudienceSelection: (audience: string) => void;
-  toggleFullDay: (day: string, platform: string) => void;
+  toggleFullDay: (platform: string, day: DayKey) => void;
   togglePlatformSelection: (platform: PlatformName) => void;
   toggleScheduleHour: (platform: string, day: DayKey, hour: number) => void;
 };
@@ -336,7 +337,7 @@ export function CampaignBuilder({
                     <button
                       key={`platform-copy-tab-${platform}`}
                       type="button"
-                      onClick={() => setSelectedCopyPlatform(platform)}
+                      onClick={() => setSelectedCopyPlatform(platform as PlatformName)}
                       className={cn(
                         'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold',
                         selected
@@ -356,8 +357,8 @@ export function CampaignBuilder({
                 const platform = selectedCopyPlatform;
                 const draft = platformCopyDrafts[platform as PlatformName];
                 if (!draft) return null;
-                const titleLimit = getPlatformTitleLimit(platform);
-                const descriptionLimit = getPlatformDescriptionLimit(platform);
+                const titleLimit = getPlatformTitleLimit(platform as PlatformName);
+                const descriptionLimit = getPlatformDescriptionLimit(platform as PlatformName);
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-3">
                     <div className="rounded-lg border border-violet-200 bg-white p-3">
@@ -365,7 +366,7 @@ export function CampaignBuilder({
                         <p className="text-xs font-bold text-violet-900">{platform}</p>
                         <button
                           type="button"
-                          onClick={() => applyPlatformCopyToFields(platform)}
+                          onClick={() => applyPlatformCopyToFields(platform as PlatformName)}
                           className="inline-flex items-center rounded-md border border-violet-300 px-2.5 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-50"
                         >
                           {text.applyPlatformCopy}
@@ -504,7 +505,7 @@ export function CampaignBuilder({
                   {useWooProductData ? text.wooTextMode : text.manualTextMode}
                 </span>
                 <span className="text-[10px] font-semibold text-indigo-700">
-                  {campaignBrief.trim().length}/{getPlatformDescriptionLimit(selectedPreviewPlatform)}
+                  {campaignBrief.trim().length}/{getPlatformDescriptionLimit(selectedPreviewPlatform as PlatformName)}
                 </span>
               </div>
             </div>
@@ -998,7 +999,7 @@ export function CampaignBuilder({
                 <button
                   key={`preview-tab-${platform}`}
                   type="button"
-                  onClick={() => setSelectedPreviewPlatform(platform)}
+                  onClick={() => setSelectedPreviewPlatform(platform as PlatformName)}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold',
                     selectedPreviewPlatform === platform
