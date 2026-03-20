@@ -195,6 +195,74 @@ Return ONLY valid JSON with this exact structure (write in Hebrew for title, des
   }
 }
 
+export interface AIRecommendation {
+  id: string;
+  platform: 'google' | 'meta' | 'tiktok' | 'cross';
+  type: 'budget' | 'creative' | 'targeting' | 'bid';
+  title: string;
+  description: string;
+  impact: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  status: 'pending' | 'applied' | 'dismissed';
+}
+
+export async function generateAIRecommendations(apiKeyOrKeys: string | AIKeys, context: string): Promise<AIRecommendation[]> {
+  const prompt = `
+    You are an expert digital marketing AI assistant.
+    Analyze the following marketing context and provide 3-4 specific, actionable recommendations for Google Ads, Meta Ads, TikTok Ads, or cross-platform optimization.
+
+    Context: ${context}
+
+    Return ONLY valid JSON array (no markdown), exactly this structure:
+    [
+      {
+        "id": "1",
+        "platform": "google",
+        "type": "budget",
+        "title": "string in Hebrew",
+        "description": "string in Hebrew",
+        "impact": "e.g. +15% ROAS",
+        "difficulty": "easy"
+      }
+    ]
+    All recommendations in Hebrew. Platform must be one of: google, meta, tiktok, cross. Type: budget, creative, targeting, bid. Difficulty: easy, medium, hard.
+  `;
+
+  function mapRow(r: Record<string, unknown>, i: number): AIRecommendation {
+    return {
+      id: String(r?.id ?? i + 1),
+      platform: (r?.platform as AIRecommendation['platform']) ?? 'cross',
+      type: (r?.type as AIRecommendation['type']) ?? 'targeting',
+      title: String(r?.title ?? 'המלצה'),
+      description: String(r?.description ?? ''),
+      impact: String(r?.impact ?? ''),
+      difficulty: (r?.difficulty as AIRecommendation['difficulty']) ?? 'medium',
+      status: 'pending',
+    };
+  }
+
+  if (typeof apiKeyOrKeys === 'object' && hasAnyAIKey(apiKeyOrKeys)) {
+    const data = await runWithMultiAI<unknown[]>(prompt, apiKeyOrKeys);
+    return (Array.isArray(data) ? data : []).map((r, i) => mapRow(r as Record<string, unknown>, i));
+  }
+
+  const ai = getAI(typeof apiKeyOrKeys === 'string' ? apiKeyOrKeys : undefined);
+  if (!ai) throw new Error('Gemini API key is missing. Add it in Integrations (Gemini) or set GEMINI_API_KEY in .env.');
+  try {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
+      contents: prompt,
+      config: { responseMimeType: 'application/json' },
+    });
+    const text = response.text || '[]';
+    const arr = JSON.parse(text);
+    return (Array.isArray(arr) ? arr : []).map((r, i) => mapRow(r as Record<string, unknown>, i));
+  } catch (error) {
+    console.error('Gemini API Error:', error);
+    throw error;
+  }
+}
+
 export interface CampaignBuilderSuggestion {
   shortTitle?: string;
   campaignName?: string;
