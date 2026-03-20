@@ -5,7 +5,7 @@ const ensureManagedApiSession = async (accessToken: string) => {
   if (accessToken !== 'server-managed') return;
   const user =
     auth.currentUser ||
-    (await new Promise<typeof auth.currentUser>((resolve) => {
+    (await new Promise<import('firebase/auth').User | null>((resolve) => {
       const timeoutId = window.setTimeout(() => {
         unsubscribe();
         resolve(auth.currentUser);

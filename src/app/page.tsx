@@ -1,5 +1,0 @@
-import { LegacyAppRoot } from '@/src/components/LegacyAppRoot';
-
-export default function HomePage() {
-  return <LegacyAppRoot />;
-}

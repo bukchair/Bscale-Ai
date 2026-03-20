@@ -726,7 +726,7 @@ export function Dashboard() {
         try {
           const report = await fetchGA4Report(
             token,
-            google.settings.ga4Id || undefined,
+            google.settings?.ga4Id || undefined,
             startIsoDateOnly,
             endIsoDateOnly
           );
@@ -789,7 +789,7 @@ export function Dashboard() {
         }
 
         try {
-          const realtime = await fetchGA4Realtime(token, google.settings.ga4Id || undefined);
+          const realtime = await fetchGA4Realtime(token, google.settings?.ga4Id || undefined);
           if (realtime.users24h > 0 || realtime.topPages.length > 0) {
             if (realtime.users24h > 0) setGa4Users24h(realtime.users24h);
             if (realtime.topPages.length > 0) {
@@ -804,7 +804,7 @@ export function Dashboard() {
         try {
           const gsc = await fetchGSCData(
             token,
-            google.settings.siteUrl || google.settings.gscSiteUrl || undefined,
+            google.settings?.siteUrl || google.settings?.gscSiteUrl || undefined,
             startIsoDateOnly,
             endIsoDateOnly
           );
@@ -831,14 +831,14 @@ export function Dashboard() {
         }
 
         const googleCustomerId =
-          google.settings.googleAdsId ||
-          google.settings.customerId ||
-          google.settings.googleCustomerId;
+          google.settings?.googleAdsId ||
+          google.settings?.customerId ||
+          google.settings?.googleCustomerId;
         try {
           const googleCampaigns = await fetchGoogleCampaigns(
             token,
             googleCustomerId || undefined,
-            google.settings.loginCustomerId
+            google.settings?.loginCustomerId
           );
           googleCampaigns.forEach((campaign: any) => {
             const spend = moneyFromUnknown(campaign.spend);

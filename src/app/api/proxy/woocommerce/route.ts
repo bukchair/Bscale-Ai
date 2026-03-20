@@ -1,6 +1,25 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 
+/** Blocks SSRF by rejecting private/loopback/link-local IP ranges and hostnames. */
+function isPrivateHost(hostname: string): boolean {
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    return (
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      a === 0 ||
+      a >= 224
+    );
+  }
+  const h = hostname.toLowerCase();
+  return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '[::1]';
+}
+
 type WooBody = {
   url?: string;
   key?: string;
@@ -62,6 +81,17 @@ export async function POST(request: Request) {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
+
+    let parsedHost: URL;
+    try {
+      parsedHost = new URL(formattedUrl);
+    } catch {
+      return NextResponse.json({ message: 'Invalid store URL.' }, { status: 400 });
+    }
+    if (isPrivateHost(parsedHost.hostname)) {
+      return NextResponse.json({ message: 'Invalid store URL.' }, { status: 400 });
+    }
+
     const baseUrl = formattedUrl.endsWith('/') ? formattedUrl.slice(0, -1) : formattedUrl;
     const rawEndpoint = endpoint || 'system_status';
     // Guard against path traversal (e.g. "../../wp-login.php").

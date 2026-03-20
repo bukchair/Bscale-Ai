@@ -4,7 +4,7 @@ import type { SyncAccountsPayload } from '@/src/lib/sync/queue/payloads';
 
 export const processSyncAccounts = async (payload: SyncAccountsPayload) => {
   const provider = providerFactory.get(payload.platform as any);
-  const discovered = await provider.discoverAccounts(payload.connectionId);
+  const discovered = await provider.discoverAccounts(payload.connectionId, payload.userId);
   await connectionService.saveDiscoveredAccounts(
     payload.userId,
     payload.connectionId,

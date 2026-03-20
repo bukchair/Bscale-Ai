@@ -202,7 +202,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const waitForCurrentUser = async () => {
     if (auth.currentUser) return auth.currentUser;
-    return new Promise<typeof auth.currentUser>((resolve) => {
+    return new Promise<import('firebase/auth').User | null>((resolve) => {
       let settled = false;
       const timeoutId = window.setTimeout(() => {
         if (settled) return;

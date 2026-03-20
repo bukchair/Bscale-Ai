@@ -523,7 +523,7 @@ export function Integrations({ userProfile }: { userProfile?: { role?: string; s
     // and returns null immediately after a redirect, causing 401s on the next API call.
     const currentUser =
       auth.currentUser ||
-      (await new Promise<typeof auth.currentUser>((resolve) => {
+      (await new Promise<import('firebase/auth').User | null>((resolve) => {
         let settled = false;
         const timeoutId = window.setTimeout(() => {
           if (settled) return;

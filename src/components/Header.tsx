@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Menu, Bell, Search, User, ChevronDown, CheckCircle, AlertTriangle, Calendar, BrainCircuit, LifeBuoy } from 'lucide-react';
+import { Menu, Bell, User, ChevronDown, CheckCircle, AlertTriangle, Calendar, BrainCircuit, LifeBuoy, Search } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, DateRangeType } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
-import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { useNotificationData, type SupportMessageRow, type SupportThreadNotification } from './hooks/useNotificationData';
+import { useTrialCountdown } from './hooks/useTrialCountdown';
 
 type UserProfile = {
   uid?: string;
@@ -25,16 +27,6 @@ interface HeaderProps {
   userProfile?: UserProfile;
 }
 
-type PendingUserApproval = {
-  uid: string;
-  name: string;
-  email: string;
-  createdAt?: string;
-  role?: string;
-  subscriptionStatus?: string;
-  approvalReadBy?: Record<string, string>;
-};
-
 type NotificationItem = {
   id: string | number;
   type: string;
@@ -49,35 +41,6 @@ type NotificationItem = {
   onAction?: () => void;
 };
 
-type SupportThreadNotification = {
-  id: string;
-  ownerUid: string;
-  docId: string;
-  kind?: 'support_thread';
-  subject: string;
-  createdByUid?: string;
-  createdByName?: string;
-  createdByEmail?: string;
-  status?: string;
-  updatedAt?: string;
-  lastMessageAt?: string;
-  lastMessageFrom?: 'user' | 'admin';
-  lastMessageText?: string;
-  adminSeenAt?: string;
-  userSeenAt?: string;
-  messages?: SupportMessageRow[];
-};
-
-type SupportMessageRow = {
-  id: string;
-  threadId: string;
-  text: string;
-  senderUid: string;
-  senderRole: 'user' | 'admin';
-  senderName?: string;
-  createdAt: string;
-};
-
 export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const { t, dir } = useLanguage();
   const { dateRange, setDateRange, customRange, setCustomRange } = useDateRange();
@@ -87,423 +50,54 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const [pendingCustomRange, setPendingCustomRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
-  const [liveLeadToast, setLiveLeadToast] = useState<{ id: string; name: string; contact: string } | null>(null);
-  const [livePendingUserToast, setLivePendingUserToast] = useState<{ uid: string; name: string; email: string } | null>(null);
-  const [leadNotifications, setLeadNotifications] = useState<Array<{
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    createdAt: string;
-    sourcePath?: string;
-    readBy?: Record<string, string>;
-  }>>([]);
-  const [pendingUserApprovals, setPendingUserApprovals] = useState<PendingUserApproval[]>([]);
-  const [supportNotifications, setSupportNotifications] = useState<SupportThreadNotification[]>([]);
-  const [supportThreads, setSupportThreads] = useState<SupportThreadNotification[]>([]);
-  const [supportSelectedThreadId, setSupportSelectedThreadId] = useState<string | null>(null);
   const [supportDraftSubject, setSupportDraftSubject] = useState('');
   const [supportDraftMessage, setSupportDraftMessage] = useState('');
   const [supportReply, setSupportReply] = useState('');
   const [supportError, setSupportError] = useState<string | null>(null);
   const [supportSuccess, setSupportSuccess] = useState<string | null>(null);
   const [isSupportSending, setIsSupportSending] = useState(false);
+
   const isDemo = userProfile?.subscriptionStatus === 'demo';
-  const isTrialUser = userProfile?.subscriptionStatus === 'trial' && userProfile?.role !== 'admin';
   const canViewLeads = userProfile?.role === 'admin';
   const canApproveUsers = userProfile?.role === 'admin';
   const canViewSupport = userProfile?.role === 'admin';
   const currentUid = auth.currentUser?.uid;
   const supportCurrentUid = auth.currentUser?.uid || userProfile?.uid || '';
-  const previousNewestLeadRef = useRef<string | null>(null);
-  const previousNewestPendingUserRef = useRef<string | null>(null);
-  const previousNewestSupportRef = useRef<string | null>(null);
-  const hasInitializedLeadFeed = useRef(false);
-  const hasInitializedPendingFeed = useRef(false);
-  const hasInitializedSupportFeed = useRef(false);
+
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
   const connectionsRef = useRef<HTMLDivElement | null>(null);
   const supportRef = useRef<HTMLDivElement | null>(null);
   const notificationsRef = useRef<HTMLDivElement | null>(null);
-  const [liveSupportToast, setLiveSupportToast] = useState<{ id: string; subject: string; user: string } | null>(null);
-  const [trialNowMs, setTrialNowMs] = useState(() => Date.now());
 
   const tr = (key: string, fallback: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
   };
 
-  const trialEndsAtMs = useMemo(() => {
-    if (!isTrialUser) return 0;
-    const trialEndsAtRaw = userProfile?.trialEndsAt;
-    const endsMs = Date.parse(String(trialEndsAtRaw || ''));
-    if (Number.isFinite(endsMs)) return endsMs;
+  // ── Notification data (Firebase subscriptions) ────────────────────────────
+  const {
+    leadNotifications,
+    pendingUserApprovals,
+    supportNotifications,
+    supportThreads,
+    supportSelectedThreadId,
+    setSupportSelectedThreadId,
+    liveLeadToast,
+    livePendingUserToast,
+    liveSupportToast,
+    unreadLeadCount,
+    unreadPendingUserCount,
+    unreadSupportCount,
+    unreadSupportWidgetCount,
+    handleApproveUserNoPayment,
+    markNotificationsRead,
+  } = useNotificationData({ canViewLeads, canApproveUsers, canViewSupport, currentUid, supportCurrentUid });
 
-    // Fallback for older profiles that might not include trialEndsAt.
-    const startedMs = Date.parse(String(userProfile?.trialStartedAt || userProfile?.createdAt || ''));
-    if (!Number.isFinite(startedMs)) return 0;
-    return startedMs + 3 * 24 * 60 * 60 * 1000;
-  }, [isTrialUser, userProfile?.createdAt, userProfile?.trialEndsAt, userProfile?.trialStartedAt]);
+  // ── Trial countdown ───────────────────────────────────────────────────────
+  const { isTrialUser, trialCountdownLabel } = useTrialCountdown(userProfile, dir);
 
-  const trialRemainingMs = useMemo(() => {
-    if (!trialEndsAtMs) return 0;
-    return Math.max(0, trialEndsAtMs - trialNowMs);
-  }, [trialEndsAtMs, trialNowMs]);
 
-  const trialCountdownLabel = useMemo(() => {
-    if (!isTrialUser) return '';
-    if (trialRemainingMs <= 0) {
-      return dir === 'rtl' ? 'הסתיים' : 'Expired';
-    }
-    const totalMinutes = Math.floor(trialRemainingMs / (60 * 1000));
-    const days = Math.floor(totalMinutes / (60 * 24));
-    const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-    const minutes = totalMinutes % 60;
-
-    if (days > 0) {
-      return dir === 'rtl'
-        ? `${days} ימים ${hours} שעות`
-        : `${days}d ${hours}h`;
-    }
-    if (hours > 0) {
-      return dir === 'rtl'
-        ? `${hours} שעות ${minutes} דק׳`
-        : `${hours}h ${minutes}m`;
-    }
-    return dir === 'rtl' ? `${minutes} דק׳` : `${minutes}m`;
-  }, [dir, isTrialUser, trialRemainingMs]);
-
-  const fallbackNotifications = [
-    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: '2h ago', icon: CheckCircle, color: 'text-emerald-500' },
-    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: '5h ago', icon: AlertTriangle, color: 'text-amber-500' },
-    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: '1d ago', icon: Search, color: 'text-indigo-500' },
-    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: '2d ago', icon: AlertTriangle, color: 'text-red-500' },
-  ];
-
-  useEffect(() => {
-    if (!canViewLeads) {
-      setLeadNotifications([]);
-      return;
-    }
-
-    const leadsQuery = query(collection(db, 'salesLeads'), orderBy('createdAt', 'desc'), limit(25));
-    const unsubscribe = onSnapshot(
-      leadsQuery,
-      (snapshot) => {
-        const leads = snapshot.docs.map((leadDoc) => ({ id: leadDoc.id, ...(leadDoc.data() as any) }));
-        if (!hasInitializedLeadFeed.current) {
-          hasInitializedLeadFeed.current = true;
-          previousNewestLeadRef.current = leads[0]?.id || null;
-        }
-        setLeadNotifications(leads);
-      },
-      (error) => {
-        console.error('Failed to subscribe to sales lead notifications:', error);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [canViewLeads]);
-
-  useEffect(() => {
-    if (!canApproveUsers) {
-      setPendingUserApprovals([]);
-      return;
-    }
-
-    const pendingUsersQuery = query(
-      collection(db, 'users'),
-      where('subscriptionStatus', '==', 'demo'),
-      limit(50)
-    );
-    const unsubscribe = onSnapshot(
-      pendingUsersQuery,
-      (snapshot) => {
-        const pendingUsers = snapshot.docs
-          .map((userDoc) => ({ uid: userDoc.id, ...(userDoc.data() as any) }) as PendingUserApproval)
-          .filter((user) => user.role !== 'admin')
-          .sort((a, b) => {
-            const aTime = new Date(a.createdAt || 0).getTime();
-            const bTime = new Date(b.createdAt || 0).getTime();
-            return bTime - aTime;
-          });
-        if (!hasInitializedPendingFeed.current) {
-          hasInitializedPendingFeed.current = true;
-          previousNewestPendingUserRef.current = pendingUsers[0]?.uid || null;
-        }
-        setPendingUserApprovals(pendingUsers);
-      },
-      (error) => {
-        console.error('Failed to subscribe to pending user approvals:', error);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [canApproveUsers]);
-
-  useEffect(() => {
-    if (!canViewSupport) {
-      setSupportNotifications([]);
-      return;
-    }
-
-    const supportQuery = query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50));
-    const unsubscribe = onSnapshot(
-      supportQuery,
-      (snapshot) => {
-        const rows = snapshot.docs
-          .map((threadDoc) => {
-            const ownerUid = threadDoc.ref.parent.parent?.id || '';
-            return {
-              id: threadDoc.id,
-              docId: threadDoc.id,
-              ownerUid,
-              ...(threadDoc.data() as any),
-            } as SupportThreadNotification;
-          })
-          .filter((row) => Boolean(row.ownerUid))
-          .sort((a, b) => {
-            const aTime = new Date(a.updatedAt || a.lastMessageAt || 0).getTime();
-            const bTime = new Date(b.updatedAt || b.lastMessageAt || 0).getTime();
-            return bTime - aTime;
-          });
-        if (!hasInitializedSupportFeed.current) {
-          hasInitializedSupportFeed.current = true;
-          previousNewestSupportRef.current = rows[0]?.id || null;
-        }
-        setSupportNotifications(rows);
-      },
-      (error) => {
-        console.error('Failed to subscribe to support notifications:', error);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [canViewSupport]);
-
-  useEffect(() => {
-    if (!supportCurrentUid) {
-      setSupportThreads([]);
-      setSupportSelectedThreadId(null);
-      return;
-    }
-
-    const unsubscribe = canViewSupport
-      ? onSnapshot(
-          query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50)),
-          (snapshot) => {
-            const rows = snapshot.docs
-              .map((threadDoc) => {
-                const ownerUid = threadDoc.ref.parent.parent?.id || '';
-                return {
-                  id: threadDoc.id,
-                  docId: threadDoc.id,
-                  ownerUid,
-                  ...(threadDoc.data() as any),
-                } as SupportThreadNotification;
-              })
-              .filter((row) => Boolean(row.ownerUid))
-              .sort((a, b) => {
-                const aTime = new Date(a.updatedAt || a.lastMessageAt || 0).getTime();
-                const bTime = new Date(b.updatedAt || b.lastMessageAt || 0).getTime();
-                return bTime - aTime;
-              });
-            setSupportThreads(rows);
-            setSupportSelectedThreadId((prev) =>
-              prev && rows.some((thread) => thread.id === prev) ? prev : rows[0]?.id || null
-            );
-          },
-          (error) => {
-            console.error('Failed to subscribe support widget threads:', error);
-          }
-        )
-      : onSnapshot(
-          collection(db, 'users', supportCurrentUid, 'settings'),
-          (snapshot) => {
-            const rows = snapshot.docs
-              .map((threadDoc) => ({
-                id: threadDoc.id,
-                docId: threadDoc.id,
-                ownerUid: supportCurrentUid,
-                ...(threadDoc.data() as any),
-              }))
-              .filter((row) => row.kind === 'support_thread')
-              .sort((a, b) => {
-                const aTime = new Date((a as any).updatedAt || (a as any).lastMessageAt || 0).getTime();
-                const bTime = new Date((b as any).updatedAt || (b as any).lastMessageAt || 0).getTime();
-                return bTime - aTime;
-              }) as SupportThreadNotification[];
-            setSupportThreads(rows);
-            setSupportSelectedThreadId((prev) =>
-              prev && rows.some((thread) => thread.id === prev) ? prev : rows[0]?.id || null
-            );
-          },
-          (error) => {
-            console.error('Failed to subscribe user support widget threads:', error);
-          }
-        );
-
-    return () => unsubscribe();
-  }, [canViewSupport, supportCurrentUid]);
-
-  const playLeadAlertSound = () => {
-    try {
-      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.38);
-      window.setTimeout(() => ctx.close(), 500);
-    } catch (error) {
-      console.warn('Failed to play lead alert sound:', error);
-    }
-  };
-
-  useEffect(() => {
-    if (!canViewLeads || !hasInitializedLeadFeed.current || leadNotifications.length === 0) return;
-    const newestLead = leadNotifications[0];
-
-    if (previousNewestLeadRef.current !== newestLead.id) {
-      const contact = newestLead.email || newestLead.phone || tr('notifications.noContact', 'ללא פרטי קשר');
-      setLiveLeadToast({ id: newestLead.id, name: newestLead.name, contact });
-      playLeadAlertSound();
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(tr('notifications.newLeadTitle', 'ליד חדש מהאתר'), {
-          body: `${newestLead.name} • ${contact}`,
-        });
-      }
-      previousNewestLeadRef.current = newestLead.id;
-    }
-  }, [canViewLeads, leadNotifications]);
-
-  useEffect(() => {
-    if (!canApproveUsers || !hasInitializedPendingFeed.current || pendingUserApprovals.length === 0) return;
-    const newestPendingUser = pendingUserApprovals[0];
-    if (previousNewestPendingUserRef.current !== newestPendingUser.uid) {
-      setLivePendingUserToast({
-        uid: newestPendingUser.uid,
-        name: newestPendingUser.name || 'User',
-        email: newestPendingUser.email || '—',
-      });
-      playLeadAlertSound();
-      previousNewestPendingUserRef.current = newestPendingUser.uid;
-    }
-  }, [canApproveUsers, pendingUserApprovals]);
-
-  useEffect(() => {
-    if (!canViewSupport || !hasInitializedSupportFeed.current || supportNotifications.length === 0) return;
-    const newestSupport = supportNotifications[0];
-    if (!newestSupport) return;
-    if (previousNewestSupportRef.current !== newestSupport.id && newestSupport.lastMessageFrom === 'user') {
-      setLiveSupportToast({
-        id: newestSupport.id,
-        subject: newestSupport.subject || tr('notifications.newSupportTitle', 'New support request'),
-        user: newestSupport.createdByName || newestSupport.createdByEmail || 'User',
-      });
-      playLeadAlertSound();
-      previousNewestSupportRef.current = newestSupport.id;
-    }
-  }, [canViewSupport, supportNotifications]);
-
-  useEffect(() => {
-    if (!liveLeadToast) return;
-    const timeout = window.setTimeout(() => setLiveLeadToast(null), 6000);
-    return () => window.clearTimeout(timeout);
-  }, [liveLeadToast]);
-
-  useEffect(() => {
-    if (!livePendingUserToast) return;
-    const timeout = window.setTimeout(() => setLivePendingUserToast(null), 6000);
-    return () => window.clearTimeout(timeout);
-  }, [livePendingUserToast]);
-
-  useEffect(() => {
-    if (!liveSupportToast) return;
-    const timeout = window.setTimeout(() => setLiveSupportToast(null), 6000);
-    return () => window.clearTimeout(timeout);
-  }, [liveSupportToast]);
-
-  useEffect(() => {
-    if (!isTrialUser) return;
-    setTrialNowMs(Date.now());
-    const intervalId = window.setInterval(() => {
-      setTrialNowMs(Date.now());
-    }, 60_000);
-    return () => window.clearInterval(intervalId);
-  }, [isTrialUser]);
-
-  const handleApproveUserNoPayment = async (
-    userId: string,
-    mode: 'active' | 'free' = 'active'
-  ) => {
-    if (!currentUid) return;
-    try {
-      await updateDoc(doc(db, 'users', userId), {
-        subscriptionStatus: mode,
-        plan: mode === 'active' ? 'granted_by_admin' : 'free_by_admin',
-        approvedByAdminUid: currentUid,
-        approvedAt: new Date().toISOString(),
-        trialStartedAt: null,
-        trialEndsAt: null,
-        trialExpiredAt: null,
-      });
-    } catch (error) {
-      console.error('Failed to approve user to a no-payment subscription:', error);
-    }
-  };
-
-  const unreadLeadCount = useMemo(() => {
-    if (!currentUid) return 0;
-    return leadNotifications.filter((lead) => !lead.readBy?.[currentUid]).length;
-  }, [currentUid, leadNotifications]);
-
-  const unreadPendingUserCount = useMemo(() => {
-    if (!currentUid) return 0;
-    return pendingUserApprovals.filter((user) => !user.approvalReadBy?.[currentUid]).length;
-  }, [currentUid, pendingUserApprovals]);
-
-  const selectedSupportThread = useMemo(
-    () => supportThreads.find((thread) => thread.id === supportSelectedThreadId) || null,
-    [supportSelectedThreadId, supportThreads]
-  );
-
-  const selectedSupportMessages = useMemo(() => {
-    if (!selectedSupportThread?.messages) return [];
-    return selectedSupportThread.messages.slice().sort((a, b) => {
-      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-    });
-  }, [selectedSupportThread]);
-
-  const unreadSupportWidgetCount = useMemo(() => {
-    return supportThreads.filter((thread) => {
-      const lastAt = thread.lastMessageAt ? new Date(thread.lastMessageAt).getTime() : 0;
-      const seenAt = canViewSupport
-        ? (thread.adminSeenAt ? new Date(thread.adminSeenAt).getTime() : 0)
-        : (thread.userSeenAt ? new Date(thread.userSeenAt).getTime() : 0);
-      const expectedSender: 'user' | 'admin' = canViewSupport ? 'user' : 'admin';
-      return thread.lastMessageFrom === expectedSender && lastAt > seenAt;
-    }).length;
-  }, [canViewSupport, supportThreads]);
-
-  const unreadSupportCount = useMemo(() => {
-    if (!canViewSupport) return 0;
-    return supportNotifications.filter((thread) => {
-      if (thread.lastMessageFrom !== 'user') return false;
-      const lastAt = thread.lastMessageAt ? new Date(thread.lastMessageAt).getTime() : 0;
-      const seenAt = thread.adminSeenAt ? new Date(thread.adminSeenAt).getTime() : 0;
-      return lastAt > seenAt;
-    }).length;
-  }, [canViewSupport, supportNotifications]);
-
+  // ── Derived: notification items (use hook data + local setters) ─────────────
   const leadNotificationItems = useMemo(
     () =>
       leadNotifications.map((lead) => ({
@@ -518,6 +112,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
       })),
     [currentUid, dir, leadNotifications]
   );
+
   const pendingUserNotificationItems = useMemo(
     () =>
       pendingUserApprovals.map((pendingUser) => ({
@@ -532,12 +127,12 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
         color: 'text-amber-600',
         unread: currentUid ? !pendingUser.approvalReadBy?.[currentUid] : false,
         actionLabel: tr('notifications.approveNoPaymentAction', 'אשר מנוי ללא תשלום'),
-        actionClassName:
-          'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100',
+        actionClassName: 'text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100',
         onAction: () => handleApproveUserNoPayment(pendingUser.uid, 'active'),
       })),
-    [currentUid, dir, pendingUserApprovals]
+    [currentUid, dir, pendingUserApprovals, handleApproveUserNoPayment]
   );
+
   const supportNotificationItems = useMemo(
     () =>
       supportNotifications.map((thread) => {
@@ -566,10 +161,33 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
     [dir, supportNotifications]
   );
 
+  const fallbackNotifications = [
+    { id: 1, type: 'ai', title: t('notifications.items.ai_ready'), desc: t('notifications.items.ai_ready_desc'), time: '2h ago', icon: CheckCircle, color: 'text-emerald-500' },
+    { id: 2, type: 'budget', title: t('notifications.items.budget_alert'), desc: t('notifications.items.budget_alert_desc'), time: '5h ago', icon: AlertTriangle, color: 'text-amber-500' },
+    { id: 3, type: 'feature', title: t('notifications.items.new_feature'), desc: t('notifications.items.new_feature_desc'), time: '1d ago', icon: Search, color: 'text-indigo-500' },
+    { id: 4, type: 'error', title: t('notifications.items.connection_error'), desc: t('notifications.items.connection_error_desc'), time: '2d ago', icon: AlertTriangle, color: 'text-red-500' },
+  ];
+
+
   const notifications: NotificationItem[] = canViewLeads
     ? [...pendingUserNotificationItems, ...supportNotificationItems, ...leadNotificationItems]
     : fallbackNotifications.map((item) => ({ ...item, unread: false }));
   const unreadNotificationsCount = unreadLeadCount + unreadPendingUserCount + unreadSupportCount;
+
+  const selectedSupportThread = useMemo(
+    () => supportThreads.find((t) => t.id === supportSelectedThreadId) || null,
+    [supportSelectedThreadId, supportThreads]
+  );
+
+  const selectedSupportMessages = useMemo(() => {
+    if (!selectedSupportThread?.messages) return [];
+    return selectedSupportThread.messages.slice().sort(
+      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+  }, [selectedSupportThread]);
+
+  // ── (Firebase subscription effects removed — see hooks/useNotificationData) ─
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
 
   useEffect(() => {
     if (!isDatePickerOpen && !isConnectionsOpen && !isSupportOpen && !isNotificationsOpen) {

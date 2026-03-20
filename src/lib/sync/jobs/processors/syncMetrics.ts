@@ -96,7 +96,7 @@ export const processSyncMetrics = async (payload: SyncMetricsPayload) => {
     await unifiedRepo.upsertDailyMetricsByExternalCampaign(
       payload.userId,
       'GOOGLE_ADS',
-      rows.map((row) => ({
+      rows.map((row: { campaignId: string; date: string; impressions: number; clicks: number; spend: number; conversions: number; revenue: number }) => ({
         campaignExternalId: row.campaignId,
         date: row.date,
         impressions: row.impressions,
@@ -149,7 +149,7 @@ export const processSyncMetrics = async (payload: SyncMetricsPayload) => {
     await unifiedRepo.upsertDailyMetricsByExternalCampaign(
       payload.userId,
       'TIKTOK',
-      rows.map((row) => ({
+      rows.map((row: { campaignId: string; date: string; impressions: number; clicks: number; spend: number; conversions: number; revenue: number }) => ({
         campaignExternalId: row.campaignId,
         date: row.date,
         impressions: row.impressions,

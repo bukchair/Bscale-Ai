@@ -226,7 +226,7 @@ export const unifiedRepo = {
         objective: true,
         externalCampaignId: true,
         connectedAccountId: true,
-        dailyMetrics: options.startDate && options.endDate
+        metricsDaily: options.startDate && options.endDate
           ? {
               where: {
                 date: {
@@ -248,8 +248,8 @@ export const unifiedRepo = {
 
     return {
       data: page.map((c) => {
-        const agg = c.dailyMetrics.reduce(
-          (acc, m) => {
+        const agg = c.metricsDaily.reduce(
+          (acc: { spend: number; revenue: number; conversions: number; clicks: number; impressions: number }, m) => {
             acc.spend += Number(m.spend);
             acc.revenue += Number(m.revenue);
             acc.conversions += Number(m.conversions);

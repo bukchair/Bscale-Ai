@@ -47,6 +47,42 @@ import {
   unifiedLayerToCampaignRows,
 } from '../lib/unified-data/mappers';
 import { createEmptyUnifiedDataLayer } from '../lib/unified-data/types';
+import {
+  type ContentType,
+  type ProductType,
+  type ObjectiveType,
+  type DayKey,
+  type RuleAction,
+  type PlatformName,
+  type UploadedAsset,
+  type TimeRule,
+  type DayHours,
+  type WeeklySchedule,
+  type MediaLimits,
+  type EditableStatus,
+  type EditCampaignDraft,
+  type WooCampaignProduct,
+  type WooPublishScope,
+  type PlatformCopyDraft,
+  DAY_KEYS,
+  PLATFORM_MEDIA_LIMITS,
+  SMART_AUDIENCE_BY_CONTENT,
+  SMART_AUDIENCE_BY_PRODUCT,
+  SMART_AUDIENCE_BY_OBJECTIVE,
+  createEmptyDaySchedule,
+  stripHtmlToText,
+} from './campaigns/types';
+import {
+  toAmount,
+  normalizeCampaignStatus,
+  getStatusBadgeClass,
+  formatPercent,
+  hasMetaMetrics,
+  hasGoogleMetrics,
+  mergePlatformCampaignsPreferRich,
+} from './campaigns/utils';
+import { CampaignEditModal } from './campaigns/CampaignEditModal';
+import { RecommendationsPanel } from './campaigns/RecommendationsPanel';
 
 const mockCampaignData = [
   { id: 1, name: 'Summer Sale - Shoes', platform: 'Google', status: 'Active', spend: 1200, roas: 2.5, cpa: 45 },
@@ -54,124 +90,6 @@ const mockCampaignData = [
   { id: 3, name: 'New Collection - Video', platform: 'TikTok', status: 'Paused', spend: 400, roas: 1.1, cpa: 85 },
   { id: 4, name: 'Brand Search', platform: 'Google', status: 'Active', spend: 300, roas: 8.5, cpa: 12 },
 ];
-
-type ContentType = 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
-type ProductType = 'fashion' | 'beauty' | 'tech' | 'home' | 'fitness' | 'services' | 'other';
-type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
-type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
-type RuleAction = 'boost' | 'limit' | 'pause';
-type PlatformName = 'Google' | 'Meta' | 'TikTok';
-
-type UploadedAsset = {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  previewUrl: string;
-  file: File;
-  mediaType: 'image' | 'video';
-  width?: number;
-  height?: number;
-};
-
-type TimeRule = {
-  id: string;
-  platform: PlatformName;
-  startHour: number;
-  endHour: number;
-  action: RuleAction;
-  minRoas: number;
-  reason?: string;
-};
-
-type DayHours = Record<DayKey, number[]>;
-type WeeklySchedule = Record<string, DayHours>;
-
-type MediaLimits = {
-  imageMaxMb: number;
-  videoMaxMb: number;
-  maxImageWidth: number;
-  maxImageHeight: number;
-};
-
-type EditableStatus = 'Active' | 'Paused';
-
-type EditCampaignDraft = {
-  rowKey: string;
-  platform: PlatformName;
-  campaignId: string;
-  name: string;
-  status: EditableStatus;
-  dailyBudget: string;
-};
-
-type WooCampaignProduct = {
-  id: number;
-  name: string;
-  categories: string[];
-  price?: string;
-  shortDescription?: string;
-  description?: string;
-  sku?: string;
-  stockQuantity?: number | null;
-};
-
-type WooPublishScope = 'category' | 'product';
-
-type PlatformCopyDraft = {
-  title: string;
-  description: string;
-};
-
-const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-const PLATFORM_MEDIA_LIMITS: Record<PlatformName, MediaLimits> = {
-  Google: { imageMaxMb: 5, videoMaxMb: 100, maxImageWidth: 1200, maxImageHeight: 1200 },
-  Meta: { imageMaxMb: 30, videoMaxMb: 500, maxImageWidth: 1440, maxImageHeight: 1440 },
-  TikTok: { imageMaxMb: 20, videoMaxMb: 500, maxImageWidth: 1080, maxImageHeight: 1920 },
-};
-
-const SMART_AUDIENCE_BY_CONTENT: Record<ContentType, string[]> = {
-  product: ['Product viewers 30d', 'Cart abandoners 14d', 'Lookalike 1% - Purchasers'],
-  offer: ['Price sensitive shoppers', 'Promo clickers 30d', 'Coupon users'],
-  educational: ['Blog readers 60d', 'Video viewers 75%', 'Top funnel warm audience'],
-  testimonial: ['Consideration audience', 'Review seekers', 'Competitor audience'],
-  video: ['Short video engagers', 'Watch time > 15s', 'Reels/TikTok engagers'],
-};
-
-const SMART_AUDIENCE_BY_PRODUCT: Record<ProductType, string[]> = {
-  fashion: ['Fashion interest', 'Streetwear audience', 'Seasonal shoppers'],
-  beauty: ['Beauty products interest', 'Skincare enthusiasts', 'Self care audience'],
-  tech: ['Tech enthusiasts', 'Gadget buyers', 'Early adopters'],
-  home: ['Home improvement', 'Interior design audience', 'Family buyers'],
-  fitness: ['Fitness audience', 'Running & sports', 'Healthy lifestyle'],
-  services: ['High intent leads', 'Local business services', 'Consultation seekers'],
-  other: ['Broad prospecting', 'Engaged audience 30d'],
-};
-
-const SMART_AUDIENCE_BY_OBJECTIVE: Record<ObjectiveType, string[]> = {
-  sales: ['High intent purchasers', 'Returning buyers', 'Upsell audience'],
-  traffic: ['Click propensity audience', 'Content consumers'],
-  leads: ['Lead forms engagers', 'WhatsApp clickers', 'Contact page visitors'],
-  awareness: ['Broad awareness 18-44', 'Reach optimized audience'],
-  retargeting: ['Site visitors 30d', 'Product viewers 14d', 'Initiated checkout 14d'],
-};
-
-const createEmptyDaySchedule = (): DayHours => ({
-  mon: [],
-  tue: [],
-  wed: [],
-  thu: [],
-  fri: [],
-  sat: [],
-  sun: [],
-});
-
-const stripHtmlToText = (value: unknown): string =>
-  String(value || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
 
 export function Campaigns() {
   const { t, dir, language } = useLanguage();
@@ -808,97 +726,6 @@ export function Campaigns() {
       uploadedAssets.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
     };
   }, [uploadedAssets]);
-  const toAmount = (value: unknown): number => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-    if (typeof value === 'string') {
-      const parsed = parseFloat(value.replace(/[^\d.-]/g, ''));
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-    return 0;
-  };
-
-  const normalizeCampaignStatus = (value: unknown): string => {
-    const raw = String(value || '').trim();
-    if (!raw) return 'Unknown';
-    const normalized = raw.toLowerCase();
-    if (normalized === 'draft') return 'Draft';
-    if (normalized.includes('scheduled')) return 'Scheduled';
-    if (
-      normalized.includes('active') ||
-      normalized === 'enabled' ||
-      normalized.includes('serving')
-    ) {
-      return 'Active';
-    }
-    if (normalized.includes('paused') || normalized.includes('disable')) return 'Paused';
-    if (
-      normalized.includes('removed') ||
-      normalized.includes('deleted') ||
-      normalized.includes('archived')
-    ) {
-      return 'Removed';
-    }
-    if (
-      normalized.includes('pending') ||
-      normalized.includes('review') ||
-      normalized.includes('learning')
-    ) {
-      return 'Pending';
-    }
-    if (normalized.includes('error') || normalized.includes('fail')) return 'Error';
-    return 'Unknown';
-  };
-
-  const getStatusBadgeClass = (status: string) => {
-    if (status === 'Active') return 'bg-green-100 text-green-800';
-    if (status === 'Scheduled' || status === 'Pending') return 'bg-indigo-100 text-indigo-800';
-    if (status === 'Draft') return 'bg-slate-100 text-slate-700';
-    if (status === 'Paused') return 'bg-yellow-100 text-yellow-800';
-    if (status === 'Removed') return 'bg-rose-100 text-rose-800';
-    if (status === 'Error') return 'bg-red-100 text-red-800';
-    return 'bg-gray-100 text-gray-700';
-  };
-
-  const formatPercent = (value: unknown, fractionDigits = 2) => {
-    const numeric = toAmount(value);
-    return `${numeric.toFixed(fractionDigits)}%`;
-  };
-
-  const hasMetaMetrics = (campaign: any) => {
-    const keys = ['spend', 'impressions', 'clicks', 'conversions', 'conversionValue', 'ctr', 'cpc', 'cpm', 'reach', 'frequency'];
-    return keys.some((key) => toAmount(campaign?.[key]) > 0);
-  };
-
-  const hasGoogleMetrics = (campaign: any) => {
-    const keys = ['spend', 'impressions', 'clicks', 'conversions', 'conversionValue', 'ctr', 'cpc', 'cpm', 'costPerConversion'];
-    return keys.some((key) => toAmount(campaign?.[key]) > 0);
-  };
-
-  const mergePlatformCampaignsPreferRich = (
-    existingRows: any[],
-    incomingRows: any[],
-    hasMetrics: (row: any) => boolean
-  ) => {
-    const existingById = new Map(
-      existingRows.map((row) => [String(row?.id || row?.campaignId || ''), row])
-    );
-    return incomingRows.map((row) => {
-      const key = String(row?.id || row?.campaignId || '');
-      if (!key) return row;
-      const existing = existingById.get(key);
-      if (!existing) return row;
-      if (!hasMetrics(row) && hasMetrics(existing)) {
-        // Keep richer historical row if new response only has minimal fields.
-        return {
-          ...existing,
-          ...row,
-          name: row.name || existing.name,
-          status: row.status || existing.status,
-        };
-      }
-      return row;
-    });
-  };
 
   const applyUnifiedPlatformLayer = (platform: PlatformName, incomingLayer: ReturnType<typeof createEmptyUnifiedDataLayer>) => {
     setUnifiedDataLayer((prev) => {
@@ -1185,7 +1012,7 @@ export function Campaigns() {
   const ensureManagedApiSession = async () => {
     const currentUser =
       auth.currentUser ||
-      (await new Promise<typeof auth.currentUser>((resolve) => {
+      (await new Promise<import('firebase/auth').User | null>((resolve) => {
         const timeoutId = window.setTimeout(() => {
           unsubscribe();
           resolve(auth.currentUser);
@@ -2428,99 +2255,17 @@ export function Campaigns() {
         </div>
       </section>
 
-      <section className="bg-white shadow rounded-lg overflow-hidden flex flex-col border border-gray-200">
-        <div className="px-3 py-3 sm:px-4 border-b border-gray-200 bg-indigo-50 flex items-center justify-between">
-          <h3 className="text-base leading-6 font-semibold text-indigo-900 flex items-center">
-            <Zap className="w-4 h-4 ml-1.5 text-indigo-600" />
-            {t('campaigns.aiRecommendations')}
-          </h3>
-          {recommendations.length > 0 && (
-            <button
-              onClick={handleSendEmail}
-              disabled={sendingEmail}
-              className="inline-flex items-center p-1.5 border border-indigo-200 rounded-md text-indigo-600 hover:bg-indigo-100 disabled:opacity-50"
-              title="Send to Email"
-            >
-              {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-            </button>
-          )}
-        </div>
-        <div className="p-3">
-          {loading ? (
-            <div className="flex justify-center items-center h-32">
-              <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-            </div>
-          ) : recommendations.length > 0 ? (
-            <ul className="space-y-1.5 max-h-[250px] overflow-y-auto pe-1">
-              {recommendations.map((rec, index) => (
-                <li key={`ai-rec-${index}`} className="bg-white border rounded-lg shadow-sm overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => toggleRecExpanded(index)}
-                    className="w-full px-2.5 py-2 flex items-center justify-between gap-2 hover:bg-gray-50"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className={cn(
-                          "inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium",
-                          rec.impact === 'High' ? "bg-red-100 text-red-800" :
-                          rec.impact === 'Medium' ? "bg-yellow-100 text-yellow-800" :
-                          "bg-green-100 text-green-800"
-                        )}>
-                          {t('campaigns.impact')}: {
-                            rec.impact === 'High' ? t('campaigns.impactHigh') :
-                            rec.impact === 'Medium' ? t('campaigns.impactMedium') :
-                            t('campaigns.impactLow')
-                          }
-                        </span>
-                        <span className="text-[10px] text-gray-500 truncate">{rec.platform}</span>
-                      </div>
-                      <h4 className="text-xs font-bold text-gray-900 truncate text-start">{rec.title}</h4>
-                    </div>
-                    {expandedRecs.includes(index) ? (
-                      <ChevronUp className="w-4 h-4 text-gray-500 shrink-0" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-                    )}
-                  </button>
-                  <div className={cn(
-                    "px-2.5 overflow-hidden transition-all duration-200",
-                    expandedRecs.includes(index) ? "max-h-44 pb-2.5" : "max-h-0"
-                  )}>
-                    <p className="text-[11px] text-gray-600 leading-relaxed line-clamp-4">{rec.description}</p>
-                    <div className="mt-1.5">
-                      <button
-                        onClick={() => handleApply(index)}
-                        disabled={appliedRecs.includes(index)}
-                        className={cn(
-                          "inline-flex items-center px-2.5 py-1 border border-transparent text-[11px] font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500",
-                          appliedRecs.includes(index)
-                            ? "bg-green-50 text-green-700 border-green-200 cursor-not-allowed"
-                            : "text-white bg-indigo-600 hover:bg-indigo-700"
-                        )}
-                      >
-                        {appliedRecs.includes(index) ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 ml-1.5" />
-                            {t('campaigns.appliedSuccess')}
-                          </>
-                        ) : (
-                          t('campaigns.applyAuto')
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-center text-gray-500 py-8">
-              <AlertCircle className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-              <p>{t('campaigns.noRecommendations')}</p>
-            </div>
-          )}
-        </div>
-      </section>
+      <RecommendationsPanel
+        recommendations={recommendations}
+        loading={loading}
+        appliedRecs={appliedRecs}
+        expandedRecs={expandedRecs}
+        sendingEmail={sendingEmail}
+        onApply={handleApply}
+        onToggleExpanded={toggleRecExpanded}
+        onSendEmail={handleSendEmail}
+        t={t}
+      />
 
       <section ref={builderSectionRef} className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-indigo-50/60">
@@ -3501,94 +3246,28 @@ export function Campaigns() {
       </section>
 
       {editingCampaign && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-xl bg-white border border-gray-200 shadow-xl">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-bold text-gray-900">{text.editCampaign}</h4>
-                <p className="text-xs text-gray-600 mt-0.5">{text.editCampaignSubtitle}</p>
-              </div>
-              <button
-                type="button"
-                onClick={closeEditCampaign}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{text.editName}</label>
-                <input
-                  value={editingCampaign.name}
-                  onChange={(e) =>
-                    setEditingCampaign((prev) => (prev ? { ...prev, name: e.target.value } : prev))
-                  }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{text.editStatus}</label>
-                <select
-                  value={editingCampaign.status}
-                  onChange={(e) =>
-                    setEditingCampaign((prev) =>
-                      prev ? { ...prev, status: e.target.value as EditableStatus } : prev
-                    )
-                  }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="Active">{isHebrew ? 'פעיל' : 'Active'}</option>
-                  <option value="Paused">{isHebrew ? 'מושהה' : 'Paused'}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{text.editBudget}</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={editingCampaign.dailyBudget}
-                  onChange={(e) =>
-                    setEditingCampaign((prev) => (prev ? { ...prev, dailyBudget: e.target.value } : prev))
-                  }
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  placeholder={isHebrew ? 'למשל 250' : 'e.g. 250'}
-                />
-              </div>
-              <div className="rounded-md border border-indigo-100 bg-indigo-50/40 px-3 py-2">
-                <label className="inline-flex items-center gap-2 text-xs font-bold text-indigo-900 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={editApplyToAds}
-                    onChange={(e) => setEditApplyToAds(e.target.checked)}
-                  />
-                  {text.editApplyAds}
-                </label>
-                <p className="mt-1 text-[11px] text-indigo-700">{text.editApplyAdsHint}</p>
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeEditCampaign}
-                  className="px-3 py-2 rounded-md border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-                >
-                  {text.cancel}
-                </button>
-                <button
-                  type="button"
-                  onClick={saveEditedCampaign}
-                  disabled={editLoading}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  {editLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
-                  {editLoading ? text.saving : text.saveChanges}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <CampaignEditModal
+          editingCampaign={editingCampaign}
+          editApplyToAds={editApplyToAds}
+          editLoading={editLoading}
+          isHebrew={isHebrew}
+          text={{
+            editCampaign: text.editCampaign,
+            editCampaignSubtitle: text.editCampaignSubtitle,
+            editName: text.editName,
+            editStatus: text.editStatus,
+            editBudget: text.editBudget,
+            editApplyAds: text.editApplyAds,
+            editApplyAdsHint: text.editApplyAdsHint,
+            cancel: text.cancel,
+            saveChanges: text.saveChanges,
+            saving: text.saving,
+          }}
+          closeEditCampaign={closeEditCampaign}
+          saveEditedCampaign={saveEditedCampaign}
+          setEditApplyToAds={setEditApplyToAds}
+          setEditingCampaign={setEditingCampaign}
+        />
       )}
 
       <OneClickWizard open={oneClickOpen} onClose={() => setOneClickOpen(false)} />

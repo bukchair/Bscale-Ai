@@ -97,7 +97,7 @@ function logMessage(entry: LogEntry): string {
 async function ensureSession() {
   const user =
     auth.currentUser ||
-    (await new Promise<typeof auth.currentUser>((resolve) => {
+    (await new Promise<import('firebase/auth').User | null>((resolve) => {
       const unsub = onAuthStateChanged(auth, (u) => { unsub(); resolve(u); });
     }));
   if (!user) return;

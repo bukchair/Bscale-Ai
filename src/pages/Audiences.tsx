@@ -146,7 +146,7 @@ export function Audiences() {
     const metaToken = meta?.status === 'connected' ? meta.settings?.metaToken || 'server-managed' : '';
     if (meta?.status === 'connected' && metaToken) {
       try {
-        const acc = meta.settings.metaAdsId || meta.settings.adAccountId || meta.settings.metaAdAccountId;
+        const acc = meta.settings?.metaAdsId || meta.settings?.adAccountId || meta.settings?.metaAdAccountId;
         result.meta = await fetchMetaCampaigns(metaToken, acc || undefined);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -161,11 +161,11 @@ export function Audiences() {
     const googleToken = google?.status === 'connected' ? google.settings?.googleAccessToken || 'server-managed' : '';
     if (google?.status === 'connected' && googleToken) {
       try {
-        const cid = google.settings.googleAdsId || google.settings.customerId || google.settings.googleCustomerId;
+        const cid = google.settings?.googleAdsId || google.settings?.customerId || google.settings?.googleCustomerId;
         result.google = await fetchGoogleCampaigns(
           googleToken,
           cid || undefined,
-          google.settings.loginCustomerId
+          google.settings?.loginCustomerId
         );
       } catch (e) {
         result.google = [{ error: String(e) }];

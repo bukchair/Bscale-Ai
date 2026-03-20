@@ -8,13 +8,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const googleProvider = new GoogleAuthProvider();
-const _viteEnv =
-  typeof import.meta !== 'undefined'
-    ? ((import.meta as unknown as { env?: Record<string, unknown> }).env ?? undefined)
-    : undefined;
 export const ADMIN_SALES_EMAIL: string =
-  (typeof _viteEnv?.VITE_ADMIN_EMAIL === 'string' && _viteEnv.VITE_ADMIN_EMAIL.trim()) ||
-  '';
+  (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim();
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TRIAL_DAYS = 3;
 const TRIAL_DURATION_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
