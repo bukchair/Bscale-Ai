@@ -126,7 +126,7 @@ export const createMetaDraft = async (
     adSetForm.set('name', `${sanitize(name)} – Ad Set`);
     adSetForm.set('campaign_id', campaignId);
     adSetForm.set('status', metaStatus);
-    adSetForm.set('billing_event', 'IMPRESSIONS');
+    adSetForm.set('billing_event', 'LINK_CLICKS');
     adSetForm.set('optimization_goal', 'LINK_CLICKS');
     adSetForm.set('daily_budget', String(Math.round(Math.max(dailyBudget, 1) * 100)));
     adSetForm.set('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');

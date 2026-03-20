@@ -155,7 +155,7 @@ export const createGoogleDraft = async (
               status: activateImmediately ? 'ENABLED' : 'PAUSED',
               advertisingChannelType: 'SEARCH',
               campaignBudget: budgetResourceName,
-              maximizeClicks: {},
+              targetSpend: {},
               networkSettings: {
                 targetGoogleSearch: true,
                 targetSearchNetwork: true,

@@ -125,7 +125,7 @@ export const createTikTokDraft = async (
         campaign_name: sanitize(name),
         objective_type: toTikTokObjective(objective),
         budget_mode: 'BUDGET_MODE_DAY',
-        budget: Math.max(dailyBudget, 1),
+        budget: Math.max(dailyBudget, 50),
         operation_status: activateImmediately ? 'ENABLE' : 'DISABLE',
       }),
     });
@@ -154,7 +154,7 @@ export const createTikTokDraft = async (
         adgroup_name: `${sanitize(name)} – Ad Group`,
         placement_type: 'PLACEMENT_TYPE_AUTOMATIC',
         budget_mode: 'BUDGET_MODE_DAY',
-        budget: Math.max(dailyBudget, 1),
+        budget: Math.max(dailyBudget, 50),
         schedule_type: 'SCHEDULE_FROM_NOW',
         schedule_start_time: scheduleStart,
         optimization_goal: toTikTokOptimizationGoal(objective),
