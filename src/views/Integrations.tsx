@@ -1,12 +1,18 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit, RotateCcw, Grid3X3, MoreHorizontal } from 'lucide-react';
+import { Plug, ShoppingCart, Store, CheckCircle2, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit, RotateCcw, Grid3X3, MoreHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useConnections, Connection } from '../contexts/ConnectionsContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { auth, onAuthStateChanged } from '../lib/firebase';
+import { OverviewTab } from './integrations/OverviewTab';
+import { GoogleTab } from './integrations/GoogleTab';
+import { MetaTab } from './integrations/MetaTab';
+import { TikTokTab } from './integrations/TikTokTab';
+import { EcommerceTab } from './integrations/EcommerceTab';
+import { ConnectionWizard } from './integrations/ConnectionWizard';
 
 type ManagedGoogleAdsAccount = {
   externalAccountId: string;
