@@ -1,13 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Activity, ArrowRight, DollarSign, Globe, HelpCircle,
-  Loader2, Megaphone, Search, ShoppingCart, Sparkles,
-  Store, Target, Users,
-} from 'lucide-react';
-import { cn } from '../lib/utils';
-import { formatDate, orderStatusBadgeClass, orderStatusLabel } from './dashboard/helpers';
+import { Loader2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
@@ -187,15 +181,11 @@ export function Dashboard() {
   const isHebrew = language === 'he';
   const text = COPY[language] || COPY.en;
   const statusLabels = STATUS_LABELS[language] || STATUS_LABELS.en;
-  const ga4TopPagesTitle = isHebrew ? '7 עמודים נצפים (30 דק׳ אחרונות)' : 'Top 7 viewed pages (last 30 min)';
-  const ga4NoTopPages = isHebrew
-    ? 'אין כרגע נתוני עמודים נצפים ב‑30 הדקות האחרונות מ‑GA4.'
-    : 'No top viewed pages from GA4 in the last 30 minutes yet.';
-
   const connectedPlatforms = connections.filter((c) => c.status === 'connected');
   const isWooConnected = connections.find((c) => c.id === 'woocommerce')?.status === 'connected';
   const isShopifyConnected = connections.find((c) => c.id === 'shopify')?.status === 'connected';
   const isStoreConnected = isWooConnected || isShopifyConnected;
+  const isMetaConnected = connections.some((c) => c.id === 'meta' && c.status === 'connected');
 
   const fallbackData = useMemo(() => {
     const seedStr =
@@ -802,46 +792,6 @@ export function Dashboard() {
     }
   };
 
-  const DemoTag = ({ show }: { show: boolean }) =>
-    show ? (
-      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-        Demo data
-      </span>
-    ) : null;
-  const SourceTag = ({ live }: { live: boolean }) => (
-    <span
-      className={cn(
-        'text-[10px] font-bold px-1.5 py-0.5 rounded-full border',
-        live
-          ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-          : 'text-gray-600 bg-gray-100 border-gray-200'
-      )}
-    >
-      {live ? text.sourceLive : text.sourceMissing}
-    </span>
-  );
-  const InlineTooltip = ({ message }: { message: string }) => (
-    <span className="relative inline-flex group">
-      <button
-        type="button"
-        aria-label={message}
-        title={message}
-        className="inline-flex items-center justify-center text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-      >
-        <HelpCircle className="w-3.5 h-3.5" />
-      </button>
-      <span
-        role="tooltip"
-        className={cn(
-          'pointer-events-none absolute top-full mt-1 z-20 hidden w-64 rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] leading-relaxed text-gray-700 shadow-lg dark:border-white/10 dark:bg-[#111] dark:text-gray-200 group-hover:block group-focus-within:block',
-          dir === 'rtl' ? 'left-0' : 'right-0'
-        )}
-      >
-        {message}
-      </span>
-    </span>
-  );
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -862,446 +812,75 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <DollarSign className="w-5 h-5" />
-              </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">{text.revenueCard}</h2>
-            </div>
-          </div>
+        <RevenueCard
+          text={text}
+          dir={dir}
+          financialAvailability={financialAvailability}
+          safeTotalRevenue={safeTotalRevenue}
+          safeTotalSpend={safeTotalSpend}
+          safeNetProfit={safeNetProfit}
+          safeRoas={safeRoas}
+          platformRevenue={platformRevenue}
+          isMetaConnected={isMetaConnected}
+          formatCurrency={formatCurrency}
+          onGoOrders={() => goToPath('/orders')}
+        />
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500 inline-flex items-center gap-1.5">
-                {text.totalRevenue}
-                <SourceTag live={financialAvailability.revenue} />
-              </span>
-              <span className="font-extrabold text-emerald-700">
-                {financialAvailability.revenue ? formatCurrency(safeTotalRevenue) : '—'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500 inline-flex items-center gap-1.5">
-                {text.totalSpend}
-                <SourceTag live={financialAvailability.spend} />
-              </span>
-              <span className="font-bold text-red-600">
-                {financialAvailability.spend ? formatCurrency(safeTotalSpend) : '—'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500 inline-flex items-center gap-1.5">
-                {text.netProfit}
-                <SourceTag live={financialAvailability.netProfit} />
-              </span>
-              <span className="font-bold text-indigo-600">
-                {financialAvailability.netProfit ? formatCurrency(safeNetProfit) : '—'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500 inline-flex items-center gap-1.5">
-                {text.roas}
-                <SourceTag live={financialAvailability.roas} />
-              </span>
-              <span className="font-black text-gray-900 dark:text-white">
-                {financialAvailability.roas ? `${safeRoas}x` : '—'}
-              </span>
-            </div>
-            {connections.some((c) => c.id === 'meta' && c.status === 'connected') && (
-              <>
-                <div className="my-1 border-t border-gray-100" />
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.metaSpend}
-                    <SourceTag live={financialAvailability.metaSpend} />
-                  </span>
-                  <span className="font-bold text-red-600">
-                    {financialAvailability.metaSpend ? formatCurrency(platformRevenue.meta.spend) : '—'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.metaRevenue}
-                    <InlineTooltip message={text.metaRevenueTooltip} />
-                    <SourceTag live={financialAvailability.metaRevenue} />
-                  </span>
-                  <span className="font-bold text-emerald-700">
-                    {financialAvailability.metaRevenue
-                      ? formatCurrency(platformRevenue.meta.attributedRevenue)
-                      : '—'}
-                  </span>
-                </div>
-              </>
-            )}
-            {!financialAvailability.revenue && !financialAvailability.spend && (
-              <p className="text-xs text-gray-500">{text.noFinanceData}</p>
-            )}
-          </div>
+        <GA4Card
+          text={text}
+          isHebrew={isHebrew}
+          isGa4UsingDemo={isGa4UsingDemo}
+          hasGa4Data={hasGa4Data}
+          ga4Availability={ga4Availability}
+          ga4LiveAvailability={ga4LiveAvailability}
+          safeGa4Stats={safeGa4Stats}
+          ga4Users24h={ga4Users24h}
+          ga4TopPages={ga4TopPages}
+          isGa4TopPagesDemo={isGa4TopPagesDemo}
+        />
 
-          <button
-            onClick={() => goToPath('/orders')}
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
-          >
-            {text.goOrders}
-            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
-          </button>
-        </div>
+        <OrdersCard
+          text={text}
+          dir={dir}
+          statusLabels={statusLabels}
+          isOrdersUsingDemo={isOrdersUsingDemo}
+          recentOrders={recentOrders}
+          formatCurrency={formatCurrency}
+          onGoOrders={() => goToPath('/orders')}
+        />
 
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="font-bold text-gray-900 dark:text-white tracking-tight">{text.ga4Card}</h2>
-                <p className="text-[11px] font-semibold text-indigo-600">{text.ga4LiveSync}</p>
-              </div>
-            </div>
-            <DemoTag show={isGa4UsingDemo} />
-          </div>
+        <CampaignsCard
+          text={text}
+          dir={dir}
+          isCampaignsUsingDemo={isCampaignsUsingDemo}
+          campaignSummary={campaignSummary}
+          campaignAvailability={campaignAvailability}
+          campaignLiveAvailability={campaignLiveAvailability}
+          hasCampaignData={hasCampaignData}
+          formatCurrency={formatCurrency}
+          onGoCampaigns={() => goToPath('/campaigns')}
+        />
 
-          {hasGa4Data ? (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3">
-                  <p className="text-[11px] font-semibold text-blue-700 inline-flex items-center gap-1.5">
-                    {text.activeNow}
-                    <SourceTag live={ga4LiveAvailability.activeNow} />
-                  </p>
-                  <p className="text-3xl font-black text-blue-600 mt-1">
-                    {ga4Availability.activeNow ? safeGa4Stats.activeNow : '—'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 p-3">
-                  <p className="text-[11px] font-semibold text-indigo-700 inline-flex items-center gap-1.5">
-                    {text.totalUsers}
-                    <SourceTag live={!isGa4TopPagesDemo} />
-                  </p>
-                  <p className="text-3xl font-black text-indigo-600 mt-1">
-                    {ga4Users24h !== null
-                      ? ga4Users24h.toLocaleString()
-                      : ga4Availability.totalUsers
-                        ? safeGa4Stats.totalUsers.toLocaleString()
-                        : '—'}
-                  </p>
-                </div>
-              </div>
+        <SeoCard
+          text={text}
+          dir={dir}
+          isGscUsingDemo={isGscUsingDemo}
+          seoAvailability={seoAvailability}
+          seoLiveAvailability={seoLiveAvailability}
+          siteSeoScore={siteSeoScore}
+          searchConsoleSeoScore={searchConsoleSeoScore}
+          safeGscStats={safeGscStats}
+          onGoSeo={() => goToPath('/seo')}
+        />
 
-              {ga4TopPages.length > 0 && (
-                <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/5 p-3 space-y-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 inline-flex items-center gap-1.5">
-                      {text.topPagesLabel}
-                      <SourceTag live={!isGa4TopPagesDemo} />
-                    </p>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{isHebrew ? 'גולשים פעילים' : 'active users'}</span>
-                  </div>
-                  {ga4TopPages.slice(0, 7).map((page, i) => (
-                    <div key={i} className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">
-                        <span className="text-gray-400 dark:text-gray-500 me-1">{i + 1}.</span>
-                        {page.title || page.path}
-                      </p>
-                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 shrink-0 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded-full">
-                        {page.views > 0 ? page.views.toLocaleString() : '—'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <p className="text-xs text-gray-500">
-                {text.ga4Desc}
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">
-              {text.noGa4}
-            </p>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-                <ShoppingCart className="w-5 h-5" />
-              </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">{text.latestOrdersCard}</h2>
-            </div>
-            <DemoTag show={isOrdersUsingDemo} />
-          </div>
-
-          <div className="space-y-2">
-            {recentOrders.length ? (
-              recentOrders.slice(0, 5).map((order) => {
-                const customerName =
-                  `${order.billing.first_name || ''} ${order.billing.last_name || ''}`.trim() || text.customerFallback;
-                return (
-                  <div key={order.id} className="rounded-xl border border-gray-200 p-2.5 bg-gray-50/60">
-                    <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                        <p className="text-xs font-bold text-gray-900">#{order.number}</p>
-                        <SourceTag live={!isOrdersUsingDemo} />
-                        <span
-                          className={cn(
-                            'inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold',
-                            orderStatusBadgeClass(order.status)
-                          )}
-                        >
-                          {statusLabels[(order.status || '').toLowerCase() as keyof typeof statusLabels] || orderStatusLabel(order.status)}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-gray-500">{formatDate(order.date_created)}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                      <p className="text-xs text-gray-700 truncate">{customerName}</p>
-                      <p className="text-xs font-extrabold text-indigo-700">
-                        {formatCurrency(order.total)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-xs text-gray-500">{text.noOrders}</p>
-            )}
-          </div>
-
-          <button
-            onClick={() => goToPath('/orders')}
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
-          >
-            {text.goOrdersShort}
-            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
-          </button>
-        </div>
-
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-                <Megaphone className="w-5 h-5" />
-              </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">{text.campaignsCard}</h2>
-            </div>
-            <DemoTag show={isCampaignsUsingDemo} />
-          </div>
-
-          {hasCampaignData || campaignAvailability.spend || campaignAvailability.roas ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
-                    {text.totalCampaigns}
-                    <SourceTag live={campaignLiveAvailability.totalCampaigns} />
-                  </p>
-                  <p className="text-xl font-black text-gray-900">
-                    {campaignAvailability.totalCampaigns ? campaignSummary.totalCampaigns : '—'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
-                    {text.activeCampaigns}
-                    <SourceTag live={campaignLiveAvailability.activeCampaigns} />
-                  </p>
-                  <p className="text-xl font-black text-emerald-600">
-                    {campaignAvailability.activeCampaigns ? campaignSummary.activeCampaigns : '—'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
-                    {text.totalCampaignSpend}
-                    <SourceTag live={campaignLiveAvailability.spend} />
-                  </p>
-                  <p className="text-xl font-black text-red-600">
-                    {campaignAvailability.spend ? formatCurrency(campaignSummary.totalSpend) : '—'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <p className="text-gray-500 text-xs inline-flex items-center gap-1.5">
-                    {text.roasRos}
-                    <SourceTag live={campaignLiveAvailability.roas} />
-                  </p>
-                  <p className="text-xl font-black text-indigo-600">
-                    {campaignAvailability.roas ? `${campaignSummary.avgRoas.toFixed(2)}x` : '—'}
-                  </p>
-                </div>
-              </div>
-
-              {campaignSummary.platformBreakdown.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {campaignSummary.platformBreakdown.map((row) => (
-                    <span
-                      key={row.platform}
-                      className="text-[11px] font-bold text-gray-700 bg-gray-100 border border-gray-200 px-2 py-1 rounded-full"
-                    >
-                      {row.platform}: {row.count}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">{text.noCampaigns}</p>
-          )}
-
-          <button
-            onClick={() => goToPath('/campaigns')}
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
-          >
-            {text.goCampaigns}
-            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
-          </button>
-        </div>
-
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
-                <Search className="w-5 h-5" />
-              </div>
-              <h2 className="font-bold text-gray-900 dark:text-white">{text.seoCard}</h2>
-            </div>
-            <DemoTag show={isGscUsingDemo} />
-          </div>
-
-          {seoAvailability.siteScore || seoAvailability.searchConsoleScore || seoAvailability.clicks ? (
-            <>
-              <div className="space-y-3">
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 inline-flex items-center gap-1">
-                      <Store className="w-3.5 h-3.5" /> {text.siteSeo}
-                      <SourceTag live={seoLiveAvailability.siteScore} />
-                    </span>
-                    <span className="font-black text-gray-900">
-                      {seoAvailability.siteScore ? `${siteSeoScore}/100` : '—'}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                    <div
-                      className="h-full bg-indigo-500 rounded-full"
-                      style={{ width: `${seoAvailability.siteScore ? Math.min(siteSeoScore, 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="rounded-xl border border-gray-200 p-3 bg-gray-50">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500 inline-flex items-center gap-1">
-                      <Globe className="w-3.5 h-3.5" /> {text.scSeo}
-                      <SourceTag live={seoLiveAvailability.searchConsoleScore} />
-                    </span>
-                    <span className="font-black text-gray-900">
-                      {seoAvailability.searchConsoleScore ? `${searchConsoleSeoScore}/100` : '—'}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 rounded-full"
-                      style={{ width: `${seoAvailability.searchConsoleScore ? Math.min(searchConsoleSeoScore, 100) : 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.clicks}
-                    <SourceTag live={seoLiveAvailability.clicks} />
-                  </p>
-                  <p className="font-bold text-gray-900">
-                    {seoAvailability.clicks ? safeGscStats.clicks.toLocaleString() : '—'}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.impressions}
-                    <SourceTag live={seoLiveAvailability.impressions} />
-                  </p>
-                  <p className="font-bold text-gray-900">
-                    {seoAvailability.impressions ? safeGscStats.impressions.toLocaleString() : '—'}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.ctr}
-                    <SourceTag live={seoLiveAvailability.ctr} />
-                  </p>
-                  <p className="font-bold text-gray-900">
-                    {seoAvailability.ctr ? `${safeGscStats.ctr.toFixed(2)}%` : '—'}
-                  </p>
-                </div>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-2.5">
-                  <p className="text-gray-500 inline-flex items-center gap-1.5">
-                    {text.avgPosition}
-                    <SourceTag live={seoLiveAvailability.avgPosition} />
-                  </p>
-                  <p className="font-bold text-gray-900">
-                    {seoAvailability.avgPosition ? `#${safeGscStats.avgPosition.toFixed(1)}` : '—'}
-                  </p>
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">{text.noSeo}</p>
-          )}
-
-          <button
-            onClick={() => goToPath('/seo')}
-            className="w-full inline-flex items-center justify-center gap-2 text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
-          >
-            {text.goSeo}
-            <ArrowRight className={cn('w-4 h-4', dir === 'rtl' ? 'rotate-180' : '')} />
-          </button>
-        </div>
-
-        <div className="bg-white dark:bg-[#111] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <h2 className="font-bold text-gray-900 dark:text-white">{text.optimizationCard}</h2>
-          </div>
-
-          <div className="space-y-2.5">
-            {optimizationRecommendations.length > 0 ? (
-              optimizationRecommendations.map((rec, idx) => (
-                <div key={idx} className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-3">
-                  <div className="flex items-start gap-2">
-                    <Activity className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-xs text-gray-800 leading-relaxed">{rec}</p>
-                  </div>
-                </div>
-              ))
-            ) : hasAnyOptimizationInput ? (
-              <p className="text-xs text-gray-500">{text.noFreshRecs}</p>
-            ) : (
-              <p className="text-xs text-gray-500">{text.noRecsData}</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => goToPath('/ai-recommendations')}
-              className="inline-flex items-center justify-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl py-2"
-            >
-              {text.aiRecs}
-              <ArrowRight className={cn('w-3.5 h-3.5', dir === 'rtl' ? 'rotate-180' : '')} />
-            </button>
-            <button
-              onClick={() => goToPath('/campaigns')}
-              className="inline-flex items-center justify-center gap-2 text-xs font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl py-2"
-            >
-              {text.campaignOptimization}
-              <Target className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        <RecommendationsCard
+          text={text}
+          dir={dir}
+          optimizationRecommendations={optimizationRecommendations}
+          hasAnyOptimizationInput={hasAnyOptimizationInput}
+          onGoAiRecs={() => goToPath('/ai-recommendations')}
+          onGoCampaigns={() => goToPath('/campaigns')}
+        />
       </div>
     </div>
   );
