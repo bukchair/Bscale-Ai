@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { Plug, CheckCircle2, ShoppingCart, BarChart2, Mail, Search, Megaphone, Video, Facebook, AlertCircle, Loader2, X, Store, HelpCircle, ChevronDown, ChevronUp, Sparkles, Settings2, Key, Link as LinkIcon, Trash2, Plus, Zap, BrainCircuit, RotateCcw, Grid3X3, MoreHorizontal } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';

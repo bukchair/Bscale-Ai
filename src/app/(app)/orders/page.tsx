@@ -1,3 +1,3 @@
 'use client';
-import { Orders } from '@/src/pages/Orders';
+import { Orders } from '@/src/views/Orders';
 export default function OrdersPage() { return <Orders />; }

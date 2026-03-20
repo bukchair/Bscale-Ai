@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { Mail, Inbox, Send, Archive, AlertCircle, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';

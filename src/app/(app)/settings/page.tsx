@@ -1,6 +1,6 @@
 'use client';
 
-import { Settings } from '@/src/pages/Settings';
+import { Settings } from '@/src/views/Settings';
 import { useUserProfile } from '@/src/contexts/UserProfileContext';
 
 export default function SettingsPage() {

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useCallback } from 'react';
 import { RefreshCw, Search, AlertCircle, Info, AlertTriangle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../lib/utils';

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Users, Target, Zap, Plus, ArrowLeft, BarChart2, Pencil, Trash2, Send, Loader2, X, Sparkles, Globe2 } from 'lucide-react';

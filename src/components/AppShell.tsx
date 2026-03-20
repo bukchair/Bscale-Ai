@@ -1,3 +1,5 @@
+"use client";
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -75,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const activeTab = PATH_TO_TAB[pathname] ?? 'dashboard';
 
   const setActiveTab = (tab: string) => {
-    router.push(TAB_TO_PATH[tab] ?? '/app');
+    router.push((TAB_TO_PATH[tab] ?? '/app') as Parameters<typeof router.push>[0]);
   };
 
   useEffect(() => {

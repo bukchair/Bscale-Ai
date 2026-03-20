@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, Bell, User, ChevronDown, CheckCircle, AlertTriangle, Calendar, BrainCircuit, LifeBuoy, Search } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';

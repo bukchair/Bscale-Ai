@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowLeft, BrainCircuit, BarChart3, Globe, Target, Zap, Mail, Layers, LineChart, Sparkles, ArrowRight, BookOpen, ShoppingBag, Headphones, Building2 } from 'lucide-react';

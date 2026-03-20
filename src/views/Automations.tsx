@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ShieldAlert, CheckCircle2, XCircle, Clock, Zap, Settings, Play, Pause, AlertTriangle, ListTodo, Search, Download, User, Calendar, RefreshCw } from 'lucide-react';

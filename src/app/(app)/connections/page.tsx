@@ -1,6 +1,6 @@
 'use client';
 
-import { Integrations } from '@/src/pages/Integrations';
+import { Integrations } from '@/src/views/Integrations';
 import { useUserProfile } from '@/src/contexts/UserProfileContext';
 
 export default function ConnectionsPage() {

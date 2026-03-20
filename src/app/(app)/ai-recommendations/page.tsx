@@ -1,3 +1,3 @@
 'use client';
-import { AIRecommendations } from '@/src/pages/AIRecommendations';
+import { AIRecommendations } from '@/src/views/AIRecommendations';
 export default function AIRecommendationsPage() { return <AIRecommendations />; }

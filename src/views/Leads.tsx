@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 import { BadgeCheck, Clock3, Download, PhoneCall, Search, XCircle } from 'lucide-react';

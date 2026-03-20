@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { BrainCircuit, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';

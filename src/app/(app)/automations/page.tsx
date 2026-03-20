@@ -1,3 +1,3 @@
 'use client';
-import { Automations } from '@/src/pages/Automations';
+import { Automations } from '@/src/views/Automations';
 export default function AutomationsPage() { return <Automations />; }

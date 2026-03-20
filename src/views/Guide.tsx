@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { SiteLegalNotice } from '../components/SiteLegalNotice';

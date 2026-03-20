@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, collectionGroup, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { MessageSquare, Send, LifeBuoy, CheckCircle2, Clock3, AlertCircle } from 'lucide-react';

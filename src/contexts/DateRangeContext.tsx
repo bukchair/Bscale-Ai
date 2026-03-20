@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useState, useMemo, ReactNode } from 'react';
 
 export type DateRangeType = 'today' | '7days' | '30days' | 'custom';

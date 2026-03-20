@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield, Mail, Share2, UserPlus, Trash2, CheckCircle2, Clock } from 'lucide-react';
