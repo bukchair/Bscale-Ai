@@ -225,8 +225,9 @@ const lookupOrCreateSharedSet = async (
   });
 
   if (lookup.response.ok) {
-    const rows = Array.isArray(((lookup.parsed as Record<string, unknown>))?.results) ? ((lookup.parsed as Record<string, unknown>)).results : [];
-    const sharedSet = rows[0]?.sharedSet || rows[0]?.shared_set;
+    const results = (lookup.parsed as Record<string, unknown>)?.results;
+    const rows = Array.isArray(results) ? (results as Record<string, unknown>[]) : [];
+    const sharedSet = (rows[0]?.sharedSet || rows[0]?.shared_set) as Record<string, unknown> | undefined;
     const resourceName = String(sharedSet?.resourceName || sharedSet?.resource_name || '').trim();
     if (resourceName) {
       return {
