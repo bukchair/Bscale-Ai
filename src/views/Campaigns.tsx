@@ -50,6 +50,7 @@ import {
 } from '../lib/unified-data/mappers';
 import { createEmptyUnifiedDataLayer } from '../lib/unified-data/types';
 import {
+  type CampaignRow,
   type ContentType,
   type ProductType,
   type ObjectiveType,
@@ -87,8 +88,6 @@ import { CampaignEditModal } from './campaigns/CampaignEditModal';
 import { RecommendationsPanel } from './campaigns/RecommendationsPanel';
 import { CampaignTable } from './campaigns/CampaignTable';
 import { CampaignBuilder } from './campaigns/CampaignBuilder';
-
-type CampaignRow = Record<string, unknown>;
 
 const mockCampaignData = [
   { id: 1, name: 'Summer Sale - Shoes', platform: 'Google', status: 'Active', spend: 1200, roas: 2.5, cpa: 45 },
