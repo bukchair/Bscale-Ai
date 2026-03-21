@@ -41,6 +41,7 @@ export function Users() {
   const [createUserError, setCreateUserError] = useState<string | null>(null);
   const [storeIdDraftByUser, setStoreIdDraftByUser] = useState<Record<string, string>>({});
   const [storeIdSaveState, setStoreIdSaveState] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
+  const [membershipSyncStateByUser, setMembershipSyncStateByUser] = useState<Record<string, 'idle' | 'syncing' | 'synced' | 'error'>>({});
   const [systemTarget, setSystemTarget] = useState<'all' | 'single'>('all');
   const [systemSelectedUserId, setSystemSelectedUserId] = useState('');
   const [systemTitle, setSystemTitle] = useState('');
@@ -85,6 +86,13 @@ export function Users() {
       .split(',')
       .map((item) => item.trim())
       .filter(Boolean))];
+
+  const hasDraftStoreChanges = (user: UserProfile): boolean => {
+    const saved = [...new Set((user.storeIds || []).filter(Boolean))].sort();
+    const draft = parseStoreIdsInput(storeIdDraftByUser[user.uid] || '').sort();
+    if (saved.length !== draft.length) return true;
+    return saved.some((item, index) => item !== draft[index]);
+  };
 
   const syncStoreMembershipDocs = async (
     user: BasicMembershipUser,
@@ -236,6 +244,33 @@ export function Users() {
       setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'error' }));
       window.setTimeout(() => {
         setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'idle' }));
+      }, 1800);
+    }
+  };
+
+  const handleMembershipResync = async (user: UserProfile) => {
+    setMembershipSyncStateByUser((prev) => ({ ...prev, [user.uid]: 'syncing' }));
+    try {
+      const normalizedStoreIds = [...new Set((user.storeIds || []).filter(Boolean))];
+      await syncStoreMembershipDocs(
+        {
+          uid: user.uid,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+        normalizedStoreIds,
+        normalizedStoreIds
+      );
+      setMembershipSyncStateByUser((prev) => ({ ...prev, [user.uid]: 'synced' }));
+      window.setTimeout(() => {
+        setMembershipSyncStateByUser((prev) => ({ ...prev, [user.uid]: 'idle' }));
+      }, 1500);
+    } catch (error) {
+      console.error('Error resyncing memberships:', error);
+      setMembershipSyncStateByUser((prev) => ({ ...prev, [user.uid]: 'error' }));
+      window.setTimeout(() => {
+        setMembershipSyncStateByUser((prev) => ({ ...prev, [user.uid]: 'idle' }));
       }, 1800);
     }
   };
@@ -495,8 +530,11 @@ export function Users() {
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1.5 mb-2">
                         {(user.storeIds || []).slice(0, 2).map((store, idx) => (
-                          <span key={idx} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs font-medium border border-gray-200/50">
-                            {store}
+                          <span key={idx} className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs font-medium border border-gray-200/50">
+                            <span>{store}</span>
+                            <span className="text-[10px] text-gray-500">
+                              · {t(roleLabels[user.role].labelKey)}
+                            </span>
                           </span>
                         ))}
                         {(user.storeIds || []).length > 2 && (
@@ -508,6 +546,11 @@ export function Users() {
                           <span className="text-gray-400 text-xs italic">{t('users.noStores')}</span>
                         )}
                       </div>
+                      {hasDraftStoreChanges(user) && (
+                        <p className="mb-2 text-[11px] font-bold text-amber-700">
+                          {isHebrew ? 'יש שינויים שלא נשמרו ב־Store IDs' : 'Unsaved Store IDs changes'}
+                        </p>
+                      )}
                       <div className="flex items-center gap-1.5">
                         <input
                           value={storeIdDraftByUser[user.uid] ?? ''}
@@ -549,6 +592,35 @@ export function Users() {
                             : isHebrew
                             ? 'שמור'
                             : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMembershipResync(user)}
+                          className={cn(
+                            'px-2 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap',
+                            membershipSyncStateByUser[user.uid] === 'synced'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : membershipSyncStateByUser[user.uid] === 'error'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          )}
+                          disabled={membershipSyncStateByUser[user.uid] === 'syncing'}
+                        >
+                          {membershipSyncStateByUser[user.uid] === 'syncing'
+                            ? isHebrew
+                              ? 'מסנכרן...'
+                              : 'Syncing...'
+                            : membershipSyncStateByUser[user.uid] === 'synced'
+                            ? isHebrew
+                              ? 'סונכרן'
+                              : 'Synced'
+                            : membershipSyncStateByUser[user.uid] === 'error'
+                            ? isHebrew
+                              ? 'שגיאה'
+                              : 'Error'
+                            : isHebrew
+                            ? 'סנכרן Membership'
+                            : 'Sync membership'}
                         </button>
                       </div>
                     </td>
