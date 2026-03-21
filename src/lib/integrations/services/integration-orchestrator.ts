@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/db/prisma';
 import type { Platform } from '@/src/lib/integrations/core/types';
 import { providerFactory } from '@/src/lib/integrations/core/provider-factory';
@@ -7,6 +8,7 @@ import { connectionService } from '@/src/lib/integrations/services/connection-se
 import { accountDiscoveryService } from '@/src/lib/integrations/services/account-discovery-service';
 import { syncService } from '@/src/lib/integrations/services/sync-service';
 import { IntegrationError, OAuthStateMismatchError } from '@/src/lib/integrations/core/errors';
+import { logger } from '@/src/lib/integrations/utils/logger';
 
 export const integrationOrchestrator = {
   async listConnections(userId: string) {
@@ -16,23 +18,38 @@ export const integrationOrchestrator = {
     const connectionIds = connections.map((c) => c.id);
 
     // Batch-fetch the last 5 sync runs for all connections in a single query (avoids N+1).
-    const allRuns = await prisma.syncRun.findMany({
-      where: { syncJob: { connectionId: { in: connectionIds } } },
+    // If this query fails (schema drift, DB issues), still return connections without history.
+    type SyncRunWithJob = Prisma.SyncRunGetPayload<{
       include: {
         syncJob: {
-          select: { id: true, platform: true, type: true, requestedBy: true, connectionId: true },
+          select: { id: true; platform: true; type: true; requestedBy: true; connectionId: true };
+        };
+      };
+    }>;
+    let runsByConnection = new Map<string, SyncRunWithJob[]>();
+    try {
+      const allRuns = await prisma.syncRun.findMany({
+        where: { syncJob: { connectionId: { in: connectionIds } } },
+        include: {
+          syncJob: {
+            select: { id: true, platform: true, type: true, requestedBy: true, connectionId: true },
+          },
         },
-      },
-      orderBy: { startedAt: 'desc' },
-    });
+        orderBy: { startedAt: 'desc' },
+      });
 
-    // Group runs by connectionId and keep at most 5 per connection.
-    const runsByConnection = new Map<string, typeof allRuns>();
-    for (const run of allRuns) {
-      const cid = run.syncJob.connectionId;
-      if (!runsByConnection.has(cid)) runsByConnection.set(cid, []);
-      const bucket = runsByConnection.get(cid)!;
-      if (bucket.length < 5) bucket.push(run);
+      for (const run of allRuns) {
+        const cid = run.syncJob.connectionId;
+        if (!runsByConnection.has(cid)) runsByConnection.set(cid, []);
+        const bucket = runsByConnection.get(cid)!;
+        if (bucket.length < 5) bucket.push(run);
+      }
+    } catch (err) {
+      logger.error('listConnections: sync history query failed', {
+        userId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+      runsByConnection = new Map();
     }
 
     return connections.map((connection) => {

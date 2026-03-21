@@ -135,7 +135,9 @@ export const createMetaDraft = async (
     adSetForm.set('campaign_id', campaignId);
     adSetForm.set('status', metaStatus);
     adSetForm.set('billing_event', 'IMPRESSIONS');
-    adSetForm.set('optimization_goal', 'LINK_CLICKS');
+    adSetForm.set('optimization_goal', 'LANDING_PAGE_VIEWS');
+    adSetForm.set('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');
+    adSetForm.set('destination_type', 'WEBSITE');
     adSetForm.set('daily_budget', String(Math.round(Math.max(dailyBudget, 1) * 100)));
     adSetForm.set('targeting', JSON.stringify({
       age_min: 18,

@@ -163,7 +163,8 @@ export const createGoogleDraft = async (
               status: activateImmediately ? 'ENABLED' : 'PAUSED',
               advertisingChannelType: 'SEARCH',
               campaignBudget: budgetResourceName,
-              maximizeClicks: {},
+              // maximizeClicks is not a Campaign REST field; manual CPC is valid for SEARCH.
+              manualCpc: { enhancedCpcEnabled: false },
               networkSettings: {
                 targetGoogleSearch: true,
                 targetSearchNetwork: false,

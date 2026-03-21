@@ -20,7 +20,8 @@ const TIKTOK_GEO: Record<string, string> = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toTikTokObjective = (o: OneClickObjective): string => {
-  if (o === 'sales') return 'CONVERSIONS';
+  // CONVERSIONS + CONVERT requires a pixel on the ad group; automated drafts use traffic-style goals.
+  if (o === 'sales') return 'TRAFFIC';
   if (o === 'leads') return 'LEAD_GENERATION';
   return 'TRAFFIC';
 };
@@ -35,7 +36,7 @@ const toTikTokOptimizationGoal = (o: OneClickObjective) => {
 };
 
 const toTikTokBillingEvent = (o: OneClickObjective) =>
-  o === 'traffic' ? 'CPC' : 'OCPM';
+  o === 'traffic' || o === 'sales' ? 'CPC' : 'OCPM';
 const normalizeFinalUrl = (value: string | undefined): string => {
   const raw = String(value || '').trim();
   if (!raw) return '';
