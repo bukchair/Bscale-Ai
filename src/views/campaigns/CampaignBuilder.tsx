@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Check, ImagePlus, Loader2, PlusCircle, Target, Trash2, Video } from 'lucide-react';
+import { Check, DollarSign, Globe, ImagePlus, Loader2, PlusCircle, Target, Trash2, Video } from 'lucide-react';
+import { COUNTRIES, LANGUAGES } from '../../components/campaigns/wizard-steps/wizard-types';
 import { cn } from '../../lib/utils';
 import type {
   ContentType, ObjectiveType, PlatformName, ProductType, RuleAction,
@@ -47,6 +48,10 @@ type CampaignBuilderProps = {
   serviceTypeInput: string;
   shortTitleInput: string;
   wooPublishScope: WooPublishScope;
+  dailyBudgetInput: string;
+  targetCountry: string;
+  campaignLanguage: string;
+  activateImmediately: boolean;
   // state - numbers
   ruleEndHour: number;
   ruleMinRoas: number;
@@ -98,6 +103,10 @@ type CampaignBuilderProps = {
   setSelectedWooProductId: (v: string) => void;
   setServiceTypeInput: (v: string) => void;
   setShortTitleInput: (v: string) => void;
+  setDailyBudgetInput: (v: string) => void;
+  setTargetCountry: (v: string) => void;
+  setCampaignLanguage: (v: string) => void;
+  setActivateImmediately: (v: boolean) => void;
   setUseWooProductData: (v: boolean) => void;
   setWooPublishScope: (v: WooPublishScope) => void;
   // handlers
@@ -131,6 +140,7 @@ export function CampaignBuilder({
   objective, productType, ruleAction, ruleReason, rulePlatform, selectedCopyPlatform,
   selectedPreviewPlatform, selectedScheduleDay, selectedSchedulePlatform, selectedWooCategory,
   selectedWooProductId, serviceTypeInput, shortTitleInput, wooPublishScope,
+  dailyBudgetInput, targetCountry, campaignLanguage, activateImmediately,
   ruleEndHour, ruleMinRoas, ruleStartHour, smartAdElapsedMs,
   aiRecommendedHoursByPlatform, audienceSuggestions, connectedAdPlatforms, contentTypeOptions,
   dayLabels, draftPlatforms, effectiveMediaLimits, hourOptions, objectiveOptions, platformCopyDrafts,
@@ -141,7 +151,8 @@ export function CampaignBuilder({
   setPlatformCopyDrafts, setProductType, setRuleAction, setRuleEndHour, setRuleMinRoas,
   setRulePlatform, setRuleReason, setRuleStartHour, setSelectedCopyPlatform,
   setSelectedPreviewPlatform, setSelectedScheduleDay, setSelectedSchedulePlatform,
-  setSelectedWooCategory, setSelectedWooProductId, setServiceTypeInput, setShortTitleInput,
+  setSelectedWooCategory,   setSelectedWooProductId, setServiceTypeInput, setShortTitleInput,
+  setDailyBudgetInput, setTargetCountry, setCampaignLanguage, setActivateImmediately,
   setUseWooProductData, setWooPublishScope,
   addCustomAudience, addTimeRule, applyPlatformCopyToFields, disableWooImportMode,
   formatHour, formatHourRange, formatSmartElapsed, getActiveSlotsCount,
@@ -262,6 +273,99 @@ export function CampaignBuilder({
               className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               placeholder={isHebrew ? 'לדוגמה: שירות פרימיום לעסקים' : 'e.g. Premium service for SMBs'}
             />
+          </div>
+        </div>
+
+        {/* Budget, geo & launch (merged former one-click options) */}
+        <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
+          <h4 className="text-sm font-bold text-violet-900 mb-3 flex items-center gap-2">
+            <Globe className="w-4 h-4 text-violet-600" />
+            {text.budgetGeoTitle}
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1 flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5 text-violet-600" />
+                {text.dailyBudgetLabel}
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={dailyBudgetInput}
+                  onChange={(e) => setDailyBudgetInput(e.target.value)}
+                  className="w-28 rounded-md border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm"
+                />
+                <span className="text-xs text-gray-500">{text.perDay}</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {[10, 20, 50, 100].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setDailyBudgetInput(String(preset))}
+                    className={cn(
+                      'px-2 py-1 rounded-md text-xs font-bold border transition-colors',
+                      Number(dailyBudgetInput) === preset
+                        ? 'border-violet-500 bg-violet-100 text-violet-800'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-violet-200'
+                    )}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.countryLabel}</label>
+              <select
+                value={targetCountry}
+                onChange={(e) => setTargetCountry(e.target.value)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm"
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">{text.campaignLanguageLabel}</label>
+              <select
+                value={campaignLanguage}
+                onChange={(e) => setCampaignLanguage(e.target.value)}
+                className="w-full rounded-md border-gray-300 shadow-sm focus:border-violet-500 focus:ring-violet-500 sm:text-sm"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col justify-end gap-2">
+              <p className="text-xs font-bold text-gray-700">{text.activateImmediatelyLabel}</p>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={activateImmediately}
+                onClick={() => setActivateImmediately(!activateImmediately)}
+                className={cn(
+                  'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                  activateImmediately ? 'bg-violet-600' : 'bg-gray-300'
+                )}
+              >
+                <span
+                  className={cn(
+                    'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition',
+                    activateImmediately ? 'translate-x-5' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+              <p className="text-[11px] text-gray-500 leading-snug">{text.activateImmediatelyHint}</p>
+            </div>
           </div>
         </div>
 

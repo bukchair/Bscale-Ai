@@ -25,6 +25,10 @@ type CreateScheduledCampaignBody = {
   objective?: ObjectiveType;
   dailyBudget?: number;
   country?: string;
+  /** Ad / copy language hint (optional; reserved for future use) */
+  language?: string;
+  /** When true, campaigns are created ENABLED/ACTIVE on platforms regardless of weekly schedule. */
+  activateImmediately?: boolean;
   platforms?: PlatformName[];
   weeklySchedule?: WeeklySchedule;
   audiences?: string[];
@@ -32,6 +36,7 @@ type CreateScheduledCampaignBody = {
   productType?: string;
   serviceType?: string;
   wooProductName?: string;
+  timeRules?: unknown;
   product?: {
     name?: string;
     description?: string;
@@ -140,11 +145,14 @@ const isIncompletePlatformResult = (result: PlatformResult): boolean => {
   );
 };
 
+const resolveActivateFlag = (body: CreateScheduledCampaignBody, platform: PlatformName) =>
+  Boolean(body.activateImmediately) || isHourActiveForPlatform(body.weeklySchedule, platform);
+
 const createGoogleCampaign = async (
   userId: string,
   body: CreateScheduledCampaignBody
 ): Promise<PlatformCreateResult> => {
-  const activeNow = isHourActiveForPlatform(body.weeklySchedule, 'Google');
+  const activateFlag = resolveActivateFlag(body, 'Google');
   const objective = mapObjectiveToOneClick((body.objective || 'sales') as ObjectiveType);
   const strategy = buildOneClickStrategy(
     body,
@@ -158,7 +166,7 @@ const createGoogleCampaign = async (
     objective,
     Math.max(Number(body.dailyBudget) || 20, 1),
     strategy,
-    activeNow,
+    activateFlag,
     String(body.country || 'IL'),
     product
   );
@@ -167,7 +175,7 @@ const createGoogleCampaign = async (
     ok: !isIncompletePlatformResult(result),
     campaignId: result.campaignId,
     message: result.message,
-    status: activeNow ? 'Scheduled' : 'Draft',
+    status: activateFlag ? 'Scheduled' : 'Draft',
   };
 };
 
@@ -177,7 +185,7 @@ const createMetaCampaign = async (
   mediaBuffer?: Buffer,
   mediaMimeType?: string
 ): Promise<PlatformCreateResult> => {
-  const activeNow = isHourActiveForPlatform(body.weeklySchedule, 'Meta');
+  const activateFlag = resolveActivateFlag(body, 'Meta');
   const objective = mapObjectiveToOneClick((body.objective || 'sales') as ObjectiveType);
   const strategy = buildOneClickStrategy(
     body,
@@ -191,7 +199,7 @@ const createMetaCampaign = async (
     objective,
     Math.max(Number(body.dailyBudget) || 20, 1),
     strategy,
-    activeNow,
+    activateFlag,
     String(body.country || 'IL'),
     product,
     mediaBuffer,
@@ -202,7 +210,7 @@ const createMetaCampaign = async (
     ok: !isIncompletePlatformResult(result),
     campaignId: result.campaignId,
     message: result.message,
-    status: activeNow ? 'Scheduled' : 'Draft',
+    status: activateFlag ? 'Scheduled' : 'Draft',
   };
 };
 
@@ -212,7 +220,7 @@ const createTikTokCampaign = async (
   mediaBuffer?: Buffer,
   mediaMimeType?: string
 ): Promise<PlatformCreateResult> => {
-  const activeNow = isHourActiveForPlatform(body.weeklySchedule, 'TikTok');
+  const activateFlag = resolveActivateFlag(body, 'TikTok');
   const objective = mapObjectiveToOneClick((body.objective || 'sales') as ObjectiveType);
   const strategy = buildOneClickStrategy(
     body,
@@ -226,7 +234,7 @@ const createTikTokCampaign = async (
     objective,
     Math.max(Number(body.dailyBudget) || 50, 50),
     strategy,
-    activeNow,
+    activateFlag,
     String(body.country || 'IL'),
     product,
     mediaBuffer,
@@ -237,7 +245,7 @@ const createTikTokCampaign = async (
     ok: !isIncompletePlatformResult(result),
     campaignId: result.campaignId,
     message: result.message,
-    status: activeNow ? 'Scheduled' : 'Draft',
+    status: activateFlag ? 'Scheduled' : 'Draft',
   };
 };
 

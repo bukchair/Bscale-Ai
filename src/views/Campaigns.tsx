@@ -16,7 +16,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Sparkles,
   Eye,
   Video,
   Pencil,
@@ -26,7 +25,6 @@ import {
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { OneClickWizard } from '../components/campaigns/OneClickWizard';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import {
@@ -205,7 +203,16 @@ export function Campaigns() {
     analyzePlatformAds: isHebrew
       ? 'נתח וצור מודעות מותאמות לפלטפורמות'
       : 'Analyze and generate platform-fit ads',
-    goToBuilder: isHebrew ? 'מעבר ליצירת מודעה' : 'Go to ad creation',
+    goToBuilder: isHebrew ? 'מעבר ליצירת קמפיין' : 'Go to campaign builder',
+    budgetGeoTitle: isHebrew ? 'תקציב, מיקום ושפת קמפיין' : 'Budget, geo & campaign language',
+    dailyBudgetLabel: isHebrew ? 'תקציב יומי' : 'Daily budget',
+    perDay: isHebrew ? 'יום' : 'day',
+    countryLabel: isHebrew ? 'מדינת יעד' : 'Target country',
+    campaignLanguageLabel: isHebrew ? 'שפת הקמפיין' : 'Campaign language',
+    activateImmediatelyLabel: isHebrew ? 'הפעלה מיידית בפלטפורמה' : 'Activate immediately on platform',
+    activateImmediatelyHint: isHebrew
+      ? 'כבוי: הקמפיין נשמר כטיוטה או פעיל רק בשעות שסימנת בלוח. מופעל: מופעל בפלטפורמה מיד (כמו "בלחיצה אחת").'
+      : 'Off: draft or only runs in hours you set in the weekly schedule. On: ENABLED/ACTIVE on the ad platform immediately.',
     applyPlatformCopy: isHebrew ? 'החל לשדות הקמפיין' : 'Apply to campaign fields',
     adPreview: isHebrew ? 'תצוגה מקדימה' : 'Ad preview',
     charLimit: isHebrew ? 'תווים' : 'chars',
@@ -299,7 +306,14 @@ export function Campaigns() {
     selectedPreviewPlatform, setSelectedPreviewPlatform,
     draftPlatforms,
     previewPlatforms,
-    oneClickOpen, setOneClickOpen,
+    dailyBudgetInput,
+    setDailyBudgetInput,
+    targetCountry,
+    setTargetCountry,
+    campaignLanguage,
+    setCampaignLanguage,
+    activateImmediately,
+    setActivateImmediately,
     builderSectionRef,
     shortTitleInputRef,
     audienceSuggestions,
@@ -505,18 +519,11 @@ export function Campaigns() {
         </div>
         <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-2">
           <button
-            onClick={() => setOneClickOpen(true)}
+            onClick={scrollToBuilderSection}
             className="inline-flex w-full sm:w-auto justify-center items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md shadow-sm text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
-            <Sparkles className="w-4 h-4" />
-            {isHebrew ? 'קמפיין בלחיצה אחת' : 'One Click Campaign'}
-          </button>
-          <button
-            onClick={scrollToBuilderSection}
-            className="inline-flex w-full sm:w-auto justify-center items-center px-4 py-2 border border-indigo-200 text-sm font-medium rounded-md shadow-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <Target className="w-4 h-4 ml-2" />
-            {text.goToBuilder}
+            <Target className="w-4 h-4" />
+            {isHebrew ? 'יצירת קמפיין' : 'Create campaign'}
           </button>
           <button 
             onClick={fetchRecommendations}
@@ -606,12 +613,16 @@ export function Campaigns() {
         serviceTypeInput={serviceTypeInput}
         shortTitleInput={shortTitleInput}
         wooPublishScope={wooPublishScope}
+        dailyBudgetInput={dailyBudgetInput}
+        targetCountry={targetCountry}
+        campaignLanguage={campaignLanguage}
+        activateImmediately={activateImmediately}
         ruleEndHour={ruleEndHour}
         ruleMinRoas={ruleMinRoas}
         ruleStartHour={ruleStartHour}
         smartAdElapsedMs={smartAdElapsedMs}
         aiRecommendedHoursByPlatform={aiRecommendedHoursByPlatform}
-        audienceSuggestions={audienceSuggestions}
+        audienceSuggestions={audienceSuggestionsWithAi}
         connectedAdPlatforms={connectedAdPlatforms}
         contentTypeOptions={contentTypeOptions}
         dayLabels={dayLabels}
@@ -654,6 +665,10 @@ export function Campaigns() {
         setSelectedWooProductId={setSelectedWooProductId}
         setServiceTypeInput={setServiceTypeInput}
         setShortTitleInput={setShortTitleInput}
+        setDailyBudgetInput={setDailyBudgetInput}
+        setTargetCountry={setTargetCountry}
+        setCampaignLanguage={setCampaignLanguage}
+        setActivateImmediately={setActivateImmediately}
         setUseWooProductData={setUseWooProductData}
         setWooPublishScope={setWooPublishScope}
         addCustomAudience={addCustomAudience}
@@ -704,7 +719,6 @@ export function Campaigns() {
         />
       )}
 
-      <OneClickWizard open={oneClickOpen} onClose={() => setOneClickOpen(false)} />
     </div>
   );
 }

@@ -71,7 +71,10 @@ export function useCampaignBuilder({
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
   const [selectedCopyPlatform, setSelectedCopyPlatform] = useState<PlatformName>('Google');
   const [selectedPreviewPlatform, setSelectedPreviewPlatform] = useState<PlatformName>('Google');
-  const [oneClickOpen, setOneClickOpen] = useState(false);
+  const [dailyBudgetInput, setDailyBudgetInput] = useState('20');
+  const [targetCountry, setTargetCountry] = useState(() => (isHebrew ? 'IL' : 'US'));
+  const [campaignLanguage, setCampaignLanguage] = useState(() => (language === 'he' ? 'he' : 'en'));
+  const [activateImmediately, setActivateImmediately] = useState(false);
 
   // ── Refs ─────────────────────────────────────────────────────────────────
   const builderSectionRef = useRef<HTMLElement | null>(null);
@@ -547,6 +550,10 @@ export function useCampaignBuilder({
       setBuilderMessage(isHebrew ? 'נדרש שם קמפיין ובחירת לפחות פלטפורמה אחת.' : 'Campaign name and at least one platform are required.');
       return;
     }
+    if (Math.max(Number(dailyBudgetInput) || 0, 0) < 1) {
+      setBuilderMessage(isHebrew ? 'נדרש תקציב יומי של לפחות 1.' : 'Daily budget must be at least 1.');
+      return;
+    }
     if (woo.useWooProductData && isWooConnected && woo.wooProducts.length > 0) {
       if (woo.wooPublishScope === 'category' && !woo.selectedWooCategory) {
         setBuilderMessage(isHebrew ? 'בחר קטגוריה או מוצר לפרסום מתוך WooCommerce.' : 'Select a WooCommerce category or product to promote.');
@@ -600,6 +607,7 @@ export function useCampaignBuilder({
             ? woo.selectedWooProduct.imageUrl
             : '',
       };
+      const budgetNum = Math.max(Number(dailyBudgetInput) || 20, 1);
       const requestPayload = {
         campaignName: resolvedCampaignName,
         shortTitle: shortTitleInput.trim(),
@@ -612,8 +620,10 @@ export function useCampaignBuilder({
         audiences: selectedAudiences,
         timeRules: schedule.timeRules,
         weeklySchedule: schedule.weeklySchedule,
-        country: language === 'he' ? 'IL' : 'US',
-        dailyBudget: 20,
+        country: targetCountry,
+        language: campaignLanguage,
+        dailyBudget: budgetNum,
+        activateImmediately,
         wooPublishMode: isWooConnected && woo.useWooProductData ? woo.wooPublishScope : null,
         wooCategory:
           isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'category'
@@ -668,11 +678,12 @@ export function useCampaignBuilder({
       const created = resolvedPlatforms.map((platform) => {
         const activeHours = schedule.getActiveSlotsCount(platform);
         const platformResult = results.find((item: Record<string, unknown>) => String(item?.platform || '') === platform);
+        const liveNow = activateImmediately || activeHours > 0;
         return {
           id: `live-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: resolvedCampaignName,
           platform,
-          status: platformResult?.ok === true ? (activeHours > 0 ? 'Scheduled' : 'Draft') : 'Error',
+          status: platformResult?.ok === true ? (liveNow ? 'Scheduled' : 'Draft') : 'Error',
           spend: 0, roas: 0, cpa: 0,
           objective,
           brief: campaignBrief.trim(),
@@ -699,6 +710,8 @@ export function useCampaignBuilder({
       setAiGeneratedAudienceNames([]);
       setPlatformCopyDrafts({});
       schedule.setTimeRules([]);
+      setDailyBudgetInput('20');
+      setActivateImmediately(false);
     } catch (error) {
       setBuilderMessage(error instanceof Error ? error.message : 'Failed to create scheduled campaign.');
     } finally {
@@ -726,7 +739,14 @@ export function useCampaignBuilder({
     selectedPreviewPlatform, setSelectedPreviewPlatform,
     draftPlatforms,
     previewPlatforms,
-    oneClickOpen, setOneClickOpen,
+    dailyBudgetInput,
+    setDailyBudgetInput,
+    targetCountry,
+    setTargetCountry,
+    campaignLanguage,
+    setCampaignLanguage,
+    activateImmediately,
+    setActivateImmediately,
     // refs
     builderSectionRef,
     shortTitleInputRef,
