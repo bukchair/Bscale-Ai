@@ -12,11 +12,18 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
+
+    function currentUserDocExists() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
     
     function hasAdminRole() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return currentUserDocExists() && currentUser().role == 'admin';
     }
 
     function isAdmin() {
@@ -25,23 +32,33 @@ service cloud.firestore {
     }
     
     function isAgency() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agency';
+      return currentUserDocExists() && currentUser().role == 'agency';
     }
     
     function hasStoreAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds);
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/stores/$(storeId)) &&
+             currentUserDocExists() &&
+             (
+               isAdmin() || 
+               (currentUser().role == 'agency' &&
+                 get(/databases/$(database)/documents/stores/$(storeId)).data.agencyId == request.auth.uid) ||
+               ((currentUser().storeIds is list) && (storeId in currentUser().storeIds))
+             );
     }
     
     function hasStoreEditAccess(storeId) {
-      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      let store = get(/databases/$(database)/documents/stores/$(storeId)).data;
-      return isAdmin() || 
-             (user.role == 'agency' && store.agencyId == request.auth.uid) ||
-             (storeId in user.storeIds && user.role in ['owner', 'editor']);
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/stores/$(storeId)) &&
+             currentUserDocExists() &&
+             (
+               isAdmin() || 
+               (currentUser().role == 'agency' &&
+                 get(/databases/$(database)/documents/stores/$(storeId)).data.agencyId == request.auth.uid) ||
+               ((currentUser().storeIds is list) &&
+                 (storeId in currentUser().storeIds) &&
+                 currentUser().role in ['owner', 'editor'])
+             );
     }
 
     function isValidUser(data) {
@@ -58,7 +75,8 @@ service cloud.firestore {
     // ===============================================================
     
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || isAgency();
+      // User profiles are private by default. Admin can read all.
+      allow read: if isOwner(userId) || isAdmin();
       
       // Only admins can create admins/agencies. Users can create themselves as 'owner' initially.
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
@@ -88,7 +106,9 @@ service cloud.firestore {
     
     match /stores/{storeId} {
       allow read: if hasStoreAccess(storeId);
-      allow create: if isAuthenticated() && (isAdmin() || isAgency() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner');
+      allow create: if isAuthenticated() &&
+                    currentUserDocExists() &&
+                    (isAdmin() || isAgency() || currentUser().role == 'owner');
       allow update: if hasStoreEditAccess(storeId);
       allow delete: if isAdmin() || (isAgency() && resource.data.agencyId == request.auth.uid) || resource.data.ownerId == request.auth.uid;
       
