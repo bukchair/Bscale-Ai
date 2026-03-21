@@ -10,6 +10,99 @@ const isNumericPropertyId = (value: string) => /^\d+$/.test(value);
 
 const toErrorMessage = toApiErrorMessage;
 
+type Ga4RunPayload = {
+  realtimeRes: Response;
+  users24hRes: Response;
+  realtimeRaw: string;
+  users24hRaw: string;
+  realtimeParsed: Record<string, unknown>;
+  users24hParsed: Record<string, unknown>;
+};
+
+const discoverNumericPropertyId = async (
+  accessToken: string,
+  options?: { exclude?: string[] }
+): Promise<string> => {
+  const exclude = new Set((options?.exclude || []).map((item) => normalizePropertyId(item)));
+  const discoverResponse = await fetch(
+    `${GA4_ADMIN_API}/accountSummaries?pageSize=${GA4_MAX_PROPERTY_DISCOVERY_CANDIDATES}`,
+    {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+    }
+  );
+  if (!discoverResponse.ok) return '';
+  const discoverParsed = await discoverResponse.json().catch(() => ({}));
+  const summaries =
+    (
+      discoverParsed as {
+        accountSummaries?: Array<{ propertySummaries?: Array<{ property?: string }> }>;
+      }
+    ).accountSummaries ?? [];
+
+  for (const summary of summaries) {
+    for (const property of summary.propertySummaries ?? []) {
+      const normalized = normalizePropertyId(String(property.property || ''));
+      if (isNumericPropertyId(normalized) && !exclude.has(normalized)) {
+        return normalized;
+      }
+    }
+  }
+  return '';
+};
+
+const runGa4Reports = async (
+  propertyId: string,
+  accessToken: string
+): Promise<Ga4RunPayload> => {
+  const [realtimeRes, users24hRes] = await Promise.all([
+    fetch(`${GA4_DATA_API}/properties/${propertyId}:runRealtimeReport`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        dimensions: [
+          { name: 'unifiedScreenName' },
+          { name: 'pagePathPlusQueryString' },
+        ],
+        metrics: [{ name: 'screenPageViews' }],
+        limit: 7,
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+      }),
+    }),
+    fetch(`${GA4_DATA_API}/properties/${propertyId}:runReport`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        dateRanges: [{ startDate: '1daysAgo', endDate: 'today' }],
+        metrics: [{ name: 'totalUsers' }],
+        metricAggregations: ['TOTAL'],
+      }),
+    }),
+  ]);
+
+  const realtimeRaw = await realtimeRes.text();
+  const users24hRaw = await users24hRes.text();
+  const realtimeParsed = (realtimeRaw ? JSON.parse(realtimeRaw) : {}) as Record<string, unknown>;
+  const users24hParsed = (users24hRaw ? JSON.parse(users24hRaw) : {}) as Record<string, unknown>;
+  return {
+    realtimeRes,
+    users24hRes,
+    realtimeRaw,
+    users24hRaw,
+    realtimeParsed,
+    users24hParsed,
+  };
+};
+
 export async function GET(request: Request) {
   try {
     const user = await requireAuthenticatedUser();
@@ -35,29 +128,7 @@ export async function GET(request: Request) {
     let propertyId = normalizePropertyId(queryPropertyId || fallbackPropertyId);
 
     if (!isNumericPropertyId(propertyId)) {
-      const discoverResponse = await fetch(`${GA4_ADMIN_API}/accountSummaries?pageSize=200`, {
-        method: 'GET',
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          'content-type': 'application/json',
-        },
-      });
-      if (discoverResponse.ok) {
-        const discoverParsed = await discoverResponse.json().catch(() => ({}));
-        const summaries =
-          (discoverParsed as { accountSummaries?: Array<{ propertySummaries?: Array<{ property?: string }> }> })
-            .accountSummaries ?? [];
-        for (const summary of summaries) {
-          for (const property of summary.propertySummaries ?? []) {
-            const normalized = normalizePropertyId(String(property.property || ''));
-            if (isNumericPropertyId(normalized)) {
-              propertyId = normalized;
-              break;
-            }
-          }
-          if (isNumericPropertyId(propertyId)) break;
-        }
-      }
+      propertyId = await discoverNumericPropertyId(accessToken);
     }
 
     if (!isNumericPropertyId(propertyId)) {
@@ -67,58 +138,47 @@ export async function GET(request: Request) {
       );
     }
 
-    // Fetch both realtime top pages and 24h user count in parallel
-    const [realtimeRes, users24hRes] = await Promise.all([
-      fetch(`${GA4_DATA_API}/properties/${propertyId}:runRealtimeReport`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          dimensions: [
-            { name: 'unifiedScreenName' },
-            { name: 'pagePathPlusQueryString' },
-          ],
-          metrics: [{ name: 'screenPageViews' }],
-          limit: 7,
-          orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-        }),
-      }),
-      fetch(`${GA4_DATA_API}/properties/${propertyId}:runReport`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          dateRanges: [{ startDate: '1daysAgo', endDate: 'today' }],
-          metrics: [{ name: 'totalUsers' }],
-          metricAggregations: ['TOTAL'],
-        }),
-      }),
-    ]);
+    let runPayload: Ga4RunPayload;
+    try {
+      runPayload = await runGa4Reports(propertyId, accessToken);
+    } catch {
+      return NextResponse.json({ message: 'Failed to parse GA4 response payload.' }, { status: 502 });
+    }
 
-    const realtimeRaw = await realtimeRes.text();
-    const users24hRaw = await users24hRes.text();
+    // If caller provided a numeric property that fails with 400/403, retry once using auto-discovery.
+    if (
+      !runPayload.realtimeRes.ok &&
+      (runPayload.realtimeRes.status === 400 || runPayload.realtimeRes.status === 403)
+    ) {
+      const fallbackPropertyId = await discoverNumericPropertyId(accessToken, { exclude: [propertyId] });
+      if (isNumericPropertyId(fallbackPropertyId) && fallbackPropertyId !== propertyId) {
+        propertyId = fallbackPropertyId;
+        try {
+          runPayload = await runGa4Reports(propertyId, accessToken);
+        } catch {
+          return NextResponse.json({ message: 'Failed to parse GA4 response payload.' }, { status: 502 });
+        }
+      }
+    }
 
-    let realtimeParsed: any = {};
-    let users24hParsed: any = {};
-    try { realtimeParsed = realtimeRaw ? JSON.parse(realtimeRaw) : {}; } catch { realtimeParsed = {}; }
-    try { users24hParsed = users24hRaw ? JSON.parse(users24hRaw) : {}; } catch { users24hParsed = {}; }
-
-    if (!realtimeRes.ok) {
+    if (!runPayload.realtimeRes.ok) {
       return NextResponse.json(
-        { message: toErrorMessage(realtimeRes.status, realtimeRaw, realtimeParsed) },
-        { status: realtimeRes.status }
+        {
+          message: toErrorMessage(
+            runPayload.realtimeRes.status,
+            runPayload.realtimeRaw,
+            runPayload.realtimeParsed
+          ),
+        },
+        { status: runPayload.realtimeRes.status }
       );
     }
 
     // Parse top pages from realtime report
     const rows: Array<{ title: string; path: string; views: number }> = [];
-    for (const row of realtimeParsed.rows ?? []) {
-      const dims = row.dimensionValues ?? [];
-      const mets = row.metricValues ?? [];
+    for (const row of (runPayload.realtimeParsed.rows as Array<Record<string, any>> | undefined) ?? []) {
+      const dims = row?.dimensionValues ?? [];
+      const mets = row?.metricValues ?? [];
       rows.push({
         title: dims[0]?.value || '',
         path: dims[1]?.value || '',
@@ -128,7 +188,9 @@ export async function GET(request: Request) {
 
     // Parse 24h totalUsers
     let users24h = 0;
-    const totals = users24hParsed.totals ?? [];
+    const totals =
+      (runPayload.users24hParsed.totals as Array<{ metricValues?: Array<{ value?: string }> }> | undefined) ??
+      [];
     if (totals.length > 0) {
       users24h = parseInt(totals[0]?.metricValues?.[0]?.value || '0', 10);
     }

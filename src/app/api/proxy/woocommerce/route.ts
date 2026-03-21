@@ -29,6 +29,37 @@ type WooBody = {
   data?: unknown;
 };
 
+type ParsedEndpoint = {
+  path: string;
+  query: string;
+};
+
+function parseEndpoint(rawEndpoint: string): ParsedEndpoint | null {
+  const trimmed = String(rawEndpoint || '').trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return null;
+  if (trimmed.includes('\\')) return null;
+
+  const [rawPathPart, ...rest] = trimmed.split('?');
+  const pathPart = rawPathPart.replace(/^\/+/, '');
+  const queryPart = rest.join('?');
+
+  // Guard path traversal and invalid path characters.
+  if (!pathPart || pathPart.includes('..') || !/^[a-zA-Z0-9_/-]+$/.test(pathPart)) {
+    return null;
+  }
+
+  // Allow a constrained query charset for WooCommerce list/report endpoints.
+  if (queryPart && !/^[a-zA-Z0-9_.,:%+@&=\-\[\]]+$/.test(queryPart)) {
+    return null;
+  }
+
+  return {
+    path: pathPart,
+    query: queryPart ? `?${queryPart}` : '',
+  };
+}
+
 async function tryFetch(
   targetUrl: string,
   key: string,
@@ -93,17 +124,16 @@ export async function POST(request: Request) {
     }
 
     const baseUrl = formattedUrl.endsWith('/') ? formattedUrl.slice(0, -1) : formattedUrl;
-    const rawEndpoint = endpoint || 'system_status';
-    // Guard against path traversal (e.g. "../../wp-login.php").
-    if (!/^[a-zA-Z0-9_/-]+$/.test(rawEndpoint) || rawEndpoint.includes('..')) {
+    const parsedEndpoint = parseEndpoint(endpoint || 'system_status');
+    if (!parsedEndpoint) {
       return NextResponse.json({ message: 'Invalid endpoint path.' }, { status: 400 });
     }
-    const endpointPath = rawEndpoint.replace(/^\/+/, '');
+    const endpointSuffix = `${parsedEndpoint.path}${parsedEndpoint.query}`;
 
     const routeCandidates = [
-      `${baseUrl}/wp-json/wc/v3/${endpointPath}`,
-      `${baseUrl}/index.php/wp-json/wc/v3/${endpointPath}`,
-      `${baseUrl}/wc-api/v3/${endpointPath}`,
+      `${baseUrl}/wp-json/wc/v3/${endpointSuffix}`,
+      `${baseUrl}/index.php/wp-json/wc/v3/${endpointSuffix}`,
+      `${baseUrl}/wc-api/v3/${endpointSuffix}`,
     ];
 
     let lastStatus = 500;
