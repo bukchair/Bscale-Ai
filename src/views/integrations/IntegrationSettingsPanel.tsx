@@ -253,7 +253,107 @@ export function IntegrationSettingsPanel({
                 </>
               )}
 
-              {/* platform fields Google/Meta/TikTok/Woo/Shopify — steps 2ד–2ו */}
+              {/* ── Google ── */}
+              {integration.id === 'google' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={onGoogleConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white py-2 rounded-lg font-bold hover:bg-blue-600 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Megaphone className="w-4 h-4" />
+                      {isConnected ? t('integrations.reconnectGoogleEcosystem') : t('integrations.connectGoogleEcosystem')}
+                    </button>
+                  </div>
+                  {isConnected && (
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => onReinstallPlatform('google')}
+                        disabled={reinstallingGoogleAndMeta || reinstallingManagedPlatform === 'google' || isConnecting}
+                        className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-amber-200 text-amber-700 bg-amber-50 rounded-lg text-xs font-bold hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {reinstallingManagedPlatform === 'google' ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        )}
+                        {isHebrew ? 'התקנה מחדש ל-Google (ניתוק + חיבור)' : 'Re-install Google (disconnect + reconnect)'}
+                      </button>
+                    </div>
+                  )}
+                  {isConnected && (
+                    <>
+                      {(() => {
+                        const managedAccounts = parseManagedGoogleAdsAccounts(formValues.googleAdsAccounts);
+                        if (managedAccounts.length > 0) {
+                          return (
+                            <div className="sm:col-span-2">
+                              <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                                {language === 'he' ? 'חשבון ברירת מחדל ל-Google Ads' : 'Default Google Ads account'}
+                              </label>
+                              <select
+                                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                                value={
+                                  formValues.googleAdsId
+                                    ? formatGoogleAdsAccountId(formValues.googleAdsId)
+                                    : formatGoogleAdsAccountId(managedAccounts[0]?.externalAccountId || '')
+                                }
+                                onChange={(e) => onInputChange('googleAdsId', e.target.value)}
+                              >
+                                {managedAccounts.map((account) => {
+                                  const formatted = formatGoogleAdsAccountId(account.externalAccountId);
+                                  const suffix = account.currency ? ` · ${account.currency}` : '';
+                                  return (
+                                    <option key={account.externalAccountId} value={formatted}>
+                                      {account.name || formatted} ({formatted}){suffix}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <p className="mt-1 text-[10px] text-gray-500">
+                                {language === 'he'
+                                  ? `יובאו ${managedAccounts.length} חשבונות. בחר ברירת מחדל לבדיקה וסנכרון.`
+                                  : `${managedAccounts.length} accounts imported. Choose the default for test and sync.`}
+                              </p>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                              {t('integrations.adsAccountId')}
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="123-456-7890"
+                              className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
+                              dir="ltr"
+                              value={formValues.googleAdsId || ''}
+                              onChange={(e) => onInputChange('googleAdsId', e.target.value)}
+                            />
+                          </div>
+                        );
+                      })()}
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.ga4MeasurementId')}</label>
+                        <input type="text" placeholder="123456789" className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.ga4Id || ''} onChange={(e) => onInputChange('ga4Id', e.target.value)} />
+                        <p className="mt-1 text-[10px] text-gray-500">
+                          {isHebrew
+                            ? 'יש להזין GA4 Property ID מספרי בלבד (לא Measurement ID שמתחיל ב‑G-).'
+                            : 'Use GA4 Property ID (digits only), not Measurement ID that starts with G-.'}
+                        </p>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">Google Access Token</label>
+                        <input type="password" placeholder="ya29..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.googleAccessToken || ''} readOnly />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* platform fields Meta/TikTok/Woo/Shopify — steps 2ה–2ו */}
             </div>
             {/* action buttons — step 2ז */}
           </div>
