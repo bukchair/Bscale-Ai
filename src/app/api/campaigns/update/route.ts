@@ -20,6 +20,11 @@ type UpdateCampaignBody = {
   applyToAds?: boolean;
 };
 
+/** googleAds:search row shape for campaign budget lookup */
+type GoogleAdsSearchBudgetRow = {
+  campaign?: { campaignBudget?: string };
+};
+
 const GOOGLE_ADS_API_BASE = 'https://googleads.googleapis.com/v22';
 const META_GRAPH_BASE = 'https://graph.facebook.com/v21.0';
 const TIKTOK_API_BASE = 'https://business-api.tiktok.com/open_api/v1.3';
@@ -210,9 +215,11 @@ const updateGoogleCampaign = async (
     if (!budgetLookupResponse.ok) {
       throw new Error(await extractErrorMessage(budgetLookupResponse));
     }
-    const budgetLookupPayload = (await budgetLookupResponse.json().catch(() => ({}))) as Record<string, unknown>;
+    const budgetLookupPayload = (await budgetLookupResponse.json().catch(() => ({}))) as {
+      results?: GoogleAdsSearchBudgetRow[];
+    };
     const budgetResourceName = String(
-      budgetLookupPayload?.results?.[0]?.campaign?.campaignBudget || ''
+      budgetLookupPayload.results?.[0]?.campaign?.campaignBudget ?? ''
     ).trim();
     if (budgetResourceName) {
       const budgetUpdateResponse = await fetch(
