@@ -1,13 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { httpStatusFromError } from '@/src/lib/integrations/core/errors';
-import { integrationsEnv } from '@/src/lib/env/integrations-env';
-import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
 import { connectionService } from '@/src/lib/integrations/services/connection-service';
-import { tokenService } from '@/src/lib/integrations/services/token-service';
-import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
-import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
-import { GOOGLE_ADS_API_BASE, META_GRAPH_BASE, TIKTOK_API_BASE } from '@/src/lib/constants/api-urls';
 import { createGoogleDraft } from '@/src/lib/one-click/builders/google';
 import { createMetaDraft } from '@/src/lib/one-click/builders/meta';
 import { createTikTokDraft } from '@/src/lib/one-click/builders/tiktok';
@@ -66,50 +60,8 @@ const DAY_BY_JS: Record<number, DayKey> = {
   6: 'sat',
 };
 
-const mapObjectiveToMeta = (objective: ObjectiveType) => {
-  if (objective === 'sales') return 'OUTCOME_SALES';
-  if (objective === 'traffic') return 'OUTCOME_TRAFFIC';
-  if (objective === 'leads') return 'OUTCOME_LEADS';
-  if (objective === 'awareness') return 'OUTCOME_AWARENESS';
-  return 'OUTCOME_ENGAGEMENT';
-};
-
-const mapObjectiveToTikTok = (objective: ObjectiveType) => {
-  if (objective === 'sales') return 'CONVERSIONS';
-  if (objective === 'leads') return 'LEAD_GENERATION';
-  if (objective === 'traffic') return 'TRAFFIC';
-  if (objective === 'retargeting') return 'CONVERSIONS';
-  return 'REACH';
-};
-
-const todayYmd = () => {
-  const date = new Date();
-  const y = date.getUTCFullYear();
-  const m = `${date.getUTCMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getUTCDate()}`.padStart(2, '0');
-  // Google Ads REST API requires YYYY-MM-DD format (not YYYYMMDD)
-  return `${y}-${m}-${d}`;
-};
-
 const sanitizeName = (value: string) => value.trim().slice(0, 120);
 const sanitizeAudienceName = (value: string) => value.trim().slice(0, 80);
-const escapeGaqlLike = (value: string) => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-const extractErrorMessage = async (response: Response) => {
-  const raw = await response.text();
-  if (!raw) return `Request failed with status ${response.status}`;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, any>;
-    return (
-      parsed?.error?.message ||
-      parsed?.message ||
-      parsed?.data?.message ||
-      raw.slice(0, 280)
-    );
-  } catch {
-    return raw.slice(0, 280);
-  }
-};
 
 const isHourActiveForPlatform = (schedule: WeeklySchedule | undefined, platform: PlatformName) => {
   const platformSchedule = schedule?.[platform];
@@ -186,119 +138,6 @@ const isIncompletePlatformResult = (result: PlatformResult): boolean => {
     message.includes('no image available') ||
     message.includes('skipped')
   );
-};
-
-const applyGoogleAudiencesToCampaign = async (input: {
-  customerId: string;
-  campaignId: string;
-  headers: Record<string, string>;
-  audienceNames: string[];
-}) => {
-  let applied = 0;
-  let failed = 0;
-  const notes: string[] = [];
-  for (const audienceName of input.audienceNames) {
-    try {
-      const searchResponse = await fetch(
-        `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/googleAds:search`,
-        {
-          method: 'POST',
-          headers: input.headers,
-          body: JSON.stringify({
-            query: `
-              SELECT user_list.resource_name, user_list.name
-              FROM user_list
-              WHERE user_list.status != 'REMOVED'
-                AND user_list.name LIKE '%${escapeGaqlLike(audienceName)}%'
-              LIMIT 1
-            `,
-          }),
-        }
-      );
-      if (!searchResponse.ok) {
-        failed += 1;
-        notes.push(`Google audience lookup failed for "${audienceName}".`);
-        continue;
-      }
-      const lookupPayload = (await searchResponse.json().catch(() => ({}))) as Record<string, any>;
-      const userListResource = String(lookupPayload?.results?.[0]?.userList?.resourceName || '').trim();
-      if (!userListResource) {
-        failed += 1;
-        notes.push(`Google user list not found for "${audienceName}".`);
-        continue;
-      }
-
-      const criteriaResponse = await fetch(
-        `${GOOGLE_ADS_API_BASE}/customers/${input.customerId}/campaignCriteria:mutate`,
-        {
-          method: 'POST',
-          headers: input.headers,
-          body: JSON.stringify({
-            operations: [
-              {
-                create: {
-                  campaign: `customers/${input.customerId}/campaigns/${input.campaignId}`,
-                  userList: { userList: userListResource },
-                },
-              },
-            ],
-          }),
-        }
-      );
-      if (!criteriaResponse.ok) {
-        const message = (await extractErrorMessage(criteriaResponse)).toLowerCase();
-        if (message.includes('already exists')) {
-          applied += 1;
-          continue;
-        }
-        failed += 1;
-        notes.push(`Google audience apply failed for "${audienceName}".`);
-        continue;
-      }
-      applied += 1;
-    } catch {
-      failed += 1;
-      notes.push(`Google audience apply crashed for "${audienceName}".`);
-    }
-  }
-
-  return { applied, failed, notes };
-};
-
-const createMetaSavedAudiences = async (input: {
-  adAccountResource: string;
-  accessToken: string;
-  audienceNames: string[];
-}) => {
-  let created = 0;
-  let failed = 0;
-  const notes: string[] = [];
-  for (const audienceName of input.audienceNames) {
-    try {
-      const form = new URLSearchParams();
-      form.set('name', audienceName);
-      form.set('description', `Created by BScale AI smart campaign`);
-      form.set('targeting', JSON.stringify({ geo_locations: { countries: ['IL'] } }));
-      form.set('access_token', input.accessToken);
-      const response = await fetch(`${META_GRAPH_BASE}/${input.adAccountResource}/saved_audiences`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/x-www-form-urlencoded',
-        },
-        body: form.toString(),
-      });
-      if (!response.ok) {
-        failed += 1;
-        notes.push(`Meta saved audience failed for "${audienceName}".`);
-        continue;
-      }
-      created += 1;
-    } catch {
-      failed += 1;
-      notes.push(`Meta saved audience crashed for "${audienceName}".`);
-    }
-  }
-  return { created, failed, notes };
 };
 
 const createGoogleCampaign = async (
