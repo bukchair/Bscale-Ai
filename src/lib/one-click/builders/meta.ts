@@ -12,13 +12,21 @@ import type {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toMetaObjective = (o: OneClickObjective): string => {
-  if (o === 'sales') return 'OUTCOME_SALES';
-  if (o === 'leads') return 'OUTCOME_LEADS';
+  // Use traffic objective for reliability across accounts without pixel/lead-form setup.
+  // This flow prioritizes publishing runnable ads over advanced conversion setup.
+  if (o === 'sales') return 'OUTCOME_TRAFFIC';
+  if (o === 'leads') return 'OUTCOME_TRAFFIC';
   return 'OUTCOME_TRAFFIC';
 };
 
 const toMetaCTA = (o: OneClickObjective) =>
   o === 'sales' ? 'SHOP_NOW' : 'LEARN_MORE';
+const normalizeFinalUrl = (value: string | undefined): string => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw.replace(/^\/+/, '')}`;
+};
 
 const fetchMetaPageId = async (accessToken: string): Promise<string | null> => {
   try {
@@ -126,10 +134,9 @@ export const createMetaDraft = async (
     adSetForm.set('name', `${sanitize(name)} – Ad Set`);
     adSetForm.set('campaign_id', campaignId);
     adSetForm.set('status', metaStatus);
-    adSetForm.set('billing_event', 'LINK_CLICKS');
+    adSetForm.set('billing_event', 'IMPRESSIONS');
     adSetForm.set('optimization_goal', 'LINK_CLICKS');
     adSetForm.set('daily_budget', String(Math.round(Math.max(dailyBudget, 1) * 100)));
-    adSetForm.set('bid_strategy', 'LOWEST_COST_WITHOUT_CAP');
     adSetForm.set('targeting', JSON.stringify({
       age_min: 18,
       age_max: 65,
@@ -180,7 +187,7 @@ export const createMetaDraft = async (
     // 5. Create Ad Creative
     const adTitle = strategy.platformCopy?.Meta?.title || name;
     const adBody  = strategy.platformCopy?.Meta?.description || product?.description || '';
-    const finalUrl = product?.url || '';
+    const finalUrl = normalizeFinalUrl(product?.url);
 
     const linkData: Record<string, unknown> = {
       link: finalUrl || 'https://facebook.com',

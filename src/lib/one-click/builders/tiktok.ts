@@ -36,6 +36,12 @@ const toTikTokOptimizationGoal = (o: OneClickObjective) => {
 
 const toTikTokBillingEvent = (o: OneClickObjective) =>
   o === 'traffic' ? 'CPC' : 'OCPM';
+const normalizeFinalUrl = (value: string | undefined): string => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw.replace(/^\/+/, '')}`;
+};
 
 /** Upload image (URL or Buffer) to TikTok ad library. Returns image_id or null. */
 export const uploadTikTokImage = async (
@@ -145,14 +151,11 @@ export const createTikTokDraft = async (
 
     // 2. Create Ad Group
     const scheduleStart = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    const adGroupRes = await fetch(`${TIKTOK_API_BASE}/adgroup/create/`, {
-      method: 'POST',
-      headers: { 'Access-Token': accessToken, 'content-type': 'application/json' },
-      body: JSON.stringify({
+    const buildAdGroupBody = (mode: 'primary' | 'fallback') => {
+      const base: Record<string, unknown> = {
         advertiser_id: account.externalAccountId,
         campaign_id: campaignId,
         adgroup_name: `${sanitize(name)} – Ad Group`,
-        placement_type: 'PLACEMENT_TYPE_AUTOMATIC',
         budget_mode: 'BUDGET_MODE_DAY',
         budget: Math.max(dailyBudget, 50),
         schedule_type: 'SCHEDULE_FROM_NOW',
@@ -160,18 +163,49 @@ export const createTikTokDraft = async (
         optimization_goal: toTikTokOptimizationGoal(objective),
         billing_event: toTikTokBillingEvent(objective),
         operation_status: activateImmediately ? 'ENABLE' : 'DISABLE',
-        ...(TIKTOK_GEO[country.toUpperCase()] ? { location_ids: [TIKTOK_GEO[country.toUpperCase()]] } : {}),
-      }),
-    });
+        promotion_type: 'WEBSITE',
+        pacing: 'PACING_MODE_SMOOTH',
+      };
+      if (mode === 'primary') {
+        base.placement_type = 'PLACEMENT_TYPE_AUTOMATIC';
+      } else {
+        base.placement_type = 'PLACEMENT_TYPE_NORMAL';
+        base.placements = ['PLACEMENT_TIKTOK'];
+      }
+      if (TIKTOK_GEO[country.toUpperCase()]) {
+        base.location_ids = [TIKTOK_GEO[country.toUpperCase()]];
+      }
+      return base;
+    };
 
-    const adGroupPayload = (await adGroupRes.json()) as Record<string, unknown>;
-    const adGroupOk = adGroupRes.ok && Number(adGroupPayload?.code) === 0;
-    const adGroupId = String(
-      (adGroupPayload?.data as Record<string, unknown>)?.adgroup_id || ''
-    );
+    const tryCreateAdGroup = async (mode: 'primary' | 'fallback') => {
+      const response = await fetch(`${TIKTOK_API_BASE}/adgroup/create/`, {
+        method: 'POST',
+        headers: { 'Access-Token': accessToken, 'content-type': 'application/json' },
+        body: JSON.stringify(buildAdGroupBody(mode)),
+      });
+      const payload = (await response.json()) as Record<string, unknown>;
+      return {
+        response,
+        payload,
+        ok: response.ok && Number(payload?.code) === 0,
+        adGroupId: String((payload?.data as Record<string, unknown>)?.adgroup_id || ''),
+      };
+    };
+
+    let adGroupAttempt = await tryCreateAdGroup('primary');
+    const primaryError = String(adGroupAttempt.payload?.message || '').toLowerCase();
+    if (!adGroupAttempt.ok && (primaryError.includes('promotion_type') || primaryError.includes('placement'))) {
+      adGroupAttempt = await tryCreateAdGroup('fallback');
+    }
+
+    const adGroupOk = adGroupAttempt.ok;
+    const adGroupId = adGroupAttempt.adGroupId;
 
     if (!adGroupOk || !adGroupId) {
-      const adGroupErr = String(adGroupPayload?.message || '').trim() || `HTTP ${adGroupRes.status}`;
+      const adGroupErr =
+        String(adGroupAttempt.payload?.message || '').trim() ||
+        `HTTP ${adGroupAttempt.response.status}`;
       console.error('[one-click] TikTok ad group failed:', adGroupErr);
       return {
         ok: true,
@@ -199,7 +233,7 @@ export const createTikTokDraft = async (
 
     // 4. Create Ad
     const adText = sanitize(strategy.platformCopy?.TikTok?.description || strategy.campaignName, 100);
-    const finalUrl = product?.url || '';
+    const finalUrl = normalizeFinalUrl(product?.url);
 
     const adRes = await fetch(`${TIKTOK_API_BASE}/ad/create/`, {
       method: 'POST',

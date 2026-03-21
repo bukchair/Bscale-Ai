@@ -19,6 +19,13 @@ const GOOGLE_GEO: Record<string, number> = {
 
 const hl = (text: string) => ({ text: text.trim().slice(0, 30) });
 const desc = (text: string) => ({ text: text.trim().slice(0, 90) });
+const normalizeCustomerId = (value: string) => value.replace(/\D/g, '');
+const normalizeFinalUrl = (value: string | undefined): string => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw.replace(/^\/+/, '')}`;
+};
 
 const buildRsaHeadlines = (
   strategy: OneClickStrategy,
@@ -100,7 +107,8 @@ export const createGoogleDraft = async (
     const { connection, accessToken } = await googleLegacyBridge.getConnectionWithAccessToken(
       userId, 'GOOGLE_ADS'
     );
-    const customerId = googleLegacyBridge.pickSelectedAccountId(connection);
+    const customerIdRaw = googleLegacyBridge.pickSelectedAccountId(connection);
+    const customerId = normalizeCustomerId(customerIdRaw);
     if (!customerId) {
       return { ok: false, message: 'No selected Google Ads account found.', campaignStatus: 'Error' };
     }
@@ -155,10 +163,10 @@ export const createGoogleDraft = async (
               status: activateImmediately ? 'ENABLED' : 'PAUSED',
               advertisingChannelType: 'SEARCH',
               campaignBudget: budgetResourceName,
-              targetSpend: {},
+              maximizeClicks: {},
               networkSettings: {
                 targetGoogleSearch: true,
-                targetSearchNetwork: true,
+                targetSearchNetwork: false,
                 targetContentNetwork: false,
               },
               startDate: new Date().toISOString().slice(0, 10),
@@ -210,7 +218,6 @@ export const createGoogleDraft = async (
               campaign: resourceName,
               status: adGroupStatus,
               type: 'SEARCH_STANDARD',
-              cpcBidMicros: 1_000_000,
             },
           }],
         }),
@@ -253,7 +260,7 @@ export const createGoogleDraft = async (
     }
 
     // 6. Create Responsive Search Ad (requires finalUrl)
-    const finalUrl = product?.url?.trim();
+    const finalUrl = normalizeFinalUrl(product?.url);
     if (!finalUrl) {
       return {
         ok: true,
