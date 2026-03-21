@@ -353,7 +353,144 @@ export function IntegrationSettingsPanel({
                 </>
               )}
 
-              {/* platform fields Meta/TikTok/Woo/Shopify — steps 2ה–2ו */}
+              {/* ── Meta ── */}
+              {integration.id === 'meta' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={onMetaConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2 rounded-lg font-bold hover:bg-blue-700 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Facebook className="w-4 h-4" />
+                      {isConnected ? 'Reconnect Meta Ads' : 'Connect with Meta Ads'}
+                    </button>
+                  </div>
+                  {isConnected && (
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => onReinstallPlatform('meta')}
+                        disabled={reinstallingGoogleAndMeta || reinstallingManagedPlatform === 'meta' || isConnecting}
+                        className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-amber-200 text-amber-700 bg-amber-50 rounded-lg text-xs font-bold hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {reinstallingManagedPlatform === 'meta' ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        )}
+                        {isHebrew ? 'התקנה מחדש ל-Meta (ניתוק + חיבור)' : 'Re-install Meta (disconnect + reconnect)'}
+                      </button>
+                    </div>
+                  )}
+                  {isConnected && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => onLoadMetaAssets(formValues)}
+                          disabled={metaAssetsLoading}
+                          className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg text-xs font-bold hover:bg-blue-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {metaAssetsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                          {isHebrew ? 'טען/רענן נכסים קיימים מ‑Meta' : 'Load/refresh existing Meta assets'}
+                        </button>
+                        {metaAssetsError && <p className="mt-1 text-[11px] text-red-600">{metaAssetsError}</p>}
+                        <p className="mt-1 text-[10px] text-gray-500">
+                          {isHebrew
+                            ? 'אם רשימת חשבונות ההודעות ריקה, לחץ Reconnect ואשר גם הרשאות Pages.'
+                            : 'If messaging accounts are empty, click Reconnect and approve Page permissions as well.'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adsAccountId')}</label>
+                        <select
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                          value={normalizeMetaAccountId(formValues.metaAdsId || '')}
+                          onChange={(e) => onInputChange('metaAdsId', normalizeMetaAccountId(e.target.value))}
+                        >
+                          <option value="">{isHebrew ? 'בחר חשבון מודעות' : 'Select ad account'}</option>
+                          {(metaAssets?.adAccounts || []).map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.name} ({account.id.startsWith('act_') ? account.id : `act_${account.id}`})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.businessId')}</label>
+                        <select
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                          value={formValues.businessId || ''}
+                          onChange={(e) => onInputChange('businessId', e.target.value)}
+                        >
+                          <option value="">{isHebrew ? 'בחר Business Manager' : 'Select Business Manager'}</option>
+                          {(metaAssets?.businesses || []).map((business) => (
+                            <option key={business.id} value={business.id}>
+                              {business.name} ({business.id})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">
+                          {isHebrew ? 'חשבון הודעות' : 'Messaging account'}
+                        </label>
+                        <select
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                          value={formValues.messageAccountId || ''}
+                          onChange={(e) => onInputChange('messageAccountId', e.target.value)}
+                        >
+                          <option value="">{isHebrew ? 'בחר חשבון הודעות' : 'Select messaging account'}</option>
+                          {(metaAssets?.messageAccounts || []).map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {account.name} ({account.id})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.pixelId')}</label>
+                        <select
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                          value={formValues.pixelId || ''}
+                          onChange={(e) => onInputChange('pixelId', e.target.value)}
+                        >
+                          <option value="">{isHebrew ? 'בחר Pixel' : 'Select pixel'}</option>
+                          {(metaAssets?.pixels || [])
+                            .filter((pixel) => {
+                              const selectedAccount = normalizeMetaAccountId(formValues.metaAdsId || '');
+                              if (!selectedAccount) return true;
+                              return !pixel.adAccountId || normalizeMetaAccountId(pixel.adAccountId) === selectedAccount;
+                            })
+                            .map((pixel) => (
+                              <option key={`${pixel.adAccountId || 'any'}-${pixel.id}`} value={pixel.id}>
+                                {pixel.name} ({pixel.id})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.accessToken')}</label>
+                        <input type="password" placeholder="EAAB..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left bg-gray-50" dir="ltr" value={formValues.metaToken || ''} readOnly />
+                      </div>
+                      {Array.isArray(metaAssets?.warnings) && metaAssets!.warnings!.length > 0 && (
+                        <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-2">
+                          <p className="text-[11px] font-bold text-amber-800">
+                            {isHebrew ? 'הערות מה‑API של Meta:' : 'Meta API notes:'}
+                          </p>
+                          <ul className="mt-1 list-disc pl-4 text-[11px] text-amber-700 space-y-0.5">
+                            {metaAssets!.warnings!.slice(0, 3).map((warning, idx) => (
+                              <li key={`meta-warning-${idx}`}>{warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* platform fields TikTok/Woo/Shopify — step 2ו */}
             </div>
             {/* action buttons — step 2ז */}
           </div>
