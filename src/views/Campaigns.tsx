@@ -471,18 +471,18 @@ export function Campaigns() {
       return matchesSearch && matchesPlatform && matchesStatus;
     })
     .sort((a, b) => {
-      let valA: unknown = a[sortField as keyof typeof a];
-      let valB: unknown = b[sortField as keyof typeof b];
+      let valA: string | number;
+      let valB: string | number;
 
       if (sortField === 'spend' || sortField === 'cpa' || sortField === 'roas') {
-        valA = toAmount(valA);
-        valB = toAmount(valB);
+        valA = toAmount(a[sortField as keyof typeof a]);
+        valB = toAmount(b[sortField as keyof typeof b]);
       } else if (sortField === 'status') {
         valA = normalizeCampaignStatus(a.status).toLowerCase();
         valB = normalizeCampaignStatus(b.status).toLowerCase();
       } else {
-        valA = String(valA || '').toLowerCase();
-        valB = String(valB || '').toLowerCase();
+        valA = String(a[sortField as keyof typeof a] || '').toLowerCase();
+        valB = String(b[sortField as keyof typeof b] || '').toLowerCase();
       }
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
