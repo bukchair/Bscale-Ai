@@ -687,8 +687,118 @@ export function IntegrationSettingsPanel({
             </div>
           </div>
 
-          {/* Quick guide column — step 2ח */}
-          <div className="w-full lg:w-56 shrink-0" />
+          {/* ── Quick Guide sidebar ── */}
+          <div className="w-full lg:w-56 shrink-0">
+            <div className="rounded-2xl p-4 h-full bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-100 shadow-inner">
+              <h5 className="font-bold text-amber-900 mb-3 text-xs flex items-center gap-2 uppercase tracking-wider">
+                <HelpCircle className="w-4 h-4 text-amber-600" />
+                {t('integrations.quickGuide')}
+              </h5>
+              <div className="text-xs text-amber-900/90 leading-relaxed space-y-2">
+                {integration.id === 'gemini' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      {t('integrations.gemini.step1')}{' '}
+                      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openGemini')} →
+                      </a>
+                    </li>
+                    <li>{t('integrations.gemini.step2')}</li>
+                    <li>{t('integrations.gemini.step3')}</li>
+                  </ul>
+                )}
+                {integration.id === 'openai' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      {t('integrations.gemini.step1')}{' '}
+                      <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openOpenAI')} →
+                      </a>
+                    </li>
+                    <li>{t('integrations.gemini.step2')}</li>
+                    <li>{t('integrations.gemini.step3')}</li>
+                  </ul>
+                )}
+                {integration.id === 'claude' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      {t('integrations.gemini.step1')}{' '}
+                      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openClaude')} →
+                      </a>
+                    </li>
+                    <li>{t('integrations.gemini.step2')}</li>
+                    <li>{t('integrations.gemini.step3')}</li>
+                  </ul>
+                )}
+                {integration.id === 'google' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      <a href="https://ads.google.com" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openGoogleAds')} →
+                      </a>
+                      {' '}{t('integrations.google.step1')}
+                    </li>
+                    <li>
+                      <a href="https://analytics.google.com" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openGA4')} →
+                      </a>
+                      {' '}{t('integrations.google.step2')}
+                    </li>
+                    <li>{t('integrations.google.step3')}</li>
+                  </ul>
+                )}
+                {integration.id === 'meta' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>{t('integrations.meta.step1')}</li>
+                    <li>{t('integrations.meta.step2')}</li>
+                    <li>
+                      {t('integrations.meta.step3')}{' '}
+                      <a href="https://business.facebook.com/settings/ad-accounts" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openMetaAdAccounts')} →
+                      </a>
+                    </li>
+                  </ul>
+                )}
+                {integration.id === 'tiktok' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>{t('integrations.tiktok.step1')}</li>
+                    <li>{t('integrations.tiktok.step2')}</li>
+                    <li>
+                      {t('integrations.tiktok.step3')}{' '}
+                      <a href="https://ads.tiktok.com" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openTikTokAds')} →
+                      </a>
+                    </li>
+                  </ul>
+                )}
+                {integration.id === 'woocommerce' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      {t('integrations.woo.step1')}{' '}
+                      <a href="https://woocommerce.com/document/woocommerce-rest-api/" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openWooREST')} →
+                      </a>
+                    </li>
+                    <li>{t('integrations.woo.step2')}</li>
+                    <li>{t('integrations.woo.step3')}</li>
+                  </ul>
+                )}
+                {integration.id === 'shopify' && (
+                  <ul className="space-y-1.5 list-disc list-inside">
+                    <li>
+                      <a href="https://help.shopify.com/en/manual/apps/app-types/custom-apps" target="_blank" rel="noreferrer" className="text-amber-700 font-bold underline hover:text-amber-900">
+                        {t('integrations.guideLinks.openShopifyApps')} →
+                      </a>
+                      {' '}{t('integrations.shopify.step1')}
+                    </li>
+                    <li>{t('integrations.shopify.step2')}</li>
+                    <li>{t('integrations.shopify.step3')}</li>
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
