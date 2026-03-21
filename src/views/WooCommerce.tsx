@@ -1,15 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React from 'react';
 import { ShoppingCart, Package, DollarSign, Tag, Loader2, AlertCircle, RefreshCw, Sparkles, Image as ImageIcon, CheckCircle2, Search, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { fetchWooCommerceProducts, updateWooCommerceProduct } from '../services/woocommerceService';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useCurrency } from '../contexts/CurrencyContext';
-import { getAIKeysFromConnections } from '../lib/gemini';
-import { requestJSON, type AIKeys } from '../lib/multiAI';
+import { useWooCommerce, type WooProduct, type SeoSuggestion } from './woocommerce/useWooCommerce';
 
 /** Strip HTML tags and return plain text, preventing XSS from external product data. */
 const stripHtml = (html: string): string => {
@@ -20,226 +18,27 @@ const stripHtml = (html: string): string => {
   return (div.textContent || '').replace(/\s+/g, ' ').trim();
 };
 
-interface Product {
-  id: number;
-  name: string;
-  sku: string;
-  stock_quantity: number | null;
-  short_description: string;
-  description: string;
-  price: string;
-  categories: { name: string }[];
-  images: { src: string; alt: string }[];
-}
-
-type SeoSuggestion = {
-  engineId: keyof AIKeys;
-  engineLabel: string;
-  longDescription: string;
-  metaDescription: string;
-  metaTitle: string;
-  focusKeyword?: string;
-  imageAltTexts: string[];
-};
-
 export function WooCommerce() {
   const { connections } = useConnections();
   const { t, dir } = useLanguage();
   const { format: formatCurrency } = useCurrency();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showListOnMobile, setShowListOnMobile] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSeoLoading, setIsSeoLoading] = useState(false);
-  const [isSeoSaving, setIsSeoSaving] = useState(false);
-  const [seoSuggestions, setSeoSuggestions] = useState<SeoSuggestion[]>([]);
-  const [activeSeoIndex, setActiveSeoIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  const wooConnection = connections.find(c => c.id === 'woocommerce');
-  const isConnected = wooConnection?.status === 'connected';
-  const { storeUrl, wooKey, wooSecret } = wooConnection?.settings || {};
-  const aiKeys = getAIKeysFromConnections(connections);
-
-  const fetchProducts = async () => {
-    if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
-      setProducts([]);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchWooCommerceProducts(storeUrl, wooKey, wooSecret);
-      setProducts(data);
-    } catch (err) {
-      setError(t('woocommerce.errorLoading'));
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const buildSeoPrompt = (product: Product) => {
-    const categories = product.categories?.map((c) => c.name).join(', ') || '';
-    const base =
-      `אתה מומחה SEO לוורדפרס + WooCommerce, Rank Math ו‑Yoast.\n` +
-      `המטרה: לשפר SEO למוצר בחנות WooCommerce בעברית.\n\n` +
-      `פרטי מוצר קיימים:\n` +
-      `שם מוצר: ${product.name}\n` +
-      `SKU: ${product.sku || '-'}\n` +
-      `קטגוריות: ${categories}\n` +
-      `תיאור קצר (WooCommerce): ${product.short_description || '-'}\n` +
-      `תיאור מלא (WooCommerce): ${product.description || '-'}\n\n` +
-      `החזר אך ורק JSON עם המפתח הבודד "suggestion" במבנה הבא (ללא טקסט נוסף):\n` +
-      `{\n` +
-      `  "suggestion": {\n` +
-      `    "longDescription": "תיאור מלא חדש ומפורט למוצר (WooCommerce description) בעברית תקינה, מתאים ל‑SEO",\n` +
-      `    "metaTitle": "כותרת SEO מומלצת בעברית, עד ~60 תווים, מתאימה ל‑Rank Math ו‑Yoast",\n` +
-      `    "metaDescription": "תיאור מטא בעברית, עד ~155 תווים, משכנע ומכיל מילות מפתח רלוונטיות",\n` +
-      `    "focusKeyword": "מילת מפתח/ביטוי מפתח מרכזי בעברית",\n` +
-      `    "imageAltTexts": [\n` +
-      `      "טקסט אלטרנטיבי לתמונה ראשית בעברית",\n` +
-      `      "טקסט אלטרנטיבי לתמונה שנייה בעברית",\n` +
-      `      "טקסט אלטרנטיבי לתמונה שלישית בעברית"\n` +
-      `    ]\n` +
-      `  }\n` +
-      `}\n\n` +
-      `הטקסטים צריכים להיות מותאמים במיוחד לפורמט ש‑Rank Math ו‑Yoast אוהבים (meta title + meta description + focus keyword).`;
-    return base;
-  };
-
-  const handleOptimizeSeo = async () => {
-    if (!selectedProduct) return;
-    setError(null);
-
-    const hasAnyKey = aiKeys.gemini || aiKeys.openai || aiKeys.claude;
-    if (!hasAnyKey) {
-      setError('כדי לבצע אופטימיזציית SEO עם AI, חבר לפחות אחד מהמנועים Gemini / OpenAI / Claude במסך חיבורים.');
-      return;
-    }
-
-    setIsSeoLoading(true);
-    try {
-      const prompt = buildSeoPrompt(selectedProduct);
-      const engines: { id: keyof AIKeys; label: string }[] = [
-        { id: 'gemini', label: 'Gemini' },
-        { id: 'openai', label: 'OpenAI' },
-        { id: 'claude', label: 'Claude' },
-      ];
-      const suggestions: SeoSuggestion[] = [];
-
-      for (const engine of engines) {
-        const key = aiKeys[engine.id];
-        if (!key) continue;
-
-        const singleKeys: AIKeys = {
-          gemini: engine.id === 'gemini' ? key : undefined,
-          openai: engine.id === 'openai' ? key : undefined,
-          claude: engine.id === 'claude' ? key : undefined,
-        };
-
-        try {
-          const { data } = await requestJSON<{ suggestion?: Partial<SeoSuggestion> }>(prompt, singleKeys);
-          const s = data?.suggestion || {};
-          suggestions.push({
-            engineId: engine.id,
-            engineLabel: engine.label,
-            longDescription: s.longDescription || selectedProduct.description || '',
-            metaDescription: s.metaDescription || selectedProduct.short_description || '',
-            metaTitle: s.metaTitle || selectedProduct.name || '',
-            focusKeyword: s.focusKeyword || '',
-            imageAltTexts:
-              Array.isArray(s.imageAltTexts) && s.imageAltTexts.length
-                ? (s.imageAltTexts as string[]).slice(0, 3)
-                : [
-                    selectedProduct.name,
-                    `${selectedProduct.name} - מוצר`,
-                    `${selectedProduct.name} בחנות אונליין`,
-                  ],
-          });
-        } catch (e) {
-          console.warn(`SEO suggestion failed for ${engine.label}`, e);
-        }
-      }
-
-      if (!suggestions.length) {
-        setError('קריאת ה‑AI נכשלה עבור כל המנועים. בדוק את המפתחות או נסה שוב מאוחר יותר.');
-        setSeoSuggestions([]);
-        return;
-      }
-
-      setSeoSuggestions(suggestions);
-      setActiveSeoIndex(0);
-    } finally {
-      setIsSeoLoading(false);
-    }
-  };
-
-  const updateSeoField = (index: number, field: keyof SeoSuggestion, value: string) => {
-    setSeoSuggestions((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) return prev;
-      if (field === 'imageAltTexts') return prev;
-      next[index] = { ...current, [field]: value } as SeoSuggestion;
-      return next;
-    });
-  };
-
-  const updateAltText = (index: number, altIndex: number, value: string) => {
-    setSeoSuggestions((prev) => {
-      const next = [...prev];
-      const current = next[index];
-      if (!current) return prev;
-      const alts = [...current.imageAltTexts];
-      alts[altIndex] = value;
-      next[index] = { ...current, imageAltTexts: alts };
-      return next;
-    });
-  };
-
-  const handleSaveSeo = async (suggestion: SeoSuggestion) => {
-    if (!selectedProduct) return;
-    if (!isConnected || !storeUrl || !wooKey || !wooSecret) {
-      setError(t('woocommerce.errorLoading'));
-      return;
-    }
-    setIsSeoSaving(true);
-    setError(null);
-    try {
-      await updateWooCommerceProduct(storeUrl, wooKey, wooSecret, selectedProduct.id, {
-        description: suggestion.longDescription,
-        short_description: suggestion.metaDescription,
-        meta_data: [
-          { key: '_yoast_wpseo_metadesc', value: suggestion.metaDescription },
-          { key: '_yoast_wpseo_title', value: suggestion.metaTitle },
-          { key: '_yoast_wpseo_focuskw', value: suggestion.focusKeyword || '' },
-          { key: 'rank_math_description', value: suggestion.metaDescription },
-          { key: 'rank_math_title', value: suggestion.metaTitle },
-        ],
-      });
-      alert('SEO של המוצר עודכן בהצלחה (WooCommerce + Rank Math / Yoast meta).');
-      await fetchProducts();
-    } catch (err) {
-      console.error('Update SEO failed:', err);
-      setError('שמירת אופטימיזציית ה‑SEO נכשלה. נסה שוב מאוחר יותר.');
-    } finally {
-      setIsSeoSaving(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isConnected) {
-      fetchProducts();
-    }
-  }, [isConnected]);
-
-  useEffect(() => {
-    setSeoSuggestions([]);
-    if (selectedProduct) {
-      setShowListOnMobile(false);
-    }
-  }, [selectedProduct]);
+  const {
+    isConnected,
+    products,
+    selectedProduct, setSelectedProduct,
+    showListOnMobile, setShowListOnMobile,
+    isLoading,
+    isSeoLoading,
+    isSeoSaving,
+    seoSuggestions,
+    activeSeoIndex, setActiveSeoIndex,
+    error,
+    fetchProducts,
+    handleOptimizeSeo,
+    updateSeoField,
+    updateAltText,
+    handleSaveSeo,
+  } = useWooCommerce({ connections, errorLoadingLabel: t('woocommerce.errorLoading') });
 
   if (!isConnected) {
     return (

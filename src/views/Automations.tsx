@@ -1,224 +1,109 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ShieldAlert, CheckCircle2, XCircle, Clock, Zap, Settings, Play, Pause, AlertTriangle, ListTodo, Search, Download, User, Calendar, RefreshCw } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { auth } from '../lib/firebase';
-import { getAutoAdsSchedule, setAutoAdsSchedule, type AutoAdsSchedule } from '../lib/firebase';
-import { runAutoAdsIfNeeded } from '../lib/autoAdsRunner';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { useCurrency } from '../contexts/CurrencyContext';
-
-const buildPendingApprovals = (money: string, isHebrew: boolean) => [
-  {
-    id: 1,
-    type: isHebrew ? 'הקצאת תקציב מחדש' : 'Budget reallocation',
-    description: isHebrew
-      ? `העבר ${money} מ-"חיפוש מותג" ל-"Performance Max" עקב ROAS גבוה יותר.`
-      : `Move ${money} from "Brand Search" to "Performance Max" due to higher ROAS.`,
-    platform: 'Google Ads',
-    impact: isHebrew ? 'גבוה' : 'High',
-    time: isHebrew ? 'לפני שעתיים' : '2 hours ago',
-  },
-  {
-    id: 2,
-    type: isHebrew ? 'עדכון קופירייטינג' : 'Copy update',
-    description: isHebrew
-      ? 'עדכן את טקסט המודעה ב-Meta כך שיכלול "משלוח חינם" על סמך ניתוח מתחרים.'
-      : 'Update Meta ad copy to include "Free shipping" based on competitor analysis.',
-    platform: 'Meta',
-    impact: isHebrew ? 'בינוני' : 'Medium',
-    time: isHebrew ? 'לפני 5 שעות' : '5 hours ago',
-  },
-  {
-    id: 3,
-    type: isHebrew ? 'החרגת מילות מפתח' : 'Negative keyword update',
-    description: isHebrew
-      ? 'הוסף "חינם" ו-"זול" כמילות מפתח שליליות כדי להפחית הוצאות מבוזבזות.'
-      : 'Add "free" and "cheap" as negative keywords to reduce wasted spend.',
-    platform: 'Google Ads',
-    impact: isHebrew ? 'גבוה' : 'High',
-    time: isHebrew ? 'לפני יום' : '1 day ago',
-  },
-];
-
-const buildAutomations = (money: string, isHebrew: boolean) => [
-  {
-    id: 1,
-    name: isHebrew ? 'השהיה אוטומטית של ביצועים נמוכים' : 'Auto pause low performance',
-    description: isHebrew
-      ? `השהה מודעות עם ROAS < 1.0 לאחר 3 ימים והוצאה של ${money}.`
-      : `Pause ads with ROAS < 1.0 after 3 days and spend of ${money}.`,
-    status: isHebrew ? 'פעיל' : 'Active',
-    platform: isHebrew ? 'כל הפלטפורמות' : 'All platforms',
-  },
-  {
-    id: 2,
-    name: isHebrew ? 'הגדלת תקציב' : 'Budget increase',
-    description: isHebrew
-      ? 'הגדל תקציב ב-10% עבור קמפיינים ששומרים על ROAS > 3.0 במשך 7 ימים.'
-      : 'Increase budget by 10% for campaigns with ROAS > 3.0 over 7 days.',
-    status: isHebrew ? 'מושהה' : 'Paused',
-    platform: 'Meta',
-  },
-  {
-    id: 3,
-    name: isHebrew ? 'התאמות הצעות מחיר' : 'Bid adjustments',
-    description: isHebrew
-      ? 'הגדל הצעות מחיר ב-15% בשעות שיא של המרות (18:00 - 22:00).'
-      : 'Increase bids by 15% during conversion peak hours (18:00 - 22:00).',
-    status: isHebrew ? 'פעיל' : 'Active',
-    platform: 'Google Ads',
-  },
-];
-
-const buildActivities = (money: string, isHebrew: boolean) => [
-  {
-    id: 1,
-    user: 'Asher B.',
-    action: isHebrew ? 'אישר המלצת AI' : 'Approved AI recommendation',
-    details: isHebrew
-      ? `הקצאת תקציב מחדש: הועברו ${money} ל-Performance Max`
-      : `Budget reallocation: moved ${money} to Performance Max`,
-    time: isHebrew ? 'לפני 10 דקות' : '10 minutes ago',
-    type: 'approval',
-    icon: CheckCircle2,
-    color: 'text-emerald-500',
-    bg: 'bg-emerald-50',
-  },
-  {
-    id: 2,
-    user: 'System AI',
-    action: isHebrew ? 'יצר קופירייטינג חדש' : 'Generated new copy',
-    details: isHebrew ? 'נוצרו 3 וריאציות לקמפיין "מבצע קיץ"' : 'Created 3 variants for "Summer Sale" campaign',
-    time: isHebrew ? 'לפני שעה' : '1 hour ago',
-    type: 'ai',
-    icon: Zap,
-    color: 'text-indigo-500',
-    bg: 'bg-indigo-50',
-  },
-  {
-    id: 3,
-    user: 'Asher B.',
-    action: isHebrew ? 'עדכן הגדרות' : 'Updated settings',
-    target: isHebrew ? 'חיוב' : 'Billing',
-    details: isHebrew ? 'שונה אמצעי תשלום ראשי' : 'Primary payment method updated',
-    time: isHebrew ? 'לפני 3 שעות' : '3 hours ago',
-    type: 'settings',
-    icon: Settings,
-    color: 'text-gray-500',
-    bg: 'bg-gray-50',
-  },
-  {
-    id: 4,
-    user: 'System',
-    action: isHebrew ? 'שגיאת חיבור' : 'Connection error',
-    target: 'Shopify',
-    details: isHebrew ? 'נכשל סנכרון נתוני מלאי. מנסה שוב...' : 'Inventory data sync failed. Retrying...',
-    time: isHebrew ? 'לפני 5 שעות' : '5 hours ago',
-    type: 'error',
-    icon: AlertTriangle,
-    color: 'text-red-500',
-    bg: 'bg-red-50',
-  },
-  {
-    id: 5,
-    user: 'Asher B.',
-    action: isHebrew ? 'יצר קהל' : 'Created audience',
-    target: 'Meta',
-    details: isHebrew ? 'Lookalike 1% - לקוחות LTV גבוה' : 'Lookalike 1% - high LTV customers',
-    time: isHebrew ? 'לפני יום' : '1 day ago',
-    type: 'action',
-    icon: User,
-    color: 'text-blue-500',
-    bg: 'bg-blue-50',
-  },
-  {
-    id: 6,
-    user: 'System AI',
-    action: isHebrew ? 'השהה קמפיין' : 'Paused campaign',
-    target: 'Google Ads',
-    details: isHebrew
-      ? 'כלל אוטומטי: "השהיית ביצועים נמוכים אוטומטית" הופעל עבור "רשת המדיה - ריטרגטינג"'
-      : 'Automation rule "Auto pause low performance" was triggered for "Display Network - Retargeting"',
-    time: isHebrew ? 'לפני יום' : '1 day ago',
-    type: 'automation',
-    icon: Zap,
-    color: 'text-amber-500',
-    bg: 'bg-amber-50',
-  },
-];
+import { useAutomations } from './automations/useAutomations';
+import { type AutoAdsSchedule } from '../lib/firebase';
 
 export function Automations() {
   const { t, dir, language } = useLanguage();
   const { format: formatCurrency } = useCurrency();
   const { dataOwnerUid, isWorkspaceReadOnly } = useConnections();
-  const [activeTab, setActiveTab] = useState<'approvals' | 'rules' | 'log' | 'auto-ads'>('approvals');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [autoSchedule, setAutoSchedule] = useState<AutoAdsSchedule | null>(null);
-  const [autoScheduleForm, setAutoScheduleForm] = useState({
-    enabled: false,
-    frequency: 'daily' as AutoAdsSchedule['frequency'],
-    platforms: [] as ('google' | 'meta' | 'tiktok')[],
-    productLimit: 3,
-  });
-  const [autoScheduleSaving, setAutoScheduleSaving] = useState(false);
-  const [lastRunResult, setLastRunResult] = useState<{ ran: boolean; created?: number } | null>(null);
-
-  const uid = dataOwnerUid || auth.currentUser?.uid;
   const isHebrew = language === 'he';
-  const pendingApprovals = useMemo(() => buildPendingApprovals(formatCurrency(500), isHebrew), [formatCurrency, isHebrew]);
-  const automations = useMemo(() => buildAutomations(formatCurrency(100), isHebrew), [formatCurrency, isHebrew]);
-  const activities = useMemo(() => buildActivities(formatCurrency(500), isHebrew), [formatCurrency, isHebrew]);
 
-  useEffect(() => {
-    if (!uid) return;
-    getAutoAdsSchedule(uid).then((s) => {
-      if (s) {
-        setAutoSchedule(s);
-        setAutoScheduleForm({
-          enabled: s.enabled,
-          frequency: s.frequency,
-          platforms: s.platforms || [],
-          productLimit: s.productLimit ?? 3,
-        });
-      }
-    });
-  }, [uid]);
+  const {
+    activeTab, setActiveTab,
+    searchTerm, setSearchTerm,
+    autoSchedule,
+    autoScheduleForm, setAutoScheduleForm,
+    autoScheduleSaving,
+    lastRunResult,
+    pendingApprovals,
+    automations,
+    handleSaveAutoSchedule,
+    handleRunNow,
+  } = useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, formatCurrency });
 
-  const handleSaveAutoSchedule = async () => {
-    if (isWorkspaceReadOnly) return;
-    if (!uid) return;
-    setAutoScheduleSaving(true);
-    const now = new Date().toISOString();
-    const nextRun = new Date();
-    if (autoScheduleForm.frequency === 'daily') nextRun.setDate(nextRun.getDate() + 1);
-    else if (autoScheduleForm.frequency === 'every_3_days') nextRun.setDate(nextRun.getDate() + 3);
-    else nextRun.setDate(nextRun.getDate() + 7);
-    const isFirstEnable = autoScheduleForm.enabled && !autoSchedule?.nextRunAt;
-    try {
-      await setAutoAdsSchedule(uid, {
-        enabled: autoScheduleForm.enabled,
-        frequency: autoScheduleForm.frequency,
-        platforms: autoScheduleForm.platforms,
-        productLimit: autoScheduleForm.productLimit,
-        lastRunAt: autoSchedule?.lastRunAt ?? null,
-        nextRunAt: autoScheduleForm.enabled ? (isFirstEnable ? now : nextRun.toISOString()) : null,
-      });
-      setAutoSchedule(await getAutoAdsSchedule(uid));
-    } finally {
-      setAutoScheduleSaving(false);
-    }
-  };
-
-  const handleRunNow = async () => {
-    if (isWorkspaceReadOnly) return;
-    if (!uid) return;
-    const result = await runAutoAdsIfNeeded(uid);
-    setLastRunResult(result);
-    setAutoSchedule(await getAutoAdsSchedule(uid));
-  };
+  const activities = [
+    {
+      id: 1,
+      user: 'Asher B.',
+      action: isHebrew ? 'אישר המלצת AI' : 'Approved AI recommendation',
+      details: isHebrew
+        ? `הקצאת תקציב מחדש: הועברו ${formatCurrency(500)} ל-Performance Max`
+        : `Budget reallocation: moved ${formatCurrency(500)} to Performance Max`,
+      time: isHebrew ? 'לפני 10 דקות' : '10 minutes ago',
+      type: 'approval',
+      icon: CheckCircle2,
+      color: 'text-emerald-500',
+      bg: 'bg-emerald-50',
+    },
+    {
+      id: 2,
+      user: 'System AI',
+      action: isHebrew ? 'יצר קופירייטינג חדש' : 'Generated new copy',
+      details: isHebrew ? 'נוצרו 3 וריאציות לקמפיין "מבצע קיץ"' : 'Created 3 variants for "Summer Sale" campaign',
+      time: isHebrew ? 'לפני שעה' : '1 hour ago',
+      type: 'ai',
+      icon: Zap,
+      color: 'text-indigo-500',
+      bg: 'bg-indigo-50',
+    },
+    {
+      id: 3,
+      user: 'Asher B.',
+      action: isHebrew ? 'עדכן הגדרות' : 'Updated settings',
+      target: isHebrew ? 'חיוב' : 'Billing',
+      details: isHebrew ? 'שונה אמצעי תשלום ראשי' : 'Primary payment method updated',
+      time: isHebrew ? 'לפני 3 שעות' : '3 hours ago',
+      type: 'settings',
+      icon: Settings,
+      color: 'text-gray-500',
+      bg: 'bg-gray-50',
+    },
+    {
+      id: 4,
+      user: 'System',
+      action: isHebrew ? 'שגיאת חיבור' : 'Connection error',
+      target: 'Shopify',
+      details: isHebrew ? 'נכשל סנכרון נתוני מלאי. מנסה שוב...' : 'Inventory data sync failed. Retrying...',
+      time: isHebrew ? 'לפני 5 שעות' : '5 hours ago',
+      type: 'error',
+      icon: AlertTriangle,
+      color: 'text-red-500',
+      bg: 'bg-red-50',
+    },
+    {
+      id: 5,
+      user: 'Asher B.',
+      action: isHebrew ? 'יצר קהל' : 'Created audience',
+      target: 'Meta',
+      details: isHebrew ? 'Lookalike 1% - לקוחות LTV גבוה' : 'Lookalike 1% - high LTV customers',
+      time: isHebrew ? 'לפני יום' : '1 day ago',
+      type: 'action',
+      icon: User,
+      color: 'text-blue-500',
+      bg: 'bg-blue-50',
+    },
+    {
+      id: 6,
+      user: 'System AI',
+      action: isHebrew ? 'השהה קמפיין' : 'Paused campaign',
+      target: 'Google Ads',
+      details: isHebrew
+        ? 'כלל אוטומטי: "השהיית ביצועים נמוכים אוטומטית" הופעל עבור "רשת המדיה - ריטרגטינג"'
+        : 'Automation rule "Auto pause low performance" was triggered for "Display Network - Retargeting"',
+      time: isHebrew ? 'לפני יום' : '1 day ago',
+      type: 'automation',
+      icon: Zap,
+      color: 'text-amber-500',
+      bg: 'bg-amber-50',
+    },
+  ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
