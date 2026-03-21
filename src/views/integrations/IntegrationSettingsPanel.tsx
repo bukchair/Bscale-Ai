@@ -626,7 +626,65 @@ export function IntegrationSettingsPanel({
                 </>
               )}
             </div>
-            {/* action buttons — step 2ז */}
+            {/* ── Action buttons ── */}
+            <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100">
+              {!isConnected ? (
+                <>
+                  <button
+                    onClick={() => onSave(integration.id)}
+                    disabled={isConnecting}
+                    className="flex-1 min-w-0 sm:min-w-[140px] bg-indigo-600 text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plug className="w-4 h-4" />}
+                    {t('integrations.saveAndConnect')}
+                  </button>
+                  {!isConnecting ? (
+                    <button
+                      onClick={() => onHardReset(integration.id)}
+                      className="px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 border-2 border-red-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {isHebrew ? 'מחק חיבור' : 'Delete connection'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => onHardReset(integration.id)}
+                      className="px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 border-2 border-red-100"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      {isHebrew ? 'איפוס חיבור' : 'Reset connection'}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onSave(integration.id)}
+                    disabled={isConnecting}
+                    className="flex-1 min-w-0 sm:min-w-[120px] bg-white border-2 border-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                    {t('integrations.updateSettings')}
+                  </button>
+                  <button
+                    onClick={() => onTest(integration.id)}
+                    disabled={testingId === integration.id}
+                    className="flex-1 min-w-0 sm:min-w-[120px] bg-indigo-50 text-indigo-600 px-4 py-3 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {testingId === integration.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    {t('integrations.testConnection')}
+                  </button>
+                  <button
+                    onClick={() => onHardReset(integration.id)}
+                    disabled={isConnecting}
+                    className="px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2 border-2 border-red-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {t('integrations.disconnect')}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Quick guide column — step 2ח */}
