@@ -66,20 +66,20 @@ const mergeById = <T extends { id: string }>(rows: T[]): T[] => {
 
 const mapCampaignRows = (
   platform: UnifiedPlatform,
-  rows: any[],
+  rows: Record<string, unknown>[],
   context: MapContext = {}
 ): UnifiedDataLayer => {
   const output = createEmptyUnifiedDataLayer();
   const accountSeen = new Set<string>();
 
-  rows.forEach((rawRow: any, index: number) => {
-    const row = (rawRow || {}) as Record<string, unknown>;
+  rows.forEach((rawRow, index: number) => {
+    const row = rawRow ?? {};
     const externalCampaignId =
       toStringSafe(row.campaignId) || toStringSafe(row.id) || `${platformKey(platform)}-campaign-${index}`;
     const accountExternalId =
       toStringSafe(context.accountExternalId) ||
       toStringSafe(row.accountId) ||
-      toStringSafe((row as any).advertiserId) ||
+      toStringSafe(row.advertiserId) ||
       'unknown';
     const accountId = createAccountId(platform, accountExternalId);
     const campaignId = createCampaignId(platform, externalCampaignId);
@@ -103,16 +103,16 @@ const mapCampaignRows = (
 
     const campaignName =
       toStringSafe(row.name) ||
-      toStringSafe((row as any).campaignName) ||
+      toStringSafe(row.campaignName) ||
       `${platform} Campaign ${externalCampaignId}`;
     const objective =
       toStringSafe(row.objective) ||
-      toStringSafe((row as any).advertisingChannelType) ||
-      toStringSafe((row as any).campaignType);
+      toStringSafe(row.advertisingChannelType) ||
+      toStringSafe(row.campaignType);
     const channelType =
-      toStringSafe((row as any).advertisingChannelSubType) ||
-      toStringSafe((row as any).advertisingChannelType) ||
-      toStringSafe((row as any).campaignType);
+      toStringSafe(row.advertisingChannelSubType) ||
+      toStringSafe(row.advertisingChannelType) ||
+      toStringSafe(row.campaignType);
 
     const campaign: UnifiedCampaign = {
       id: campaignId,
@@ -123,8 +123,8 @@ const mapCampaignRows = (
       status,
       objective: objective || undefined,
       channelType: channelType || undefined,
-      startDate: toStringSafe((row as any).startDate) || toStringSafe((row as any).startTime) || undefined,
-      endDate: toStringSafe((row as any).endDate) || toStringSafe((row as any).stopTime) || undefined,
+      startDate: toStringSafe(row.startDate) || toStringSafe(row.startTime) || undefined,
+      endDate: toStringSafe(row.endDate) || toStringSafe(row.stopTime) || undefined,
       budgetId,
       adGroupIds: [adGroupId],
       adIds: [adId],
@@ -157,16 +157,16 @@ const mapCampaignRows = (
 
     const impressions = toNumber(row.impressions);
     const clicks = toNumber(row.clicks);
-    const reach = toNumber((row as any).reach);
+    const reach = toNumber(row.reach);
     const spend = toNumber(row.spend);
-    const conversions = toNumber((row as any).conversions);
-    const conversionValue = toNumber((row as any).conversionValue);
+    const conversions = toNumber(row.conversions);
+    const conversionValue = toNumber(row.conversionValue);
     const ctr = toNumber(row.ctr) || (impressions > 0 ? (clicks / impressions) * 100 : 0);
-    const cpc = toNumber((row as any).cpc) || (clicks > 0 ? spend / clicks : 0);
-    const cpm = toNumber((row as any).cpm) || (impressions > 0 ? (spend / impressions) * 1000 : 0);
-    const frequency = toNumber((row as any).frequency) || (reach > 0 ? impressions / reach : 0);
-    const roas = toNumber((row as any).roas) || (spend > 0 ? conversionValue / spend : 0);
-    const cpa = toNumber((row as any).cpa) || (conversions > 0 ? spend / conversions : 0);
+    const cpc = toNumber(row.cpc) || (clicks > 0 ? spend / clicks : 0);
+    const cpm = toNumber(row.cpm) || (impressions > 0 ? (spend / impressions) * 1000 : 0);
+    const frequency = toNumber(row.frequency) || (reach > 0 ? impressions / reach : 0);
+    const roas = toNumber(row.roas) || (spend > 0 ? conversionValue / spend : 0);
+    const cpa = toNumber(row.cpa) || (conversions > 0 ? spend / conversions : 0);
 
     output.metrics.push({
       id: `${campaignId}:metrics`,
@@ -196,8 +196,8 @@ const mapCampaignRows = (
       value: conversionValue,
     });
 
-    const dailyAmount = toNumber((row as any).dailyBudget) || toNumber((row as any).budget);
-    const lifetimeAmount = toNumber((row as any).lifetimeBudget);
+    const dailyAmount = toNumber(row.dailyBudget) || toNumber(row.budget);
+    const lifetimeAmount = toNumber(row.lifetimeBudget);
     const budget: UnifiedBudgetSnapshot = {
       id: budgetId,
       platform,
@@ -205,8 +205,8 @@ const mapCampaignRows = (
       entityId: campaignId,
       dailyAmount: dailyAmount > 0 ? dailyAmount : undefined,
       lifetimeAmount: lifetimeAmount > 0 ? lifetimeAmount : undefined,
-      currency: toStringSafe(context.currency) || toStringSafe((row as any).currency) || undefined,
-      period: toStringSafe((row as any).budgetPeriod) || undefined,
+      currency: toStringSafe(context.currency) || toStringSafe(row.currency) || undefined,
+      period: toStringSafe(row.budgetPeriod) || undefined,
     };
     if (budget.dailyAmount || budget.lifetimeAmount) {
       output.budgets.push(budget);
@@ -225,17 +225,17 @@ const mapCampaignRows = (
 };
 
 export const mapGoogleCampaignRowsToUnifiedLayer = (
-  rows: any[],
+  rows: Record<string, unknown>[],
   context: MapContext = {}
 ): UnifiedDataLayer => mapCampaignRows('Google', rows, context);
 
 export const mapMetaCampaignRowsToUnifiedLayer = (
-  rows: any[],
+  rows: Record<string, unknown>[],
   context: MapContext = {}
 ): UnifiedDataLayer => mapCampaignRows('Meta', rows, context);
 
 export const mapTikTokCampaignRowsToUnifiedLayer = (
-  rows: any[],
+  rows: Record<string, unknown>[],
   context: MapContext = {}
 ): UnifiedDataLayer => mapCampaignRows('TikTok', rows, context);
 
@@ -281,7 +281,7 @@ export const replaceUnifiedPlatformSlice = (
   return mergeUnifiedDataLayers([withoutPlatform, incoming]);
 };
 
-export const unifiedLayerToCampaignRows = (layer: UnifiedDataLayer): any[] => {
+export const unifiedLayerToCampaignRows = (layer: UnifiedDataLayer): Record<string, unknown>[] => {
   const accountById = new Map(layer.accounts.map((account) => [account.id, account]));
   const metricByCampaignId = new Map(
     layer.metrics
@@ -326,11 +326,11 @@ export const unifiedLayerToCampaignRows = (layer: UnifiedDataLayer): any[] => {
       spend,
       impressions: metric?.impressions ?? toNumber(providerData.impressions),
       clicks: metric?.clicks ?? toNumber(providerData.clicks),
-      reach: metric?.reach ?? toNumber((providerData as any).reach),
-      frequency: metric?.frequency ?? toNumber((providerData as any).frequency),
+      reach: metric?.reach ?? toNumber(providerData.reach),
+      frequency: metric?.frequency ?? toNumber(providerData.frequency),
       ctr: metric?.ctr ?? toNumber(providerData.ctr),
-      cpc: metric?.cpc ?? toNumber((providerData as any).cpc),
-      cpm: metric?.cpm ?? toNumber((providerData as any).cpm),
+      cpc: metric?.cpc ?? toNumber(providerData.cpc),
+      cpm: metric?.cpm ?? toNumber(providerData.cpm),
       conversions,
       conversionValue,
       roas,
@@ -338,15 +338,15 @@ export const unifiedLayerToCampaignRows = (layer: UnifiedDataLayer): any[] => {
       budget:
         budget?.dailyAmount ??
         budget?.lifetimeAmount ??
-        toNumber((providerData as any).budget),
+        toNumber(providerData.budget),
       dailyBudget:
         budget?.dailyAmount ??
-        toNumber((providerData as any).dailyBudget),
+        toNumber(providerData.dailyBudget),
       lifetimeBudget:
         budget?.lifetimeAmount ??
-        toNumber((providerData as any).lifetimeBudget),
-      budgetPeriod: budget?.period || toStringSafe((providerData as any).budgetPeriod),
-      accountId: account?.externalId || toStringSafe((providerData as any).accountId),
+        toNumber(providerData.lifetimeBudget),
+      budgetPeriod: budget?.period || toStringSafe(providerData.budgetPeriod),
+      accountId: account?.externalId || toStringSafe(providerData.accountId),
       unifiedCampaignId: campaign.id,
       unifiedAccountId: campaign.accountId,
       dataSource: 'UnifiedDataLayer',

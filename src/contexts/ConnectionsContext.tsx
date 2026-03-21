@@ -6,6 +6,8 @@ import { auth, db, resolveWorkspaceScope, type WorkspaceScope } from '../lib/fir
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
 import { fetchGoogleAdAccounts } from '../services/googleService';
+import { AI_CONNECTION_IDS, PLATFORM_CONNECTION_IDS, ADMIN_SALES_EMAIL, initialConnections } from './connectionsData';
+import { isValidDateValue, isExpiredTrialStatus, stripUndefinedDeep, isPermissionDeniedError } from './connectionsUtils';
 
 export type ConnectionStatus = 'connected' | 'disconnected' | 'error' | 'connecting';
 
@@ -70,120 +72,7 @@ type ManagedPlatformSlug =
   | 'meta'
   | 'tiktok';
 
-const AI_CONNECTION_IDS = ['gemini', 'openai', 'claude'] as const;
-const PLATFORM_CONNECTION_IDS = ['google', 'meta', 'tiktok', 'woocommerce', 'shopify'] as const;
-const ADMIN_SALES_EMAIL = 'asher205@gmail.com';
 // AI connections are stored in appSettings/connections and shared with all users (read by everyone, write by admin only).
-
-const isValidDateValue = (value: unknown): value is string => {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
-};
-
-const isExpiredTrialStatus = (data: Record<string, unknown> | undefined) => {
-  if (!data) return false;
-  if (data.subscriptionStatus !== 'trial') return false;
-  const trialEndsAt = data.trialEndsAt;
-  if (!isValidDateValue(trialEndsAt)) return false;
-  return Date.parse(trialEndsAt) <= Date.now();
-};
-
-const stripUndefinedDeep = <T,>(value: T): T => {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => stripUndefinedDeep(item))
-      .filter((item) => item !== undefined) as unknown as T;
-  }
-  if (value && typeof value === 'object') {
-    const next: Record<string, unknown> = {};
-    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      if (nestedValue === undefined) continue;
-      const cleaned = stripUndefinedDeep(nestedValue as unknown);
-      if (cleaned !== undefined) {
-        next[key] = cleaned;
-      }
-    }
-    return next as T;
-  }
-  return value;
-};
-
-const isPermissionDeniedError = (error: unknown) => {
-  if (!error || typeof error !== 'object') return false;
-  const maybeCode =
-    typeof (error as { code?: unknown }).code === 'string'
-      ? String((error as { code?: unknown }).code).toLowerCase()
-      : '';
-  const maybeMessage =
-    typeof (error as { message?: unknown }).message === 'string'
-      ? String((error as { message?: unknown }).message).toLowerCase()
-      : '';
-  return maybeCode.includes('permission-denied') || maybeMessage.includes('missing or insufficient permissions');
-};
-
-const initialConnections: Connection[] = [
-  { 
-    id: 'gemini', 
-    name: 'integrations.platforms.gemini.name', 
-    category: 'AI Engine', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.gemini.desc' 
-  },
-  { 
-    id: 'openai', 
-    name: 'integrations.platforms.openai.name', 
-    category: 'AI Engine', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.openai.desc' 
-  },
-  { 
-    id: 'claude', 
-    name: 'integrations.platforms.claude.name', 
-    category: 'AI Engine', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.claude.desc' 
-  },
-  { 
-    id: 'google', 
-    name: 'integrations.platforms.google.name', 
-    category: 'Google', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.google.desc',
-    subConnections: [
-      { id: 'google_ads', name: 'Google Ads', status: 'disconnected' },
-      { id: 'ga4', name: 'Google Analytics 4', status: 'disconnected' },
-      { id: 'gsc', name: 'Search Console', status: 'disconnected' },
-      { id: 'gmail', name: 'Gmail / Reports', status: 'disconnected' },
-    ]
-  },
-  { 
-    id: 'meta', 
-    name: 'integrations.platforms.meta.name', 
-    category: 'Social', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.meta.desc' 
-  },
-  { 
-    id: 'tiktok', 
-    name: 'integrations.platforms.tiktok.name', 
-    category: 'Social', 
-    status: 'disconnected',
-    description: 'integrations.platforms.tiktok.desc' 
-  },
-  { 
-    id: 'woocommerce', 
-    name: 'integrations.platforms.woocommerce.name', 
-    category: 'E-commerce', 
-    status: 'disconnected', 
-    description: 'integrations.platforms.woocommerce.desc' 
-  },
-  { 
-    id: 'shopify', 
-    name: 'integrations.platforms.shopify.name', 
-    category: 'E-commerce', 
-    status: 'disconnected',
-    description: 'integrations.platforms.shopify.desc' 
-  },
-];
 
 const ConnectionsContext = createContext<ConnectionsContextType | undefined>(undefined);
 
@@ -259,7 +148,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const parseManagedPayload = (raw: string) => {
     try {
-      return raw ? (JSON.parse(raw) as { success?: boolean; message?: string; errorCode?: string; data?: any }) : null;
+      return raw ? (JSON.parse(raw) as { success?: boolean; message?: string; errorCode?: string; data?: { connections?: unknown; accounts?: unknown } }) : null;
     } catch {
       return null;
     }
@@ -648,7 +537,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       const applyPlanRestrictions = (items: Connection[]) => {
         if (!restrictPlatformsToDemo) return items;
         return items.map((connection) => {
-          if (!PLATFORM_CONNECTION_IDS.includes(connection.id as any)) return connection;
+          if (!(PLATFORM_CONNECTION_IDS as readonly string[]).includes(connection.id)) return connection;
           return {
             ...connection,
             status: 'disconnected' as ConnectionStatus,
@@ -698,7 +587,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         }
       );
 
-      const handleSnapshotError = (source: 'global' | 'user') => (err: any) => {
+      const handleSnapshotError = (source: 'global' | 'user') => (err: unknown) => {
         const permissionDenied = isPermissionDeniedError(err);
         if (!permissionDenied) {
           console.error(`Error in ${source} connections snapshot:`, err);
@@ -724,7 +613,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
           (snap) => {
             if (snap.exists()) {
               const items = (snap.data().items || []) as Connection[];
-              globalItems = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+              globalItems = items.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
             } else {
               globalItems = [];
             }
@@ -751,7 +640,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
               userConnectionsRef,
               {
                 items: stripUndefinedDeep(
-                  initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any))
+                  initialConnections.filter((c) => (PLATFORM_CONNECTION_IDS as readonly string[]).includes(c.id))
                 ),
               }
             ).catch((err) => {
@@ -787,7 +676,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const persistGlobalAiConnections = async (items: Connection[]) => {
     const ref = doc(db, 'appSettings', 'connections');
-    const aiOnly = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+    const aiOnly = items.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
     try {
       await setDoc(ref, { items: stripUndefinedDeep(aiOnly) }, { merge: true });
     } catch (err) {
@@ -799,7 +688,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     // תמיד שומרים במסמך המשתמש (כולל AI) כדי שהאדמין יראה את ההגדרות מיד
     await persistUserConnections(newConnections);
     // ואם מדובר בחיבור AI – גם במסמך הגלובלי המשותף
-    if (updatedId && AI_CONNECTION_IDS.includes(updatedId as any)) {
+    if (updatedId && (AI_CONNECTION_IDS as readonly string[]).includes(updatedId)) {
       await persistGlobalAiConnections(newConnections);
     }
   };
@@ -981,8 +870,8 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const aiPart = connections.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
-    const platformPart = initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any));
+    const aiPart = connections.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
+    const platformPart = initialConnections.filter((c) => (PLATFORM_CONNECTION_IDS as readonly string[]).includes(c.id));
     const fresh = [...aiPart, ...platformPart];
     setConnections(fresh);
     await persistUserConnections(fresh);
@@ -1011,7 +900,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }
 
     const userItems = (userSnap.data().items || []) as Connection[];
-    const aiFromUser = userItems.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+    const aiFromUser = userItems.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
 
     if (aiFromUser.length === 0) {
       return { success: false, message: 'No Gemini / OpenAI / Claude connections found on the current user.' };
@@ -1020,7 +909,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const existingGlobalItems = globalSnap.exists() ? ((globalSnap.data().items || []) as Connection[]) : [];
     const byId = new Map<string, Connection>();
     existingGlobalItems.forEach((c) => {
-      if (AI_CONNECTION_IDS.includes(c.id as any)) {
+      if ((AI_CONNECTION_IDS as readonly string[]).includes(c.id)) {
         byId.set(c.id, c);
       }
     });

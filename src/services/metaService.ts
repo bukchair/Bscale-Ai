@@ -1,12 +1,16 @@
 import { auth, onAuthStateChanged } from '../lib/firebase';
 import { API_BASE } from '../lib/utils/client-api-base';
 
+type MetaApiPayload = { data?: unknown[]; meta?: Record<string, unknown>; message?: string; success?: boolean } | null;
+type MetaAction = { action_type?: string; value?: string | number };
+type ChannelAgg = Record<string, { spend: number; impressions: number; clicks: number; reach: number; conversions: number }>;
+
 const META_CACHE_PREFIX = 'bscale:meta-campaigns:';
 const META_RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
 const META_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
 let metaRateLimitedUntil = 0;
-let lastSuccessfulMetaCampaigns: any[] = [];
-const metaInFlight = new Map<string, Promise<any[]>>();
+let lastSuccessfulMetaCampaigns: Record<string, unknown>[] = [];
+const metaInFlight = new Map<string, Promise<Record<string, unknown>[]>>();
 let metaNextAllowedRequestAt = 0;
 
 export const isMetaRateLimitMessage = (message: string) => {
@@ -27,7 +31,7 @@ const loadCachedMetaCampaigns = (cacheKey: string) => {
   try {
     const raw = window.localStorage.getItem(cacheKey);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { savedAt?: number; items?: any[] };
+    const parsed = JSON.parse(raw) as { savedAt?: number; items?: Record<string, unknown>[] };
     const savedAt = Number(parsed.savedAt || 0);
     if (!Array.isArray(parsed.items)) return null;
     return {
@@ -41,14 +45,14 @@ const loadCachedMetaCampaigns = (cacheKey: string) => {
 
 const loadAnyCachedMetaCampaigns = () => {
   if (typeof window === 'undefined') return null;
-  let latest: { savedAt: number; items: any[] } | null = null;
+  let latest: { savedAt: number; items: Record<string, unknown>[] } | null = null;
   try {
     for (let i = 0; i < window.localStorage.length; i += 1) {
       const key = window.localStorage.key(i);
       if (!key || !key.startsWith(META_CACHE_PREFIX)) continue;
       const raw = window.localStorage.getItem(key);
       if (!raw) continue;
-      const parsed = JSON.parse(raw) as { savedAt?: number; items?: any[] };
+      const parsed = JSON.parse(raw) as { savedAt?: number; items?: Record<string, unknown>[] };
       if (Array.isArray(parsed.items) && parsed.items.length > 0) {
         const savedAt = Number(parsed.savedAt || 0);
         if (!latest || savedAt > latest.savedAt) {
@@ -65,7 +69,7 @@ const loadAnyCachedMetaCampaigns = () => {
   return latest;
 };
 
-const saveCachedMetaCampaigns = (cacheKey: string, items: any[]) => {
+const saveCachedMetaCampaigns = (cacheKey: string, items: Record<string, unknown>[]) => {
   if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(
@@ -126,7 +130,7 @@ export async function fetchMetaAdAccounts(accessToken: string) {
     }
 
     const accounts = Array.isArray(managedPayload?.data?.accounts) ? managedPayload.data.accounts : [];
-    return accounts.map((account: any) => ({
+    return accounts.map((account: Record<string, unknown>) => ({
       id: account.externalAccountId,
       account_id: account.externalAccountId,
       name: account.name || account.externalAccountId,
@@ -202,7 +206,7 @@ export async function fetchMetaCampaigns(
 
     let { response, payload } = await loadCampaigns(adAccountId);
     if (!response.ok && adAccountId) {
-      const message = String((payload as any)?.message || '').toLowerCase();
+      const message = String((payload as MetaApiPayload)?.message || '').toLowerCase();
       const hasStaleAccountError =
         message.includes('unsupported get request') ||
         message.includes('does not exist') ||
@@ -219,7 +223,7 @@ export async function fetchMetaCampaigns(
     }
 
     if (!response.ok) {
-      const message = String((payload as any)?.message || 'Failed to fetch Meta campaigns');
+      const message = String((payload as MetaApiPayload)?.message || 'Failed to fetch Meta campaigns');
       if (isMetaRateLimitMessage(message) || response.status === 429) {
         metaRateLimitedUntil = Date.now() + META_RATE_LIMIT_COOLDOWN_MS;
         metaNextAllowedRequestAt = Date.now() + META_RATE_LIMIT_COOLDOWN_MS;
@@ -238,28 +242,28 @@ export async function fetchMetaCampaigns(
       throw new Error(message);
     }
 
-    let campaigns = Array.isArray((payload as any)?.data) ? (payload as any).data : [];
+    const typedPayload = payload as MetaApiPayload;
+    let campaigns = Array.isArray(typedPayload?.data) ? (typedPayload.data as Record<string, unknown>[]) : [];
     if (campaigns.length === 0 && adAccountId) {
       // Retry once without forcing account ID to avoid stale/incorrect UI-selected accounts.
       const fallbackResult = await loadCampaigns(undefined);
       if (fallbackResult.response.ok) {
-        campaigns = Array.isArray((fallbackResult.payload as any)?.data)
-          ? (fallbackResult.payload as any).data
-          : campaigns;
+        const fallbackPayload = fallbackResult.payload as MetaApiPayload;
+        campaigns = Array.isArray(fallbackPayload?.data) ? (fallbackPayload.data as Record<string, unknown>[]) : campaigns;
       }
     }
-    const mapped = campaigns.map((c: any) => {
-    const insights = c.insights?.data?.[0] || {};
-    const spend = parseFloat(insights.spend || 0) || 0;
-    const impressions = parseFloat(insights.impressions || 0) || 0;
-    const clicks = parseFloat(insights.clicks || 0) || 0;
-    const reach = parseFloat(insights.reach || 0) || 0;
-    const ctr =
-      parseFloat(insights.ctr || 0) ||
-      (impressions > 0 ? (clicks / impressions) * 100 : 0);
-    const cpc = parseFloat(insights.cpc || 0) || (clicks > 0 ? spend / clicks : 0);
-    const cpm = parseFloat(insights.cpm || 0) || (impressions > 0 ? (spend / impressions) * 1000 : 0);
-    const frequency = parseFloat(insights.frequency || 0) || (reach > 0 ? impressions / reach : 0);
+    const mapped = campaigns.map((c: Record<string, unknown>) => {
+    const insightsArr = (c.insights as { data?: Record<string, unknown>[] } | undefined)?.data;
+    const insights: Record<string, unknown> = (Array.isArray(insightsArr) ? insightsArr[0] : null) ?? {};
+    const pf = (v: unknown) => { const n = parseFloat(String(v ?? 0)); return Number.isFinite(n) ? n : 0; };
+    const spend = pf(insights.spend);
+    const impressions = pf(insights.impressions);
+    const clicks = pf(insights.clicks);
+    const reach = pf(insights.reach);
+    const ctr = pf(insights.ctr) || (impressions > 0 ? (clicks / impressions) * 100 : 0);
+    const cpc = pf(insights.cpc) || (clicks > 0 ? spend / clicks : 0);
+    const cpm = pf(insights.cpm) || (impressions > 0 ? (spend / impressions) * 1000 : 0);
+    const frequency = pf(insights.frequency) || (reach > 0 ? impressions / reach : 0);
     const actions = Array.isArray(insights.actions) ? insights.actions : [];
     const actionValues = Array.isArray(insights.action_values) ? insights.action_values : [];
     const conversionActionTypes = new Set([
@@ -276,14 +280,14 @@ export async function fetchMetaCampaigns(
       'omni_purchase',
       'onsite_conversion.purchase',
     ]);
-    const conversions = actions.reduce((sum: number, action: any) => {
+    const conversions = actions.reduce((sum: number, action: MetaAction) => {
       if (!action || !conversionActionTypes.has(String(action.action_type || ''))) return sum;
-      const v = parseFloat(action.value || 0);
+      const v = parseFloat(String(action.value ?? 0));
       return sum + (Number.isFinite(v) ? v : 0);
     }, 0);
-    const conversionValue = actionValues.reduce((sum: number, action: any) => {
+    const conversionValue = actionValues.reduce((sum: number, action: MetaAction) => {
       if (!action || !conversionValueTypes.has(String(action.action_type || ''))) return sum;
-      const v = parseFloat(action.value || 0);
+      const v = parseFloat(String(action.value ?? 0));
       return sum + (Number.isFinite(v) ? v : 0);
     }, 0);
     const cpa = conversions > 0 ? spend / conversions : 0;
@@ -296,7 +300,7 @@ export async function fetchMetaCampaigns(
     const roas = roasFromInsight > 0 ? roasFromInsight : spend > 0 ? conversionValue / spend : 0;
     const channelBreakdownRows = Array.isArray(c.channelBreakdown) ? c.channelBreakdown : [];
     const channelAgg = channelBreakdownRows.reduce(
-      (acc: any, row: any) => {
+      (acc: ChannelAgg, row: Record<string, unknown>) => {
         const rawPlatform = String(row?.publisher_platform || '').toLowerCase();
         const platform =
           rawPlatform === 'facebook'
@@ -314,12 +318,12 @@ export async function fetchMetaCampaigns(
           reach: 0,
           conversions: 0,
         };
-        const rowSpend = parseFloat(row?.spend || 0) || 0;
-        const rowImpressions = parseFloat(row?.impressions || 0) || 0;
-        const rowClicks = parseFloat(row?.clicks || 0) || 0;
-        const rowReach = parseFloat(row?.reach || 0) || 0;
-        const rowActions = Array.isArray(row?.actions) ? row.actions : [];
-        const rowConversions = rowActions.reduce((sum: number, action: any) => {
+        const rowSpend = pf(row?.spend);
+        const rowImpressions = pf(row?.impressions);
+        const rowClicks = pf(row?.clicks);
+        const rowReach = pf(row?.reach);
+        const rowActions: MetaAction[] = Array.isArray(row?.actions) ? row.actions as MetaAction[] : [];
+        const rowConversions = rowActions.reduce((sum: number, action: MetaAction) => {
           const actionType = String(action?.action_type || '').toLowerCase();
           if (
             actionType === 'purchase' ||
@@ -327,8 +331,7 @@ export async function fetchMetaCampaigns(
             actionType.includes('lead') ||
             actionType.includes('messaging')
           ) {
-            const v = parseFloat(action?.value || 0);
-            return sum + (Number.isFinite(v) ? v : 0);
+            return sum + pf(action?.value);
           }
           return sum;
         }, 0);
@@ -344,16 +347,16 @@ export async function fetchMetaCampaigns(
       {} as Record<string, { spend: number; impressions: number; clicks: number; reach: number; conversions: number }>
     );
 
-    const promotedObject = c.promoted_object || {};
+    const promotedObject = (c.promoted_object ?? {}) as Record<string, unknown>;
     const hasWhatsappDestination =
       Boolean(promotedObject?.whatsapp_phone_number) ||
       String(c?.destination_type || '').toLowerCase().includes('whatsapp');
     const whatsappConversations =
       (channelAgg.messenger?.conversions || 0) +
-      actions.reduce((sum: number, action: any) => {
+      actions.reduce((sum: number, action: MetaAction) => {
         const actionType = String(action?.action_type || '').toLowerCase();
         if (!actionType.includes('messaging') && !actionType.includes('whatsapp')) return sum;
-        const v = parseFloat(action?.value || 0);
+        const v = parseFloat(String(action?.value ?? 0));
         return sum + (Number.isFinite(v) ? v : 0);
       }, 0);
 
@@ -374,8 +377,8 @@ export async function fetchMetaCampaigns(
       stopTime: c.stop_time || '',
       createdTime: c.created_time || '',
       updatedTime: c.updated_time || '',
-      dailyBudget: parseFloat(c.daily_budget || 0) || 0,
-      lifetimeBudget: parseFloat(c.lifetime_budget || 0) || 0,
+      dailyBudget: pf(c.daily_budget),
+      lifetimeBudget: pf(c.lifetime_budget),
       reach,
       impressions,
       clicks,
@@ -404,13 +407,13 @@ export async function fetchMetaCampaigns(
     });
 
     // Surface server-side diagnostics to the browser console for easier debugging.
-    const responseMeta = (payload as any)?.meta;
+    const responseMeta = typedPayload?.meta;
     if (responseMeta?.insightsFetchError) {
       console.error('[Meta] Server failed to fetch insights:', responseMeta.insightsFetchError);
     }
     if (responseMeta?.allMetricsZero && mapped.length > 0) {
       console.warn(
-        `[Meta] All ${mapped.length} campaign(s) returned zero metrics for date range ${responseMeta?.dateRange?.startDate ?? '?'} → ${responseMeta?.dateRange?.endDate ?? '?'}. ` +
+        `[Meta] All ${mapped.length} campaign(s) returned zero metrics for date range ${(responseMeta?.dateRange as Record<string, unknown>)?.startDate ?? '?'} → ${(responseMeta?.dateRange as Record<string, unknown>)?.endDate ?? '?'}. ` +
         'Possible causes: campaigns have no delivery, billing is paused, or ads are disapproved.'
       );
     }
@@ -479,9 +482,10 @@ export async function fetchMetaAdsets(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error((error as any).message || 'Failed to fetch Meta adsets');
+    const errPayload = error as { message?: string };
+    throw new Error(errPayload.message || 'Failed to fetch Meta adsets');
   }
 
-  const payload = await response.json();
-  return Array.isArray((payload as any).data) ? (payload as any).data : [];
+  const payload = await response.json() as MetaApiPayload;
+  return Array.isArray(payload?.data) ? (payload.data as MetaAdset[]) : [];
 }

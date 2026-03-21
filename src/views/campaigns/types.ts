@@ -1,5 +1,7 @@
 // Types, constants, and pure helpers extracted from Campaigns.tsx
 
+export type CampaignRow = Record<string, unknown>;
+
 export type ContentType = 'product' | 'offer' | 'educational' | 'testimonial' | 'video';
 export type ProductType = 'fashion' | 'beauty' | 'tech' | 'home' | 'fitness' | 'services' | 'other';
 export type ObjectiveType = 'sales' | 'traffic' | 'leads' | 'awareness' | 'retargeting';
