@@ -24,6 +24,15 @@ import {
   normalizeMetaAccountId,
   normalizeGoogleAdsAccountId,
 } from './integrations/integrationUtils';
+import {
+  type WizardPlatform,
+  type WizardStep,
+  type WizardField,
+  type WizardDraft,
+  WIZARD_STORAGE_PREFIX,
+  WIZARD_PLATFORM_OPTIONS,
+  WIZARD_FIELDS,
+} from './integrations/wizardTypes';
 
 const viteEnv =
   typeof import.meta !== 'undefined'
@@ -95,65 +104,6 @@ const brandStyles: Record<string, { bg: string, text: string, border: string, li
   'tiktok': { bg: 'bg-gradient-to-br from-gray-800 to-black', text: 'text-white', border: 'border-gray-300', lightBg: 'bg-gray-100' },
   'woocommerce': { bg: 'bg-gradient-to-br from-purple-600 to-purple-800', text: 'text-white', border: 'border-purple-200', lightBg: 'bg-purple-50' },
   'shopify': { bg: 'bg-gradient-to-br from-emerald-500 to-green-600', text: 'text-white', border: 'border-emerald-200', lightBg: 'bg-emerald-50' },
-};
-
-type WizardPlatform = 'google' | 'meta' | 'tiktok' | 'woocommerce' | 'shopify';
-type WizardStep = 1 | 2 | 3;
-
-type WizardField = {
-  key: string;
-  labelHe: string;
-  labelEn: string;
-  placeholder: string;
-  required?: boolean;
-  type?: 'text' | 'password' | 'url';
-};
-
-type WizardDraft = {
-  platform: WizardPlatform;
-  step: WizardStep;
-  values: Record<string, string>;
-  completedPlatforms: WizardPlatform[];
-  updatedAt: number;
-};
-
-const WIZARD_STORAGE_PREFIX = 'bscale.integrations.wizardDraft';
-
-const WIZARD_PLATFORM_OPTIONS: Array<{ id: WizardPlatform; label: string }> = [
-  { id: 'google', label: 'Google' },
-  { id: 'meta', label: 'Meta' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'woocommerce', label: 'WooCommerce' },
-  { id: 'shopify', label: 'Shopify' },
-];
-
-const WIZARD_FIELDS: Record<WizardPlatform, WizardField[]> = {
-  google: [
-    { key: 'googleAdsId', labelHe: 'מזהה חשבון מודעות', labelEn: 'Ads account ID', placeholder: '123-456-7890', required: true },
-    { key: 'loginCustomerId', labelHe: 'Login Customer ID', labelEn: 'Login Customer ID', placeholder: '123-456-7890' },
-    { key: 'ga4Id', labelHe: 'GA4 Property ID', labelEn: 'GA4 Property ID', placeholder: '123456789' },
-    { key: 'siteUrl', labelHe: 'Site URL ל-GSC', labelEn: 'Site URL for GSC', placeholder: 'https://example.com', type: 'url' },
-    { key: 'googleAccessToken', labelHe: 'Google Access Token', labelEn: 'Google Access Token', placeholder: 'ya29...' },
-  ],
-  meta: [
-    { key: 'metaAdsId', labelHe: 'מזהה חשבון מודעות', labelEn: 'Ads account ID', placeholder: 'act_123456789', required: true },
-    { key: 'pixelId', labelHe: 'Pixel ID', labelEn: 'Pixel ID', placeholder: '123456789012345', required: true },
-    { key: 'businessId', labelHe: 'Business Manager ID', labelEn: 'Business Manager ID', placeholder: '112233445566778' },
-    { key: 'metaToken', labelHe: 'Meta Access Token', labelEn: 'Meta Access Token', placeholder: 'EAAB...' },
-  ],
-  tiktok: [
-    { key: 'tiktokAdvertiserId', labelHe: 'Advertiser ID', labelEn: 'Advertiser ID', placeholder: '7012345678901234567', required: true },
-    { key: 'tiktokPixelId', labelHe: 'Pixel ID', labelEn: 'Pixel ID', placeholder: 'TT-PIXEL-123' },
-  ],
-  woocommerce: [
-    { key: 'storeUrl', labelHe: 'כתובת החנות', labelEn: 'Store URL', placeholder: 'https://mystore.com', type: 'url', required: true },
-    { key: 'wooKey', labelHe: 'Consumer Key', labelEn: 'Consumer Key', placeholder: 'ck_...', required: true },
-    { key: 'wooSecret', labelHe: 'Consumer Secret', labelEn: 'Consumer Secret', placeholder: 'cs_...', required: true, type: 'password' },
-  ],
-  shopify: [
-    { key: 'storeUrl', labelHe: 'כתובת החנות', labelEn: 'Store URL', placeholder: 'https://mystore.myshopify.com', type: 'url', required: true },
-    { key: 'shopifyToken', labelHe: 'Admin API Access Token', labelEn: 'Admin API Access Token', placeholder: 'shpat_...', required: true, type: 'password' },
-  ],
 };
 
 export function Integrations({ userProfile }: { userProfile?: { role?: string; subscriptionStatus?: string } | null }) {
