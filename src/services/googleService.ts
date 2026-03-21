@@ -71,23 +71,24 @@ export async function fetchGoogleCampaigns(
   const data = await response.json();
   
   // Google Ads API returns results in a 'results' array
-  return (data.results || []).map((r: any) => {
+  type RawGoogleAdsRow = { campaign: Record<string, string | undefined>; campaignBudget?: Record<string, string | undefined>; metrics: Record<string, string | undefined> };
+  return ((data.results as RawGoogleAdsRow[]) || []).map((r) => {
     const c = r.campaign;
     const budget = r.campaignBudget || {};
     const m = r.metrics;
-    const spend = parseFloat(m.costMicros || 0) / 1000000;
-    const impressions = parseFloat(m.impressions || 0) || 0;
-    const clicks = parseFloat(m.clicks || 0) || 0;
-    const ctr = parseFloat(m.ctr || 0) || (impressions > 0 ? (clicks / impressions) * 100 : 0);
-    const avgCpc = parseFloat(m.averageCpc || 0) / 1000000 || (clicks > 0 ? spend / clicks : 0);
-    const avgCpm = parseFloat(m.averageCpm || 0) / 1000000 || (impressions > 0 ? (spend / impressions) * 1000 : 0);
-    const conversions = parseFloat(m.conversions || 0);
-    const conversionValue = parseFloat(m.conversionsValue || 0);
+    const spend = parseFloat(m.costMicros ?? "0") / 1000000;
+    const impressions = parseFloat(m.impressions ?? "0") || 0;
+    const clicks = parseFloat(m.clicks ?? "0") || 0;
+    const ctr = parseFloat(m.ctr ?? "0") || (impressions > 0 ? (clicks / impressions) * 100 : 0);
+    const avgCpc = parseFloat(m.averageCpc ?? "0") / 1000000 || (clicks > 0 ? spend / clicks : 0);
+    const avgCpm = parseFloat(m.averageCpm ?? "0") / 1000000 || (impressions > 0 ? (spend / impressions) * 1000 : 0);
+    const conversions = parseFloat(m.conversions ?? "0");
+    const conversionValue = parseFloat(m.conversionsValue ?? "0");
     const cpa = conversions > 0 ? spend / conversions : 0;
     const costPerConversion =
-      parseFloat(m.costPerConversion || 0) / 1000000 || (conversions > 0 ? spend / conversions : 0);
+      parseFloat(m.costPerConversion ?? "0") / 1000000 || (conversions > 0 ? spend / conversions : 0);
     const roas = spend > 0 ? conversionValue / spend : 0;
-    const budgetMicros = parseFloat(budget.amountMicros || 0) || 0;
+    const budgetMicros = parseFloat(budget.amountMicros ?? "0") || 0;
 
     return {
       id: c.id,
@@ -109,9 +110,9 @@ export async function fetchGoogleCampaigns(
       cpc: avgCpc,
       cpm: avgCpm,
       costPerConversion,
-      searchImpressionShare: parseFloat(m.searchImpressionShare || 0) || 0,
-      searchTopImpressionShare: parseFloat(m.searchTopImpressionShare || 0) || 0,
-      absoluteTopImpressionPercentage: parseFloat(m.absoluteTopImpressionPercentage || 0) || 0,
+      searchImpressionShare: parseFloat(m.searchImpressionShare ?? "0") || 0,
+      searchTopImpressionShare: parseFloat(m.searchTopImpressionShare ?? "0") || 0,
+      absoluteTopImpressionPercentage: parseFloat(m.absoluteTopImpressionPercentage ?? "0") || 0,
       spend,
       roas: Number.isFinite(roas) ? roas.toFixed(2) : '0.00',
       cpa,
@@ -260,12 +261,22 @@ export async function sendGmailNotification(accessToken: string, to: string, sub
   return response.json();
 }
 
+type GA4MetricValue = { value?: string };
+type GA4Row = { metricValues?: GA4MetricValue[]; metrics?: GA4MetricValue[]; dimensionValues?: { value?: string }[] };
+export type GA4ReportData = {
+  rows?: GA4Row[];
+  metricHeaders?: { name: string }[];
+  totals?: GA4Row[];
+  realtime?: { activeUsers?: number; usersLast24h?: number };
+  topPages?: { path?: string; title?: string; views?: number }[];
+};
+
 export async function fetchGA4Report(
   accessToken: string,
   propertyId?: string,
   startDate?: string,
   endDate?: string
-) {
+): Promise<GA4ReportData> {
   await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
   if (propertyId) query.set('property_id', propertyId);
@@ -282,7 +293,7 @@ export async function fetchGA4Report(
     throw new Error(error.message || 'Failed to fetch GA4 report');
   }
 
-  return response.json();
+  return response.json() as Promise<GA4ReportData>;
 }
 
 export async function fetchGA4Realtime(accessToken: string, propertyId?: string) {
@@ -303,7 +314,8 @@ export async function fetchGA4Realtime(accessToken: string, propertyId?: string)
   return response.json() as Promise<{ topPages: Array<{ title: string; path: string; views: number }>; users24h: number }>;
 }
 
-export async function fetchGSCData(accessToken: string, siteUrl?: string, startDate?: string, endDate?: string) {
+type GSCRow = { clicks: number; impressions: number; position: number; keys?: string[] };
+export async function fetchGSCData(accessToken: string, siteUrl?: string, startDate?: string, endDate?: string): Promise<{ rows: GSCRow[] }> {
   await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
   if (siteUrl) query.set('site_url', siteUrl);
@@ -320,5 +332,5 @@ export async function fetchGSCData(accessToken: string, siteUrl?: string, startD
     throw new Error(error.message || 'Failed to fetch GSC data');
   }
 
-  return response.json();
+  return response.json() as Promise<{ rows: GSCRow[] }>;
 }

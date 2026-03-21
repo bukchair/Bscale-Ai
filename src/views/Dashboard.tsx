@@ -360,15 +360,13 @@ export function Dashboard() {
             endIsoDateOnly
           );
           const rows = Array.isArray(report.rows) ? report.rows : [];
-          const metricHeaders = Array.isArray((report as any).metricHeaders)
-            ? (report as any).metricHeaders
-            : [];
-          const metricIndexByName = (metricHeaders as any[]).reduce<Record<string, number>>((acc, header, index) => {
+          const metricHeaders = Array.isArray(report.metricHeaders) ? report.metricHeaders : [];
+          const metricIndexByName = metricHeaders.reduce<Record<string, number>>((acc, header, index) => {
             const name = String(header?.name || '').trim();
             if (name) acc[name] = index;
             return acc;
           }, {});
-          const metricValueByName = (row: any, metricName: string, fallbackIndex: number) => {
+          const metricValueByName = (row: { metricValues?: { value?: string }[]; metrics?: { value?: string }[] }, metricName: string, fallbackIndex: number) => {
             const metrics = row?.metricValues || row?.metrics || [];
             const namedIndex = metricIndexByName[metricName];
             const index =
@@ -379,9 +377,9 @@ export function Dashboard() {
           };
           let totalUsers = 0;
           let activeNow = 0;
-          const realtimeActiveUsers = Number((report as any)?.realtime?.activeUsers ?? NaN);
-          const usersLast24hRaw = Number((report as any)?.realtime?.usersLast24h ?? NaN);
-          rows.forEach((row: any) => {
+          const realtimeActiveUsers = Number(report?.realtime?.activeUsers ?? NaN);
+          const usersLast24hRaw = Number(report?.realtime?.usersLast24h ?? NaN);
+          rows.forEach((row) => {
             totalUsers += moneyFromUnknown(metricValueByName(row, 'totalUsers', 0));
           });
           if (Number.isFinite(realtimeActiveUsers)) {
@@ -389,16 +387,16 @@ export function Dashboard() {
           } else if (rows.length) {
             activeNow = moneyFromUnknown(metricValueByName(rows[rows.length - 1], 'activeUsers', 0));
           }
-          const totalsRow = Array.isArray((report as any).totals) ? (report as any).totals[0] : undefined;
+          const totalsRow = Array.isArray(report.totals) ? report.totals[0] : undefined;
           if (totalsRow) {
             totalUsers = moneyFromUnknown(metricValueByName(totalsRow, 'totalUsers', 0));
           }
           if (Number.isFinite(usersLast24hRaw)) {
             totalUsers = usersLast24hRaw;
           }
-          const topPagesRaw = Array.isArray((report as any)?.topPages) ? (report as any).topPages : [];
-          const topPagesMapped: Ga4TopPage[] = topPagesRaw
-            .map((row: any) => ({
+          const topPagesRaw = Array.isArray(report?.topPages) ? report.topPages : [];
+          const topPagesMapped: Ga4TopPage[] = (topPagesRaw ?? [])
+            .map((row) => ({
               path: String(row?.path || '').trim(),
               title: String(row?.title || '').trim(),
               views: toNumber(row?.views, 0),
@@ -441,7 +439,7 @@ export function Dashboard() {
           let clicks = 0;
           let impressions = 0;
           let positionSum = 0;
-          rows.forEach((row: any) => {
+          rows.forEach((row) => {
             clicks += toNumber(row.clicks, 0);
             impressions += toNumber(row.impressions, 0);
             positionSum += toNumber(row.position, 0);
@@ -469,13 +467,13 @@ export function Dashboard() {
             googleCustomerId || undefined,
             google.settings?.loginCustomerId
           );
-          googleCampaigns.forEach((campaign: any) => {
+          googleCampaigns.forEach((campaign) => {
             const spend = moneyFromUnknown(campaign.spend);
             const conversionValue = moneyFromUnknown(campaign.conversionValue);
             const roasValue = moneyFromUnknown(campaign.roas);
             campaignRows.push({
-              id: campaign.id,
-              name: campaign.name || 'Google Campaign',
+              id: String(campaign.id || ''),
+              name: String(campaign.name || 'Google Campaign'),
               platform: 'Google',
               status: campaign.status === 'Active' ? 'Active' : 'Paused',
               spend,
@@ -507,15 +505,15 @@ export function Dashboard() {
             startIsoDateOnly,
             endIsoDateOnly
           );
-          metaCampaigns.forEach((campaign: any) => {
+          metaCampaigns.forEach((campaign) => {
             const spend = moneyFromUnknown(campaign.spend);
             const conversionValue = moneyFromUnknown(campaign.conversionValue);
             const roasValue = moneyFromUnknown(campaign.roas);
             campaignRows.push({
-              id: campaign.id,
-              name: campaign.name || 'Meta Campaign',
+              id: String(campaign.id || ''),
+              name: String(campaign.name || 'Meta Campaign'),
               platform: 'Meta',
-              status: campaign.status === 'Active' ? 'Active' : 'Paused',
+              status: String(campaign.status || '') === 'Active' ? 'Active' : 'Paused',
               spend,
               roas: roasValue,
             });
@@ -544,24 +542,15 @@ export function Dashboard() {
             tiktokToken,
             tiktokAdvertiserId
           );
-          (Array.isArray(tiktokCampaigns) ? tiktokCampaigns : []).forEach((campaign: any) => {
-            const spend = moneyFromUnknown(
-              campaign.stat_cost ?? campaign.spend ?? campaign.cost ?? campaign.metrics?.spend
-            );
-            const conversionValue = moneyFromUnknown(
-              campaign.conversionValue ??
-                campaign.stat_conversion_value ??
-                campaign.total_conversion_value ??
-                campaign.metrics?.conversionValue
-            );
-            const roasValue = moneyFromUnknown(
-              campaign.roas ?? campaign.stat_roas ?? campaign.metrics?.roas
-            );
+          (Array.isArray(tiktokCampaigns) ? tiktokCampaigns : []).forEach((campaign) => {
+            const spend = moneyFromUnknown(campaign.spend);
+            const conversionValue = moneyFromUnknown(campaign.conversionValue);
+            const roasValue = moneyFromUnknown(campaign.roas);
             campaignRows.push({
-              id: campaign.campaign_id || campaign.id || `tiktok-${campaign.campaign_name || 'campaign'}`,
-              name: campaign.campaign_name || campaign.name || 'TikTok Campaign',
+              id: String(campaign.id || ''),
+              name: String(campaign.name || 'TikTok Campaign'),
               platform: 'TikTok',
-              status: campaign.operation_status === 'ENABLE' ? 'Active' : 'Paused',
+              status: campaign.status === 'Active' ? 'Active' : 'Paused',
               spend,
               roas: roasValue,
             });

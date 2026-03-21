@@ -148,7 +148,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const parseManagedPayload = (raw: string) => {
     try {
-      return raw ? (JSON.parse(raw) as { success?: boolean; message?: string; errorCode?: string; data?: any }) : null;
+      return raw ? (JSON.parse(raw) as { success?: boolean; message?: string; errorCode?: string; data?: { connections?: unknown; accounts?: unknown } }) : null;
     } catch {
       return null;
     }
@@ -537,7 +537,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       const applyPlanRestrictions = (items: Connection[]) => {
         if (!restrictPlatformsToDemo) return items;
         return items.map((connection) => {
-          if (!PLATFORM_CONNECTION_IDS.includes(connection.id as any)) return connection;
+          if (!(PLATFORM_CONNECTION_IDS as readonly string[]).includes(connection.id)) return connection;
           return {
             ...connection,
             status: 'disconnected' as ConnectionStatus,
@@ -587,7 +587,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
         }
       );
 
-      const handleSnapshotError = (source: 'global' | 'user') => (err: any) => {
+      const handleSnapshotError = (source: 'global' | 'user') => (err: unknown) => {
         const permissionDenied = isPermissionDeniedError(err);
         if (!permissionDenied) {
           console.error(`Error in ${source} connections snapshot:`, err);
@@ -613,7 +613,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
           (snap) => {
             if (snap.exists()) {
               const items = (snap.data().items || []) as Connection[];
-              globalItems = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+              globalItems = items.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
             } else {
               globalItems = [];
             }
@@ -640,7 +640,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
               userConnectionsRef,
               {
                 items: stripUndefinedDeep(
-                  initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any))
+                  initialConnections.filter((c) => (PLATFORM_CONNECTION_IDS as readonly string[]).includes(c.id))
                 ),
               }
             ).catch((err) => {
@@ -676,7 +676,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
 
   const persistGlobalAiConnections = async (items: Connection[]) => {
     const ref = doc(db, 'appSettings', 'connections');
-    const aiOnly = items.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+    const aiOnly = items.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
     try {
       await setDoc(ref, { items: stripUndefinedDeep(aiOnly) }, { merge: true });
     } catch (err) {
@@ -688,7 +688,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     // תמיד שומרים במסמך המשתמש (כולל AI) כדי שהאדמין יראה את ההגדרות מיד
     await persistUserConnections(newConnections);
     // ואם מדובר בחיבור AI – גם במסמך הגלובלי המשותף
-    if (updatedId && AI_CONNECTION_IDS.includes(updatedId as any)) {
+    if (updatedId && (AI_CONNECTION_IDS as readonly string[]).includes(updatedId)) {
       await persistGlobalAiConnections(newConnections);
     }
   };
@@ -870,8 +870,8 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    const aiPart = connections.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
-    const platformPart = initialConnections.filter((c) => PLATFORM_CONNECTION_IDS.includes(c.id as any));
+    const aiPart = connections.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
+    const platformPart = initialConnections.filter((c) => (PLATFORM_CONNECTION_IDS as readonly string[]).includes(c.id));
     const fresh = [...aiPart, ...platformPart];
     setConnections(fresh);
     await persistUserConnections(fresh);
@@ -900,7 +900,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     }
 
     const userItems = (userSnap.data().items || []) as Connection[];
-    const aiFromUser = userItems.filter((c) => AI_CONNECTION_IDS.includes(c.id as any));
+    const aiFromUser = userItems.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
 
     if (aiFromUser.length === 0) {
       return { success: false, message: 'No Gemini / OpenAI / Claude connections found on the current user.' };
@@ -909,7 +909,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     const existingGlobalItems = globalSnap.exists() ? ((globalSnap.data().items || []) as Connection[]) : [];
     const byId = new Map<string, Connection>();
     existingGlobalItems.forEach((c) => {
-      if (AI_CONNECTION_IDS.includes(c.id as any)) {
+      if ((AI_CONNECTION_IDS as readonly string[]).includes(c.id)) {
         byId.set(c.id, c);
       }
     });

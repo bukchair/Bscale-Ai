@@ -88,6 +88,8 @@ import { RecommendationsPanel } from './campaigns/RecommendationsPanel';
 import { CampaignTable } from './campaigns/CampaignTable';
 import { CampaignBuilder } from './campaigns/CampaignBuilder';
 
+type CampaignRow = Record<string, unknown>;
+
 const mockCampaignData = [
   { id: 1, name: 'Summer Sale - Shoes', platform: 'Google', status: 'Active', spend: 1200, roas: 2.5, cpa: 45 },
   { id: 2, name: 'Retargeting - Abandoned Cart', platform: 'Meta', status: 'Active', spend: 800, roas: 4.2, cpa: 22 },
@@ -246,11 +248,11 @@ export function Campaigns() {
   const periodLabel = dateRange === 'today' ? t('dashboard.today') : dateRange === '7days' ? t('dashboard.last7Days') : dateRange === '30days' ? t('dashboard.last30Days') : t('dashboard.customRange');
   const startDateIso = useMemo(() => bounds.startDate.toISOString().slice(0, 10), [bounds.startDate]);
   const endDateIso = useMemo(() => bounds.endDate.toISOString().slice(0, 10), [bounds.endDate]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [appliedRecs, setAppliedRecs] = useState<number[]>([]);
   const [expandedRecs, setExpandedRecs] = useState<number[]>([]);
-  const [realCampaigns, setRealCampaigns] = useState<any[]>([]);
+  const [realCampaigns, setRealCampaigns] = useState<CampaignRow[]>([]);
   const [unifiedDataLayer, setUnifiedDataLayer] = useState(createEmptyUnifiedDataLayer);
   const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
   const [adsetsByCampaignId, setAdsetsByCampaignId] = useState<Record<string, MetaAdset[]>>({});
@@ -261,7 +263,7 @@ export function Campaigns() {
     try {
       const raw = window.localStorage.getItem(CAMPAIGNS_CACHE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as { items?: any[] };
+      const parsed = JSON.parse(raw) as { items?: CampaignRow[] };
       if (Array.isArray(parsed.items) && parsed.items.length > 0) {
         setRealCampaigns(parsed.items);
       }
@@ -302,7 +304,7 @@ export function Campaigns() {
     }
   }, [realCampaigns]);
 
-  const [createdCampaigns, setCreatedCampaigns] = useState<any[]>([]);
+  const [createdCampaigns, setCreatedCampaigns] = useState<CampaignRow[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [builderMessage, setBuilderMessage] = useState<string | null>(null);
@@ -624,7 +626,7 @@ export function Campaigns() {
       setSelectedWooProductId('');
       return;
     }
-    const { storeUrl, wooKey, wooSecret } = (wooConnection.settings || {}) as any;
+    const { storeUrl, wooKey, wooSecret } = (wooConnection.settings || {}) as Record<string, string>;
     if (!storeUrl || !wooKey || !wooSecret) {
       setWooProducts([]);
       return;
@@ -635,12 +637,12 @@ export function Campaigns() {
       .then((list) => {
         if (cancelled) return;
         const mapped = (Array.isArray(list) ? list : [])
-          .map((item: any) => ({
+          .map((item: Record<string, unknown>) => ({
             id: Number(item?.id || 0),
-            name: stripHtmlToText(item?.name || ''),
+            name: stripHtmlToText(String(item?.name || '')),
             categories: Array.isArray(item?.categories)
-              ? item.categories
-                  .map((category: any) => stripHtmlToText(category?.name || ''))
+              ? (item.categories as Record<string, unknown>[])
+                  .map((category) => stripHtmlToText(String(category?.name || '')))
                   .filter(Boolean)
               : [],
             price: item?.price != null ? String(item.price) : '',
@@ -742,7 +744,7 @@ export function Campaigns() {
     });
   };
 
-  const toggleCampaignExpand = async (campaign: any) => {
+  const toggleCampaignExpand = async (campaign: CampaignRow) => {
     const campaignId = String(campaign?.campaignId || campaign?.id || '');
     if (!campaignId) return;
 
@@ -1271,7 +1273,7 @@ export function Campaigns() {
     setTimeRules((prev) => prev.filter((rule) => rule.id !== id));
   };
 
-  const isEditablePlatformCampaign = (campaign: any) => {
+  const isEditablePlatformCampaign = (campaign: CampaignRow) => {
     const platform = String(campaign?.platform || '');
     if (platform !== 'Google' && platform !== 'Meta' && platform !== 'TikTok') return false;
     const idValue = String(campaign?.campaignId || campaign?.id || '').trim();
@@ -1280,7 +1282,7 @@ export function Campaigns() {
     return true;
   };
 
-  const openEditCampaign = (campaign: any) => {
+  const openEditCampaign = (campaign: CampaignRow) => {
     const platform = String(campaign?.platform || '') as PlatformName;
     const campaignId = String(campaign?.campaignId || campaign?.id || '').trim();
     if (!campaignId || !isEditablePlatformCampaign(campaign)) {
@@ -1342,7 +1344,7 @@ export function Campaigns() {
         throw new Error(payload?.message || text.updateFailed);
       }
 
-      const updateRow = (row: any) => {
+      const updateRow = (row: CampaignRow) => {
         const rowId = String(row?.campaignId || row?.id || '').trim();
         const samePlatform = String(row?.platform || '') === editingCampaign.platform;
         if (!samePlatform || rowId !== editingCampaign.campaignId) return row;
@@ -1807,7 +1809,7 @@ export function Campaigns() {
 
       const created = resolvedPlatforms.map((platform) => {
         const activeHours = getActiveSlotsCount(platform);
-        const platformResult = results.find((item: any) => String(item?.platform || '') === platform);
+        const platformResult = results.find((item: Record<string, unknown>) => String(item?.platform || '') === platform);
         return {
           id: `live-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: resolvedCampaignName,
@@ -1838,7 +1840,7 @@ export function Campaigns() {
       });
       setCreatedCampaigns((prev) => [...created, ...prev]);
 
-      const successCount = results.filter((item: any) => item?.ok).length;
+      const successCount = results.filter((item: Record<string, unknown>) => item?.ok).length;
       setBuilderMessage(
         successCount === resolvedPlatforms.length
           ? text.publishedOk
@@ -1871,13 +1873,13 @@ export function Campaigns() {
     )
   );
 
-  const allCampaigns = [
+  const allCampaigns: CampaignRow[] = [
     ...createdCampaigns,
     ...(realCampaigns.length > 0
       ? realCampaigns
       : hasConnectedAdPlatform
       ? []
-      : mockCampaignData),
+      : (mockCampaignData as CampaignRow[])),
   ];
 
   const filteredAndSortedCampaigns = allCampaigns
@@ -1891,8 +1893,8 @@ export function Campaigns() {
       return matchesSearch && matchesPlatform && matchesStatus;
     })
     .sort((a, b) => {
-      let valA: any = a[sortField as keyof typeof a];
-      let valB: any = b[sortField as keyof typeof b];
+      let valA: unknown = a[sortField as keyof typeof a];
+      let valB: unknown = b[sortField as keyof typeof b];
 
       if (sortField === 'spend' || sortField === 'cpa' || sortField === 'roas') {
         valA = toAmount(valA);
@@ -1910,7 +1912,7 @@ export function Campaigns() {
       return 0;
     });
 
-  const platforms = ['All', ...new Set(allCampaigns.map(c => c.platform))];
+  const platforms = ['All', ...new Set(allCampaigns.map(c => String(c.platform || '')))];
   const statuses = ['All', ...new Set(allCampaigns.map(c => normalizeCampaignStatus(c.status)))];
 
   return (
