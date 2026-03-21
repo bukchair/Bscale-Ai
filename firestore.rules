@@ -43,6 +43,7 @@ service cloud.firestore {
                isAdmin() || 
                (currentUser().role == 'agency' &&
                  get(/databases/$(database)/documents/stores/$(storeId)).data.agencyId == request.auth.uid) ||
+               exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)) ||
                ((currentUser().storeIds is list) && (storeId in currentUser().storeIds))
              );
     }
@@ -55,6 +56,10 @@ service cloud.firestore {
                isAdmin() || 
                (currentUser().role == 'agency' &&
                  get(/databases/$(database)/documents/stores/$(storeId)).data.agencyId == request.auth.uid) ||
+               (
+                 exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)) &&
+                 get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.role in ['owner', 'editor']
+               ) ||
                ((currentUser().storeIds is list) &&
                  (storeId in currentUser().storeIds) &&
                  currentUser().role in ['owner', 'editor'])
@@ -115,6 +120,11 @@ service cloud.firestore {
       match /connections/{connectionId} {
         allow read: if hasStoreAccess(storeId);
         allow write: if hasStoreEditAccess(storeId);
+      }
+
+      match /members/{memberId} {
+        allow read: if hasStoreAccess(storeId);
+        allow create, update, delete: if hasStoreEditAccess(storeId);
       }
       
       match /activityLogs/{logId} {

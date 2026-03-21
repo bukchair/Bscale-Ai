@@ -15,6 +15,8 @@ interface UserProfile {
   photoURL?: string;
 }
 
+type BasicMembershipUser = Pick<UserProfile, 'uid' | 'name' | 'email' | 'role'>;
+
 const roleLabels: Record<UserProfile['role'], { labelKey: string, icon: React.ElementType, color: string, bg: string }> = {
   admin: { labelKey: 'users.roles.admin', icon: Shield, color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
   agency: { labelKey: 'users.roles.agency', icon: UsersIcon, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
@@ -84,9 +86,56 @@ export function Users() {
       .map((item) => item.trim())
       .filter(Boolean))];
 
+  const syncStoreMembershipDocs = async (
+    user: BasicMembershipUser,
+    previousStoreIds: string[],
+    nextStoreIds: string[]
+  ) => {
+    const previous = new Set(previousStoreIds.filter(Boolean));
+    const next = new Set(nextStoreIds.filter(Boolean));
+    const toRemove = [...previous].filter((storeId) => !next.has(storeId));
+    const toUpsert = [...next];
+    if (toRemove.length === 0 && toUpsert.length === 0) return;
+
+    const batch = writeBatch(db);
+    const nowIso = new Date().toISOString();
+    const actorUid = auth.currentUser?.uid || null;
+
+    for (const storeId of toUpsert) {
+      const memberRef = doc(db, 'stores', storeId, 'members', user.uid);
+      batch.set(
+        memberRef,
+        {
+          uid: user.uid,
+          name: user.name || '',
+          email: user.email || '',
+          role: user.role,
+          updatedAt: nowIso,
+          updatedByUid: actorUid,
+        },
+        { merge: true }
+      );
+    }
+
+    for (const storeId of toRemove) {
+      const memberRef = doc(db, 'stores', storeId, 'members', user.uid);
+      batch.delete(memberRef);
+    }
+
+    await batch.commit();
+  };
+
   const handleRoleChange = async (userId: string, newRole: UserProfile['role']) => {
     try {
       await updateDoc(doc(db, 'users', userId), { role: newRole });
+      const targetUser = users.find((item) => item.uid === userId);
+      if (targetUser) {
+        await syncStoreMembershipDocs(
+          { uid: targetUser.uid, name: targetUser.name, email: targetUser.email, role: newRole },
+          targetUser.storeIds || [],
+          targetUser.storeIds || []
+        );
+      }
     } catch (error) {
       console.error("Error updating role:", error);
     }
@@ -128,6 +177,16 @@ export function Users() {
         createdAt: new Date().toISOString(),
         storeIds: normalizedStoreIds,
       });
+      await syncStoreMembershipDocs(
+        {
+          uid,
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          role: newUserRole,
+        },
+        [],
+        normalizedStoreIds
+      );
       setIsCreateModalOpen(false);
       setNewUserUid('');
       setNewUserName('');
@@ -144,8 +203,23 @@ export function Users() {
   const handleStoreIdsSave = async (userId: string) => {
     setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'saving' }));
     try {
+      const targetUser = users.find((item) => item.uid === userId);
+      if (!targetUser) {
+        setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'error' }));
+        return;
+      }
       const normalizedStoreIds = parseStoreIdsInput(storeIdDraftByUser[userId] || '');
       await updateDoc(doc(db, 'users', userId), { storeIds: normalizedStoreIds });
+      await syncStoreMembershipDocs(
+        {
+          uid: targetUser.uid,
+          name: targetUser.name,
+          email: targetUser.email,
+          role: targetUser.role,
+        },
+        targetUser.storeIds || [],
+        normalizedStoreIds
+      );
       setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'saved' }));
       window.setTimeout(() => {
         setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'idle' }));
