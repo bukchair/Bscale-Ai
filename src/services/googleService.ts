@@ -24,6 +24,27 @@ const getActiveUid = async (): Promise<string> => {
   });
 };
 
+const getFirebaseAuthHeader = async (): Promise<Record<string, string>> => {
+  const user = auth.currentUser || (await new Promise<typeof auth.currentUser>((resolve) => {
+    const timeoutId = window.setTimeout(() => {
+      unsubscribe();
+      resolve(auth.currentUser);
+    }, 3000);
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+      window.clearTimeout(timeoutId);
+      unsubscribe();
+      resolve(nextUser);
+    });
+  }));
+  if (!user) return {};
+  try {
+    const idToken = await user.getIdToken();
+    return idToken ? { 'x-firebase-id-token': idToken } : {};
+  } catch {
+    return {};
+  }
+};
+
 const getManagedGoogleAccessToken = async (
   serviceSlug: GoogleServiceSlug,
   providedToken?: string
@@ -39,8 +60,10 @@ const getManagedGoogleAccessToken = async (
     throw new Error('Missing authenticated user context for managed Google service token.');
   }
 
+  const authHeaders = await getFirebaseAuthHeader();
   const response = await fetch(
-    `/api/integrations/${serviceSlug}/access-token?user_id=${encodeURIComponent(uid)}`
+    `/api/integrations/${serviceSlug}/access-token?user_id=${encodeURIComponent(uid)}`,
+    { headers: authHeaders }
   );
   const payload = (await response.json().catch(() => null)) as
     | { accessToken?: string; message?: string }
@@ -54,7 +77,10 @@ const getManagedGoogleAccessToken = async (
 export async function fetchGoogleAdAccounts(accessToken: string) {
   const uid = await getActiveUid();
   const query = uid ? `?user_id=${encodeURIComponent(uid)}` : '';
-  const response = await fetch(`/api/integrations/google/discover${query}`);
+  const authHeaders = await getFirebaseAuthHeader();
+  const response = await fetch(`/api/integrations/google/discover${query}`, {
+    headers: authHeaders,
+  });
   
   if (!response.ok) {
     const error = await response.json();
@@ -219,7 +245,7 @@ export interface GoogleDiscoveryResult {
 export async function fetchGoogleDiscovery(accessToken: string): Promise<GoogleDiscoveryResult> {
   const uid = await getActiveUid();
   const query = uid ? `?user_id=${encodeURIComponent(uid)}` : '';
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...(await getFirebaseAuthHeader()) };
   if (accessToken && accessToken !== 'server-managed') {
     headers.Authorization = `Bearer ${accessToken}`;
   }

@@ -8,7 +8,7 @@ import {
   getValidServiceAccessToken,
   googleServiceCatalog,
   listGoogleServiceConnections,
-  resolveUserIdFromRequest,
+  resolveAuthorizedUserIdFromRequest,
   saveServiceConnection,
   toPublicGoogleServicePayload,
   type GoogleServiceSlug,
@@ -114,9 +114,9 @@ const getRedirectUri = (req: IncomingMessage, serviceSlug: GoogleServiceSlug) =>
 };
 
 async function handleGoogleDiscover(req: Req, res: ServerResponse) {
-  const userId = resolveUserIdFromRequest(req);
+  const userId = await resolveAuthorizedUserIdFromRequest(req);
   if (!userId) {
-    return sendJson(res, 400, { message: 'Missing user_id' });
+    return sendJson(res, 401, { message: 'Missing authenticated user context.' });
   }
 
   const discovered: Record<string, string> = {};
@@ -195,8 +195,8 @@ export default async function handler(req: Req, res: ServerResponse) {
 
   if (segments[2] === 'google' && segments[3] === 'services') {
     if (req.method !== 'GET') return sendJson(res, 405, { message: 'Method not allowed' });
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) return sendJson(res, 400, { message: 'Missing user_id' });
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
+    if (!userId) return sendJson(res, 401, { message: 'Missing authenticated user context.' });
     const items = listGoogleServiceConnections(userId).map(toPublicGoogleServicePayload);
     return sendJson(res, 200, { items });
   }
@@ -214,8 +214,8 @@ export default async function handler(req: Req, res: ServerResponse) {
 
   if (action === 'start') {
     if (req.method !== 'GET') return sendJson(res, 405, { message: 'Method not allowed' });
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) return sendJson(res, 400, { message: 'Missing user_id' });
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
+    if (!userId) return sendJson(res, 401, { message: 'Missing authenticated user context.' });
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
       return sendJson(res, 500, { message: 'Google OAuth client is not configured' });
     }
@@ -271,8 +271,8 @@ export default async function handler(req: Req, res: ServerResponse) {
 
   if (action === 'disconnect') {
     if (req.method !== 'POST') return sendJson(res, 405, { message: 'Method not allowed' });
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) return sendJson(res, 400, { message: 'Missing user_id' });
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
+    if (!userId) return sendJson(res, 401, { message: 'Missing authenticated user context.' });
     disconnectServiceConnection({ userId, serviceSlug });
     return sendJson(res, 200, {
       disconnected: true,
@@ -282,8 +282,8 @@ export default async function handler(req: Req, res: ServerResponse) {
 
   if (action === 'access-token') {
     if (req.method !== 'GET') return sendJson(res, 405, { message: 'Method not allowed' });
-    const userId = resolveUserIdFromRequest(req);
-    if (!userId) return sendJson(res, 400, { message: 'Missing user_id' });
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
+    if (!userId) return sendJson(res, 401, { message: 'Missing authenticated user context.' });
     try {
       const accessToken = await getValidServiceAccessToken({
         userId,

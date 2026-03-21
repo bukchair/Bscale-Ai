@@ -12,7 +12,7 @@ import {
   getValidServiceAccessToken,
   googleServiceCatalog,
   listGoogleServiceConnections,
-  resolveUserIdFromRequest,
+  resolveAuthorizedUserIdFromRequest,
   saveServiceConnection,
   toPublicGoogleServicePayload,
 } from "./src/server/google-store";
@@ -531,10 +531,10 @@ async function startServer() {
       gmail: process.env.GMAIL_REDIRECT_URI,
     };
 
-    app.get(`/api/integrations/${serviceSlug}/start`, (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
+    app.get(`/api/integrations/${serviceSlug}/start`, async (req, res) => {
+      const userId = await resolveAuthorizedUserIdFromRequest(req);
       if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
+        return res.status(401).json({ message: "Missing authenticated user context." });
       }
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
         return res.status(500).json({ message: "Google OAuth client is not configured" });
@@ -606,19 +606,19 @@ async function startServer() {
       }
     });
 
-    app.post(`/api/integrations/${serviceSlug}/disconnect`, express.json(), (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
+    app.post(`/api/integrations/${serviceSlug}/disconnect`, express.json(), async (req, res) => {
+      const userId = await resolveAuthorizedUserIdFromRequest(req);
       if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
+        return res.status(401).json({ message: "Missing authenticated user context." });
       }
       disconnectServiceConnection({ userId, serviceSlug });
       return res.json({ disconnected: true, service: serviceKey });
     });
 
     app.get(`/api/integrations/${serviceSlug}/access-token`, async (req, res) => {
-      const userId = resolveUserIdFromRequest(req);
+      const userId = await resolveAuthorizedUserIdFromRequest(req);
       if (!userId) {
-        return res.status(400).json({ message: "Missing user_id" });
+        return res.status(401).json({ message: "Missing authenticated user context." });
       }
       try {
         const accessToken = await getValidServiceAccessToken({ userId, service: serviceKey });
@@ -631,19 +631,19 @@ async function startServer() {
     });
   }
 
-  app.get("/api/integrations/google/services", (req, res) => {
-    const userId = resolveUserIdFromRequest(req);
+  app.get("/api/integrations/google/services", async (req, res) => {
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
     if (!userId) {
-      return res.status(400).json({ message: "Missing user_id" });
+      return res.status(401).json({ message: "Missing authenticated user context." });
     }
     const items = listGoogleServiceConnections(userId).map(toPublicGoogleServicePayload);
     return res.json({ items });
   });
 
   app.get("/api/integrations/google/discover", async (req, res) => {
-    const userId = resolveUserIdFromRequest(req);
+    const userId = await resolveAuthorizedUserIdFromRequest(req);
     if (!userId) {
-      return res.status(400).json({ message: "Missing user_id" });
+      return res.status(401).json({ message: "Missing authenticated user context." });
     }
 
     const discovered: Record<string, string> = {};

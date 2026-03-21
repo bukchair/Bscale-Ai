@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import axios from 'axios';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export type GoogleServiceSlug = 'google-ads' | 'ga4' | 'search-console' | 'gmail';
 export type GoogleServiceKey = 'google_ads' | 'ga4' | 'search_console' | 'gmail';
@@ -101,6 +102,55 @@ const sanitizeUserId = (value: unknown) => {
   return typeof value === 'string' ? value.trim() : '';
 };
 
+const getHeaderValue = (headers: any, key: string): string => {
+  const direct = headers?.[key];
+  if (typeof direct === 'string') return direct.trim();
+  if (Array.isArray(direct) && typeof direct[0] === 'string') return direct[0].trim();
+  const lower = headers?.[String(key).toLowerCase()];
+  if (typeof lower === 'string') return lower.trim();
+  if (Array.isArray(lower) && typeof lower[0] === 'string') return lower[0].trim();
+  return '';
+};
+
+const resolveFirebaseApiKey = (): string => {
+  return (
+    process.env.FIREBASE_API_KEY ||
+    process.env.VITE_FIREBASE_API_KEY ||
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+    String((firebaseConfig as { apiKey?: string })?.apiKey || '').trim()
+  );
+};
+
+const extractFirebaseIdToken = (req: { headers?: any }): string => {
+  const explicit = getHeaderValue(req.headers, 'x-firebase-id-token');
+  if (explicit) return explicit;
+  const authHeader = getHeaderValue(req.headers, 'authorization');
+  if (!authHeader.toLowerCase().startsWith('bearer ')) return '';
+  const token = authHeader.slice(7).trim();
+  // Google OAuth access tokens usually start with ya29.; avoid treating them as Firebase ID tokens.
+  if (!token || token.startsWith('ya29.')) return '';
+  return token;
+};
+
+const verifyFirebaseIdToken = async (idToken: string): Promise<string> => {
+  const apiKey = resolveFirebaseApiKey();
+  if (!apiKey) {
+    throw new Error('Firebase API key is missing for Google integrations auth validation.');
+  }
+
+  const response = await axios.post(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
+    { idToken },
+    { headers: { 'content-type': 'application/json' } }
+  );
+  const users = Array.isArray((response.data as any)?.users) ? (response.data as any).users : [];
+  const localId = String(users[0]?.localId || '').trim();
+  if (!localId) {
+    throw new Error('Invalid Firebase auth token.');
+  }
+  return localId;
+};
+
 const refreshAccessToken = async (refreshToken: string): Promise<ExchangeTokenResponse> => {
   const clientId = process.env.GOOGLE_CLIENT_ID || '';
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -176,6 +226,34 @@ export const resolveUserIdFromRequest = (req: { query?: any; headers?: any; body
   const fromHeader = sanitizeUserId(req.headers?.['x-user-id']);
   if (fromHeader) return fromHeader;
   return sanitizeUserId(req.body?.user_id);
+};
+
+export const resolveAuthorizedUserIdFromRequest = async (req: {
+  query?: any;
+  headers?: any;
+  body?: any;
+}): Promise<string> => {
+  const requestedUserId = resolveUserIdFromRequest(req);
+  const firebaseIdToken = extractFirebaseIdToken(req);
+
+  if (firebaseIdToken) {
+    try {
+      const authenticatedUid = await verifyFirebaseIdToken(firebaseIdToken);
+      if (requestedUserId && requestedUserId !== authenticatedUid) {
+        return '';
+      }
+      return authenticatedUid;
+    } catch {
+      return '';
+    }
+  }
+
+  const allowLegacyUserId = String(process.env.GOOGLE_INTEGRATIONS_ALLOW_LEGACY_USER_ID || '') === '1';
+  if (allowLegacyUserId && requestedUserId) {
+    return requestedUserId;
+  }
+
+  return '';
 };
 
 export const buildGoogleOAuthUrl = (args: {

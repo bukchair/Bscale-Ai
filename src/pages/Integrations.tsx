@@ -158,6 +158,17 @@ export function Integrations() {
 
   const getActiveUid = () => auth.currentUser?.uid || '';
 
+  const getFirebaseAuthHeaders = async () => {
+    const user = auth.currentUser;
+    if (!user) return {} as Record<string, string>;
+    try {
+      const idToken = await user.getIdToken();
+      return idToken ? { 'x-firebase-id-token': idToken } : {};
+    } catch {
+      return {} as Record<string, string>;
+    }
+  };
+
   const setGoogleServiceLoading = (slug: GoogleServiceSlug, loading: boolean) => {
     setGoogleServiceBusy((prev) => ({ ...prev, [slug]: loading }));
   };
@@ -174,11 +185,14 @@ export function Integrations() {
 
     setGoogleServiceLoading(serviceSlug, true);
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
       const query = new URLSearchParams({
         user_id: uid,
         select_account: selectDifferentAccount ? '1' : '0',
       });
-      const response = await fetch(`/api/integrations/${serviceSlug}/start?${query.toString()}`);
+      const response = await fetch(`/api/integrations/${serviceSlug}/start?${query.toString()}`, {
+        headers: authHeaders,
+      });
       const payload = (await response.json().catch(() => null)) as { url?: string; message?: string } | null;
       if (!response.ok || !payload?.url) {
         throw new Error(payload?.message || t('integrations.oauth.googleStartFailed'));
@@ -206,9 +220,10 @@ export function Integrations() {
     if (!uid) return;
     setGoogleServiceLoading(serviceSlug, true);
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
       const response = await fetch(`/api/integrations/${serviceSlug}/disconnect`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', ...authHeaders },
         body: JSON.stringify({ user_id: uid }),
       });
       const payload = (await response.json().catch(() => null)) as { message?: string } | null;
@@ -420,7 +435,10 @@ export function Integrations() {
 
     setDiscoveringGoogle(true);
     try {
-      const response = await fetch(`/api/integrations/google/discover?user_id=${encodeURIComponent(uid)}`);
+      const authHeaders = await getFirebaseAuthHeaders();
+      const response = await fetch(`/api/integrations/google/discover?user_id=${encodeURIComponent(uid)}`, {
+        headers: authHeaders,
+      });
       const payload = (await response.json().catch(() => null)) as
         | { discovered?: Record<string, string>; message?: string }
         | null;
@@ -642,11 +660,12 @@ export function Integrations() {
     setError(null);
     try {
       if (id === 'google' && !subId) {
+        const authHeaders = await getFirebaseAuthHeaders();
         await Promise.allSettled(
           GOOGLE_SERVICE_ROWS.map((row) =>
             fetch(`/api/integrations/${row.slug}/disconnect`, {
               method: 'POST',
-              headers: { 'content-type': 'application/json' },
+              headers: { 'content-type': 'application/json', ...authHeaders },
               body: JSON.stringify({ user_id: getActiveUid() }),
             })
           )

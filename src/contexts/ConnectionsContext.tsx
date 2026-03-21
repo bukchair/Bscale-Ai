@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useState, useEffect, ReactNode } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, onAuthStateChanged } from '../lib/firebase';
 import { verifyWooCommerceConnection } from '../services/woocommerceService';
 import { fetchMetaAdAccounts } from '../services/metaService';
 import { fetchTikTokCampaigns } from '../services/tiktokService';
@@ -181,13 +181,38 @@ const stripUndefinedDeep = <T,>(value: T): T => {
 export function ConnectionsProvider({ children }: { children: ReactNode }) {
   const [connections, setConnections] = useState<Connection[]>(initialConnections);
 
+  const getFirebaseAuthHeaders = useCallback(async () => {
+    const user =
+      auth.currentUser ||
+      (await new Promise<typeof auth.currentUser>((resolve) => {
+        const timeoutId = window.setTimeout(() => {
+          unsubscribe();
+          resolve(auth.currentUser);
+        }, 3000);
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve(nextUser);
+        });
+      }));
+    if (!user) return {} as Record<string, string>;
+    try {
+      const idToken = await user.getIdToken();
+      return idToken ? { 'x-firebase-id-token': idToken } : {};
+    } catch {
+      return {} as Record<string, string>;
+    }
+  }, []);
+
   const syncGoogleServices = useCallback(async () => {
     const user = auth.currentUser;
     if (!user) return;
 
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
       const response = await fetch(
-        `/api/integrations/google/services?user_id=${encodeURIComponent(user.uid)}`
+        `/api/integrations/google/services?user_id=${encodeURIComponent(user.uid)}`,
+        { headers: authHeaders }
       );
       if (!response.ok) return;
       const payload = (await response.json().catch(() => null)) as { items?: GoogleServiceApiItem[] } | null;
@@ -196,7 +221,7 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn('Failed to sync Google services snapshot:', error);
     }
-  }, []);
+  }, [getFirebaseAuthHeaders]);
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | null = null;
@@ -386,8 +411,10 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       try {
         const userId = auth.currentUser?.uid || '';
         if (userId) {
+          const authHeaders = await getFirebaseAuthHeaders();
           const response = await fetch(
-            `/api/integrations/google/discover?user_id=${encodeURIComponent(userId)}`
+            `/api/integrations/google/discover?user_id=${encodeURIComponent(userId)}`,
+            { headers: authHeaders }
           );
           if (response.ok) {
             const payload = (await response.json().catch(() => null)) as
@@ -494,7 +521,11 @@ export function ConnectionsProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const response = await fetch(`/api/integrations/google/services?user_id=${encodeURIComponent(userId)}`);
+        const authHeaders = await getFirebaseAuthHeaders();
+        const response = await fetch(
+          `/api/integrations/google/services?user_id=${encodeURIComponent(userId)}`,
+          { headers: authHeaders }
+        );
         if (!response.ok) {
           throw new Error('Failed to load Google service statuses');
         }
