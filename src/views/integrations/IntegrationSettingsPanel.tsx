@@ -490,7 +490,141 @@ export function IntegrationSettingsPanel({
                 </>
               )}
 
-              {/* platform fields TikTok/Woo/Shopify — step 2ו */}
+              {/* ── TikTok ── */}
+              {integration.id === 'tiktok' && (
+                <>
+                  <div className="sm:col-span-2">
+                    <button
+                      onClick={onTikTokConnect}
+                      className="w-full flex items-center justify-center gap-2 bg-black text-white py-2 rounded-lg font-bold hover:bg-gray-900 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+                    >
+                      <Video className="w-4 h-4" />
+                      {isConnected ? 'Reconnect TikTok Ads' : 'Connect with TikTok Ads'}
+                    </button>
+                  </div>
+                  {isConnected && (
+                    <div className="sm:col-span-2">
+                      <button
+                        type="button"
+                        onClick={() => onReinstallPlatform('tiktok')}
+                        disabled={reinstallingGoogleAndMeta || reinstallingManagedPlatform === 'tiktok' || isConnecting}
+                        className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-amber-200 text-amber-700 bg-amber-50 rounded-lg text-xs font-bold hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {reinstallingManagedPlatform === 'tiktok' ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        )}
+                        {isHebrew ? 'התקנה מחדש ל-TikTok (ניתוק + חיבור)' : 'Re-install TikTok (disconnect + reconnect)'}
+                      </button>
+                    </div>
+                  )}
+                  {isConnected && (
+                    <>
+                      <div className="sm:col-span-2">
+                        <button
+                          type="button"
+                          onClick={() => onLoadTikTokAccounts(formValues)}
+                          disabled={tiktokAccountsLoading}
+                          className="w-full inline-flex items-center justify-center gap-2 py-1.5 border border-blue-200 text-blue-700 bg-blue-50 rounded-lg text-xs font-bold hover:bg-blue-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {tiktokAccountsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                          {isHebrew ? 'טען/רענן חשבונות מפרסם מ-TikTok' : 'Load/refresh TikTok advertiser accounts'}
+                        </button>
+                        {tiktokAccountsError && <p className="mt-1 text-[11px] text-red-600">{tiktokAccountsError}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.advertiserId')}</label>
+                        {tiktokAccounts.length > 0 ? (
+                          <select
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs bg-white"
+                            value={formValues.tiktokAdvertiserId || ''}
+                            onChange={(e) => onInputChange('tiktokAdvertiserId', e.target.value)}
+                          >
+                            <option value="">{isHebrew ? 'בחר חשבון מפרסם' : 'Select advertiser account'}</option>
+                            {tiktokAccounts.map((account) => (
+                              <option key={account.externalAccountId} value={account.externalAccountId}>
+                                {account.name || account.externalAccountId} ({account.externalAccountId})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="7012345678901234567"
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left"
+                            dir="ltr"
+                            value={formValues.tiktokAdvertiserId || ''}
+                            onChange={(e) => onInputChange('tiktokAdvertiserId', e.target.value)}
+                          />
+                        )}
+                        <p className="mt-1 text-[10px] text-gray-400">
+                          {isHebrew
+                            ? 'הטוקן נשאב אוטומטית דרך OAuth — רק ה-Advertiser ID נדרש.'
+                            : 'Access token is fetched automatically via OAuth — only the Advertiser ID is required.'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ── WooCommerce + Shopify ── */}
+              {(integration.id === 'woocommerce' || integration.id === 'shopify') && (
+                <>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.storeUrl')}</label>
+                    <div className="relative">
+                      <div className={cn('absolute inset-y-0 flex items-center pointer-events-none', dir === 'rtl' ? 'right-2.5' : 'left-2.5')}>
+                        <LinkIcon className="h-3.5 w-3.5 text-gray-400" />
+                      </div>
+                      <input type="url" placeholder="https://mystore.co.il" className={cn('w-full py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left', dir === 'rtl' ? 'pr-9 pl-3' : 'pl-9 pr-3')} dir="ltr" value={formValues.storeUrl || (isConnected ? 'https://mystore.co.il' : '')} onChange={(e) => onInputChange('storeUrl', e.target.value)} />
+                    </div>
+                  </div>
+
+                  {integration.id === 'woocommerce' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.consumerKey')}</label>
+                        <input type="text" placeholder="ck_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.wooKey || (isConnected ? 'ck_1234567890' : '')} onChange={(e) => onInputChange('wooKey', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.consumerSecret')}</label>
+                        <input type="password" placeholder="cs_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.wooSecret || (isConnected ? '••••••••••••••••' : '')} onChange={(e) => onInputChange('wooSecret', e.target.value)} />
+                      </div>
+                      {isConnected && (
+                        <div className="sm:col-span-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (window.confirm(t('integrations.wooResetConfirm') || (language === 'he' ? 'למחוק את החיבור ל-WooCommerce ולהגדיר מחדש?' : 'Delete the WooCommerce connection and reconfigure it?'))) {
+                                await onClearConnectionSettings('woocommerce');
+                                onSetFormValues((prev) => ({ ...prev, storeUrl: '', wooKey: '', wooSecret: '' }));
+                                onSetToast({
+                                  message: t('integrations.wooResetDone') || (language === 'he' ? 'החיבור נוקה. הזן פרטים חדשים למעלה.' : 'Connection cleared. Enter new details above.'),
+                                  type: 'success',
+                                });
+                                setTimeout(() => onSetToast(null), 3000);
+                              }
+                            }}
+                            className="w-full py-2 rounded-lg text-xs font-bold border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {t('integrations.wooResetConnection') || (language === 'he' ? 'מחק חיבור והגדר מחדש' : 'Reset connection and reconfigure')}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {integration.id === 'shopify' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase tracking-wider">{t('integrations.adminAccessToken')}</label>
+                      <input type="password" placeholder="shpat_..." className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xs text-left" dir="ltr" value={formValues.shopifyToken || (isConnected ? '••••••••••••••••' : '')} onChange={(e) => onInputChange('shopifyToken', e.target.value)} />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             {/* action buttons — step 2ז */}
           </div>
