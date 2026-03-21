@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { auth, onAuthStateChanged } from '../../lib/firebase';
+import { normalizeGoogleAdsAccountId } from './integrationUtils';
 import type { Connection } from '../../contexts/ConnectionsContext';
 import type { MetaAssetsPayload } from './integrationUtils';
 import {
@@ -252,16 +254,245 @@ export function useIntegrationsLogic({
     }
   }, [wizardPlatform, wizardStep, wizardValues, completedWizardPlatforms, wizardStorageKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Placeholders for functions added in later steps ──────────────────────
-  // (managed connections — added in ט-3)
-  const _bootstrapManagedSession = async (_timeoutMs?: number): Promise<boolean> => false; // replaced in ט-3
-  const loadManagedMetaAssets = async (_seedValues?: Record<string, string>) => {};         // replaced in ט-3
-  const loadManagedTikTokAccounts = async (_seedValues?: Record<string, string>) => {};     // replaced in ט-3
-  const handleGoogleConnect = async () => {};                                               // replaced in ט-3
-  const handleMetaConnect = async () => {};                                                 // replaced in ט-3
-  const handleTikTokConnect = async () => {};                                               // replaced in ט-3
-  const handleReinstallManagedConnection = async (_platform: 'google' | 'meta' | 'tiktok') => {}; // replaced in ט-3
-  const handleReinstallGoogleAndMeta = async () => {};                                      // replaced in ט-3
+  // ── Managed connections ──────────────────────────────────────────────────
+
+  const bootstrapManagedSession = async (timeoutMs = 3000): Promise<boolean> => {
+    try {
+      const sessionCheck = await fetch(`${API_BASE}/api/connections`, { method: 'GET', cache: 'no-store' });
+      if (sessionCheck.ok) return true;
+    } catch { /* proceed to re-bootstrap */ }
+
+    const currentUser =
+      auth.currentUser ||
+      (await new Promise<import('firebase/auth').User | null>((resolve) => {
+        let settled = false;
+        const timeoutId = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          unsubscribe();
+          resolve(auth.currentUser);
+        }, timeoutMs);
+        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve(nextUser);
+        });
+      }));
+
+    if (!currentUser) return false;
+    const idToken = await currentUser.getIdToken(true);
+    const bootstrapRes = await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    return bootstrapRes.ok;
+  };
+
+  const persistManagedGoogleSelection = async (googleAdsId: string) => {
+    const normalizedId = normalizeGoogleAdsAccountId(googleAdsId);
+    if (!normalizedId) return;
+    await bootstrapManagedSession();
+    await fetch(`${API_BASE}/api/connections/google-ads/select-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountIds: [normalizedId] }),
+    });
+  };
+
+  const persistManagedTikTokSelection = async (advertiserId: string) => {
+    const id = String(advertiserId || '').trim();
+    if (!id) return;
+    await bootstrapManagedSession();
+    await fetch(`${API_BASE}/api/connections/tiktok/select-accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountIds: [id] }),
+    });
+  };
+
+  const loadManagedTikTokAccounts = async (seedValues?: Record<string, string>) => {
+    await bootstrapManagedSession();
+    setTiktokAccountsLoading(true);
+    setTiktokAccountsError(null);
+    try {
+      let response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
+        method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store',
+      });
+      if (response.status === 401) {
+        await bootstrapManagedSession(8000);
+        response = await fetch(`${API_BASE}/api/connections/tiktok/accounts`, {
+          method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store',
+        });
+      }
+      const payload = await response.json() as {
+        success?: boolean; message?: string;
+        data?: { accounts?: Array<{ externalAccountId: string; name?: string }> };
+      };
+      if (!response.ok || !payload?.success) {
+        setTiktokAccountsError(payload?.message || 'Failed to load TikTok advertiser accounts.');
+        return;
+      }
+      const accounts = payload?.data?.accounts ?? [];
+      setTiktokAccounts(accounts);
+      if (!accounts.length) return;
+      setFormValues((prev) => {
+        const source = seedValues || prev;
+        if (String(source.tiktokAdvertiserId || '').trim()) return prev;
+        return { ...prev, tiktokAdvertiserId: accounts[0].externalAccountId };
+      });
+    } catch (err) {
+      setTiktokAccountsError(err instanceof Error ? err.message : 'Failed to load TikTok advertiser accounts.');
+    } finally {
+      setTiktokAccountsLoading(false);
+    }
+  };
+
+  const loadManagedMetaAssets = async (seedValues?: Record<string, string>) => {
+    await bootstrapManagedSession();
+    setMetaAssetsLoading(true);
+    setMetaAssetsError(null);
+    try {
+      const response = await fetch(`${API_BASE}/api/connections/meta/assets`, {
+        method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store',
+      });
+      const text = await response.text();
+      let payload: { success?: boolean; message?: string; data?: MetaAssetsPayload } | null = null;
+      try { payload = text ? JSON.parse(text) : null; } catch { payload = null; }
+
+      if (!response.ok || !payload?.success || !payload?.data) {
+        throw new Error(payload?.message || `Failed to load Meta assets (${response.status}).`);
+      }
+      const assets = payload.data;
+      setMetaAssets(assets);
+      setFormValues((prev) => {
+        const source = seedValues || prev;
+        const next = { ...prev };
+        if (!String(source.metaAdsId || '').trim() && assets.defaultAdAccountId) next.metaAdsId = assets.defaultAdAccountId;
+        if (!String(source.businessId || '').trim() && assets.defaultBusinessId) next.businessId = assets.defaultBusinessId;
+        if (!String(source.messageAccountId || '').trim() && assets.defaultMessageAccountId) next.messageAccountId = assets.defaultMessageAccountId;
+        if (!String(source.pixelId || '').trim() && assets.defaultPixelId) next.pixelId = assets.defaultPixelId;
+        return next;
+      });
+    } catch (err) {
+      setMetaAssets(null);
+      setMetaAssetsError(err instanceof Error ? err.message : 'Failed to load Meta assets.');
+    } finally {
+      setMetaAssetsLoading(false);
+    }
+  };
+
+  const startManagedOAuth = async (platformSlug: 'google-ads' | 'meta' | 'tiktok', failureMessage: string) => {
+    await bootstrapManagedSession();
+    const parsePayload = async (res: Response) => {
+      const text = await res.text();
+      try { return text ? JSON.parse(text) : null; } catch { return null; }
+    };
+    let response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
+      method: 'GET', headers: { accept: 'application/json' }, cache: 'no-store',
+    });
+    let payload = await parsePayload(response);
+    if (response.status === 405) {
+      response = await fetch(`${API_BASE}/api/connections/${platformSlug}/start`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}),
+      });
+      payload = await parsePayload(response);
+    }
+    if (!response.ok || !payload?.success || !payload?.data?.authorizationUrl) {
+      throw new Error(payload?.message || `${failureMessage} (${response.status})`);
+    }
+    window.location.assign(payload.data.authorizationUrl);
+  };
+
+  const handleTikTokConnect = async () => {
+    if (blockIfReadOnly()) return;
+    try {
+      await startManagedOAuth('tiktok', 'Failed to start TikTok authentication');
+    } catch (err) {
+      setToast({ message: err instanceof Error && err.message ? err.message : 'Failed to start TikTok authentication', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
+
+  const handleMetaConnect = async () => {
+    if (blockIfReadOnly()) return;
+    try {
+      await startManagedOAuth('meta', 'Failed to start Meta authentication');
+    } catch (err) {
+      setToast({ message: err instanceof Error && err.message ? err.message : 'Failed to start Meta authentication', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
+
+  const handleGoogleConnect = async () => {
+    if (blockIfReadOnly()) return;
+    try {
+      await startManagedOAuth('google-ads', 'Failed to start Google authentication');
+    } catch (err) {
+      setToast({ message: err instanceof Error && err.message ? err.message : 'Failed to start Google authentication', type: 'error' });
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
+
+  const handleReinstallManagedConnection = async (platform: 'google' | 'meta' | 'tiktok') => {
+    if (blockIfReadOnly()) return;
+    const confirmMessage =
+      platform === 'google'
+        ? isHebrew ? 'לבצע התקנה מחדש לחיבור Google? הפעולה תנתק את החיבור הנוכחי ותפתח התחברות מחדש.' : 'Re-install Google connection? This will disconnect the current Google link and start OAuth again.'
+        : platform === 'meta'
+        ? isHebrew ? 'לבצע התקנה מחדש לחיבור Meta? הפעולה תנתק את החיבור הנוכחי ותפתח התחברות מחדש.' : 'Re-install Meta connection? This will disconnect the current Meta link and start OAuth again.'
+        : isHebrew ? 'לבצע התקנה מחדש לחיבור TikTok? הפעולה תנתק את החיבור הנוכחי ותפתח התחברות מחדש.' : 'Re-install TikTok connection? This will disconnect the current TikTok link and start OAuth again.';
+    if (!window.confirm(confirmMessage)) return;
+    setError(null); setSuccess(null);
+    setReinstallingManagedPlatform(platform);
+    try {
+      await clearConnectionSettings(platform);
+      setExpandedId(null);
+      setFormValues({});
+      if (platform === 'google') await startManagedOAuth('google-ads', 'Failed to start Google authentication');
+      else if (platform === 'meta') await startManagedOAuth('meta', 'Failed to start Meta authentication');
+      else await startManagedOAuth('tiktok', 'Failed to start TikTok authentication');
+    } catch (err) {
+      setToast({
+        message: err instanceof Error && err.message ? err.message : isHebrew ? 'התקנה מחדש נכשלה. נסה שוב.' : 'Re-install failed. Please try again.',
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setReinstallingManagedPlatform(null);
+    }
+  };
+
+  const handleReinstallGoogleAndMeta = async () => {
+    if (blockIfReadOnly()) return;
+    const confirmMessage = isHebrew
+      ? 'לבצע התקנה מחדש גם ל-Google וגם ל-Meta? הפעולה תמחק את החיבורים הקיימים ותתחיל התחברות מחדש.'
+      : 'Re-install both Google and Meta? This will delete existing connections and start OAuth setup again.';
+    if (!window.confirm(confirmMessage)) return;
+    setError(null); setSuccess(null);
+    setReinstallingGoogleAndMeta(true);
+    try {
+      await clearConnectionSettings('google');
+      await clearConnectionSettings('meta');
+      setExpandedId(null);
+      setFormValues({});
+      setToast({
+        message: isHebrew ? 'החיבורים הישנים נמחקו. ממשיך להתחברות Google מחדש...' : 'Previous connections deleted. Continuing with Google re-authentication...',
+        type: 'success',
+      });
+      await startManagedOAuth('google-ads', 'Failed to start Google authentication');
+    } catch (err) {
+      setToast({
+        message: err instanceof Error && err.message ? err.message : isHebrew ? 'התקנה מחדש ל-Google+Meta נכשלה. נסה שוב.' : 'Google+Meta re-install failed. Please retry.',
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 3500);
+    } finally {
+      setReinstallingGoogleAndMeta(false);
+    }
+  };
 
   // (form handlers — added in ט-4)
   const handleMigrateAi = async () => {};                                                   // replaced in ט-4
