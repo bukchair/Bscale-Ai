@@ -225,7 +225,7 @@ const lookupOrCreateSharedSet = async (
   });
 
   if (lookup.response.ok) {
-    const rows = Array.isArray((lookup.parsed as any)?.results) ? (lookup.parsed as any).results : [];
+    const rows = Array.isArray(((lookup.parsed as Record<string, unknown>))?.results) ? ((lookup.parsed as Record<string, unknown>)).results : [];
     const sharedSet = rows[0]?.sharedSet || rows[0]?.shared_set;
     const resourceName = String(sharedSet?.resourceName || sharedSet?.resource_name || '').trim();
     if (resourceName) {
@@ -250,8 +250,8 @@ const lookupOrCreateSharedSet = async (
   if (!created.response.ok) {
     throw new Error(toErrorMessage(created.response.status, created.raw, created.parsed));
   }
-  const resourceName = Array.isArray((created.parsed as any)?.results)
-    ? String((created.parsed as any).results[0]?.resourceName || '')
+  const resourceName = Array.isArray(((created.parsed as Record<string, unknown>))?.results)
+    ? String(((created.parsed as Record<string, unknown>)).results[0]?.resourceName || '')
     : '';
   if (!resourceName) {
     throw new Error('Shared negative keyword list was created without resource name.');
@@ -439,8 +439,8 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const resourceName = Array.isArray((result.parsed as any)?.results)
-        ? String((result.parsed as any).results[0]?.resourceName || '')
+      const resourceName = Array.isArray(((result.parsed as Record<string, unknown>))?.results)
+        ? String(((result.parsed as Record<string, unknown>)).results[0]?.resourceName || '')
         : '';
       applied.push({
         term: item.term,

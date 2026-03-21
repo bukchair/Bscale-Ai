@@ -72,7 +72,7 @@ export function useProfitability({ connections, startDate, endDate, periodLabel 
         }
 
         const connectedCampaigns = unifiedCampaignRows
-          .map((row: any) => {
+          .map((row: Record<string, unknown>) => {
             const platformRaw = String(row?.platform || '');
             const platform =
               platformRaw === 'Google' || platformRaw === 'Meta' || platformRaw === 'TikTok'

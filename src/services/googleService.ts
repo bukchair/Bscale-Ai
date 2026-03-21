@@ -151,22 +151,27 @@ export async function fetchGoogleSearchTerms(
   const rows = Array.isArray(data.results) ? data.results : [];
 
   return rows
-    .map((row: any) => {
-      const term = String(row?.searchTermView?.searchTerm || '').trim();
+    .map((row: Record<string, unknown>) => {
+      const searchTermView = row?.searchTermView as Record<string, unknown> | undefined;
+      const campaign = row?.campaign as Record<string, unknown> | undefined;
+      const adGroup = row?.adGroup as Record<string, unknown> | undefined;
+      const adGroupAlt = row?.ad_group as Record<string, unknown> | undefined;
+      const metrics = row?.metrics as Record<string, unknown> | undefined;
+      const term = String(searchTermView?.searchTerm || '').trim();
       if (!term) return null;
 
-      const campaignId = String(row?.campaign?.id || '').trim();
-      const campaignName = String(row?.campaign?.name || '').trim();
-      const adGroupId = String(row?.adGroup?.id || row?.ad_group?.id || '').trim();
-      const adGroupName = String(row?.adGroup?.name || row?.ad_group?.name || '').trim();
-      const clicks = Number(row?.metrics?.clicks || 0);
-      const impressions = Number(row?.metrics?.impressions || 0);
+      const campaignId = String(campaign?.id || '').trim();
+      const campaignName = String(campaign?.name || '').trim();
+      const adGroupId = String(adGroup?.id || adGroupAlt?.id || '').trim();
+      const adGroupName = String(adGroup?.name || adGroupAlt?.name || '').trim();
+      const clicks = Number(metrics?.clicks || 0);
+      const impressions = Number(metrics?.impressions || 0);
       const ctr =
-        Number(row?.metrics?.ctr || 0) ||
+        Number(metrics?.ctr || 0) ||
         (impressions > 0 ? clicks / impressions : 0);
-      const cost = Number(row?.metrics?.costMicros || 0) / 1_000_000;
-      const conversions = Number(row?.metrics?.conversions || 0);
-      const conversionValue = Number(row?.metrics?.conversionsValue || 0);
+      const cost = Number(metrics?.costMicros || 0) / 1_000_000;
+      const conversions = Number(metrics?.conversions || 0);
+      const conversionValue = Number(metrics?.conversionsValue || 0);
       const roas = cost > 0 ? conversionValue / cost : 0;
 
       const status =

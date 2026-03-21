@@ -34,7 +34,7 @@ export function Leads() {
       (snapshot) => {
         const items = snapshot.docs.map((docSnap) => ({
           id: docSnap.id,
-          ...(docSnap.data() as any),
+          ...(docSnap.data() as Record<string, unknown>),
         })) as SalesLeadRow[];
         setLeads(items);
         setLoading(false);

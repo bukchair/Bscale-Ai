@@ -1,9 +1,25 @@
-import { Prisma } from '@prisma/client';
+import { Platform, Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/db/prisma';
 import { toPrismaJson } from '@/src/lib/integrations/utils/prisma-json';
-import type { UnifiedDataLayer } from '@/src/lib/unified-data/types';
+import type { UnifiedDataLayer, UnifiedMetricSnapshot } from '@/src/lib/unified-data/types';
 
 const toDecimal = (value: number | undefined | null) => new Prisma.Decimal(Number(value || 0));
+
+const PLATFORM_MAP: Record<string, Platform> = {
+  Google: Platform.GOOGLE_ADS,
+  Meta: Platform.META,
+  TikTok: Platform.TIKTOK,
+  GA4: Platform.GA4,
+  SearchConsole: Platform.SEARCH_CONSOLE,
+};
+
+const toPlatformEnum = (platform: string): Platform =>
+  PLATFORM_MAP[platform] ?? (platform.toUpperCase() as Platform);
+
+type MetricWithConversions = UnifiedMetricSnapshot & {
+  conversions?: number;
+  conversionValue?: number;
+};
 
 export const unifiedRepo = {
   async upsertLayer(userId: string, layer: UnifiedDataLayer) {
@@ -13,7 +29,7 @@ export const unifiedRepo = {
         const account = await tx.connectedAccount.findFirst({
           where: {
             userId,
-            platform: campaign.platform === 'Google' ? 'GOOGLE_ADS' : campaign.platform.toUpperCase() as any,
+            platform: toPlatformEnum(campaign.platform),
             externalAccountId: accountExternalId,
           },
           select: {
@@ -26,14 +42,14 @@ export const unifiedRepo = {
         await tx.unifiedCampaign.upsert({
           where: {
             platform_connectedAccountId_externalCampaignId: {
-              platform: campaign.platform === 'Google' ? 'GOOGLE_ADS' : campaign.platform.toUpperCase() as any,
+              platform: toPlatformEnum(campaign.platform),
               connectedAccountId: account.id,
               externalCampaignId: campaign.externalId,
             },
           },
           create: {
             userId,
-            platform: campaign.platform === 'Google' ? 'GOOGLE_ADS' : campaign.platform.toUpperCase() as any,
+            platform: toPlatformEnum(campaign.platform),
             connectionId: account.platformConnectionId,
             connectedAccountId: account.id,
             externalCampaignId: campaign.externalId,
@@ -56,11 +72,11 @@ export const unifiedRepo = {
       for (const metric of layer.metrics) {
         if (metric.entityType !== 'campaign') continue;
         const externalCampaignId = metric.entityId.split(':').pop() || '';
-        const platform = metric.platform === 'Google' ? 'GOOGLE_ADS' : metric.platform.toUpperCase();
+        const platform = toPlatformEnum(metric.platform);
         const campaign = await tx.unifiedCampaign.findFirst({
           where: {
             userId,
-            platform: platform as any,
+            platform,
             externalCampaignId,
           },
           select: { id: true },
@@ -83,16 +99,16 @@ export const unifiedRepo = {
             impressions: Math.round(metric.impressions || 0),
             clicks: Math.round(metric.clicks || 0),
             spend: toDecimal(metric.spend),
-            conversions: toDecimal((metric as any).conversions || 0),
-            revenue: toDecimal((metric as any).conversionValue || 0),
+            conversions: toDecimal((metric as MetricWithConversions).conversions || 0),
+            revenue: toDecimal((metric as MetricWithConversions).conversionValue || 0),
             raw: toPrismaJson(metric as unknown as Record<string, unknown>),
           },
           update: {
             impressions: Math.round(metric.impressions || 0),
             clicks: Math.round(metric.clicks || 0),
             spend: toDecimal(metric.spend),
-            conversions: toDecimal((metric as any).conversions || 0),
-            revenue: toDecimal((metric as any).conversionValue || 0),
+            conversions: toDecimal((metric as MetricWithConversions).conversions || 0),
+            revenue: toDecimal((metric as MetricWithConversions).conversionValue || 0),
             raw: toPrismaJson(metric as unknown as Record<string, unknown>),
           },
         });
@@ -216,7 +232,7 @@ export const unifiedRepo = {
     const campaigns = await prisma.unifiedCampaign.findMany({
       where: {
         userId,
-        ...(options.platform ? { platform: options.platform as any } : {}),
+        ...(options.platform ? { platform: toPlatformEnum(options.platform) } : {}),
       },
       select: {
         id: true,
@@ -289,7 +305,7 @@ export const unifiedRepo = {
         },
         ...(options.campaignId ? { unifiedCampaignId: options.campaignId } : {}),
         ...(options.platform
-          ? { campaign: { platform: options.platform as any } }
+          ? { campaign: { platform: toPlatformEnum(options.platform) } }
           : {}),
       },
       select: {

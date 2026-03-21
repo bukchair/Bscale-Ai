@@ -24,7 +24,7 @@ type LoadUnifiedCampaignLayerInput = {
 
 type LoadUnifiedCampaignLayerResult = {
   layer: UnifiedDataLayer;
-  campaignRows: any[];
+  campaignRows: unknown[];
   errors: Partial<Record<'Google' | 'Meta' | 'TikTok', string>>;
 };
 

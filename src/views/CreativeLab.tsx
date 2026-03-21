@@ -555,7 +555,7 @@ export function CreativeLab() {
                 </div>
                 
                 <div className="space-y-4">
-                  {generatedContent.options.map((option: any, idx: number) => (
+                  {generatedContent.options.map((option, idx: number) => (
                     <div key={idx} className="p-4 border border-gray-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow relative">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                         <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase">אופציה {idx + 1}</span>
@@ -651,7 +651,7 @@ export function CreativeLab() {
                 </div>
                 
                 <div className="space-y-4">
-                  {generatedContent.script.map((scene: any, idx: number) => (
+                  {generatedContent.script.map((scene, idx: number) => (
                     <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border border-gray-100 rounded-xl bg-gray-50/50">
                       <div className="md:col-span-2">
                         <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase">{scene.time}</span>

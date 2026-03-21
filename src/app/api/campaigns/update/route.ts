@@ -42,7 +42,7 @@ const extractErrorMessage = async (response: Response) => {
   const raw = await response.text();
   if (!raw) return `Request failed with status ${response.status}`;
   try {
-    const parsed = JSON.parse(raw) as Record<string, any>;
+    const parsed = JSON.parse(raw) as { error?: { message?: string; details?: Array<{ message?: string }> }; message?: string; data?: { message?: string } };
     return (
       parsed?.error?.message ||
       parsed?.error?.details?.[0]?.message ||
@@ -93,9 +93,9 @@ const updateGoogleAdsInCampaign = async (input: {
   if (!searchResponse.ok) {
     throw new Error(await extractErrorMessage(searchResponse));
   }
-  const searchPayload = (await searchResponse.json().catch(() => ({}))) as Record<string, any>;
+  const searchPayload = (await searchResponse.json().catch(() => ({}))) as Record<string, unknown>;
   const resourceNames = (Array.isArray(searchPayload?.results) ? searchPayload.results : [])
-    .map((row: any) => String(row?.adGroupAd?.resourceName || '').trim())
+    .map((row: Record<string, unknown>) => String((row?.adGroupAd as Record<string, unknown>)?.resourceName || '').trim())
     .filter(Boolean);
   if (resourceNames.length === 0) {
     return { updatedAdsCount: 0, adsUpdateFailures: 0 };
@@ -126,7 +126,7 @@ const updateGoogleAdsInCampaign = async (input: {
       adsUpdateFailures += chunk.length;
       continue;
     }
-    const mutatePayload = (await mutateResponse.json().catch(() => ({}))) as Record<string, any>;
+    const mutatePayload = (await mutateResponse.json().catch(() => ({}))) as Record<string, unknown>;
     const updatedInChunk = Array.isArray(mutatePayload?.results)
       ? mutatePayload.results.length
       : chunk.length;
@@ -210,7 +210,7 @@ const updateGoogleCampaign = async (
     if (!budgetLookupResponse.ok) {
       throw new Error(await extractErrorMessage(budgetLookupResponse));
     }
-    const budgetLookupPayload = (await budgetLookupResponse.json().catch(() => ({}))) as Record<string, any>;
+    const budgetLookupPayload = (await budgetLookupResponse.json().catch(() => ({}))) as Record<string, unknown>;
     const budgetResourceName = String(
       budgetLookupPayload?.results?.[0]?.campaign?.campaignBudget || ''
     ).trim();
@@ -309,9 +309,9 @@ const updateMetaCampaign = async (
       headers: { authorization: `Bearer ${accessToken}` },
     });
     if (adsResponse.ok) {
-      const adsPayload = (await adsResponse.json().catch(() => ({}))) as Record<string, any>;
+      const adsPayload = (await adsResponse.json().catch(() => ({}))) as Record<string, unknown>;
       const adIds = (Array.isArray(adsPayload?.data) ? adsPayload.data : [])
-        .map((ad: any) => String(ad?.id || '').trim())
+        .map((ad: Record<string, unknown>) => String(ad?.id || '').trim())
         .filter(Boolean);
       for (const adId of adIds) {
         const adForm = new URLSearchParams();
@@ -397,7 +397,7 @@ const updateTikTokCampaign = async (
     },
     body: JSON.stringify(payload),
   });
-  const parsed = (await response.json().catch(() => null)) as Record<string, any> | null;
+  const parsed = (await response.json().catch(() => null)) as Record<string, unknown> | null;
   if (!response.ok || Number(parsed?.code) !== 0) {
     throw new Error(String(parsed?.message || `TikTok update failed (${response.status}).`));
   }
@@ -420,9 +420,10 @@ const updateTikTokCampaign = async (
         },
       }),
     });
-    const adsListPayload = (await adsListResponse.json().catch(() => null)) as Record<string, any> | null;
+    const adsListPayload = (await adsListResponse.json().catch(() => null)) as Record<string, unknown> | null;
     if (adsListResponse.ok && Number(adsListPayload?.code) === 0) {
-      const adRows = Array.isArray(adsListPayload?.data?.list) ? adsListPayload?.data?.list : [];
+      const adsListData = adsListPayload?.data as Record<string, unknown> | undefined;
+      const adRows = Array.isArray(adsListData?.list) ? (adsListData!.list as Record<string, unknown>[]) : [];
       for (const adRow of adRows) {
         const adId = String(adRow?.ad_id || adRow?.id || '').trim();
         if (!adId) continue;
@@ -438,7 +439,7 @@ const updateTikTokCampaign = async (
             operation_status: toTikTokStatus(body.status),
           }),
         });
-        const adUpdatePayload = (await adUpdateResponse.json().catch(() => null)) as Record<string, any> | null;
+        const adUpdatePayload = (await adUpdateResponse.json().catch(() => null)) as Record<string, unknown> | null;
         if (adUpdateResponse.ok && Number(adUpdatePayload?.code) === 0) updatedAdsCount += 1;
         else adsUpdateFailures += 1;
       }

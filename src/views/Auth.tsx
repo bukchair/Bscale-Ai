@@ -30,13 +30,13 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
       await signInWithPopup(auth, googleProvider);
       trackEvent('bscale_login_google_success', { page_path: window.location.pathname });
       // App.tsx will handle the redirect/state change via onAuthStateChanged
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Google Login Error:", err);
       trackEvent('bscale_login_google_error', {
         page_path: window.location.pathname,
-        error_message: err?.message || 'unknown_error',
+        error_message: err instanceof Error ? err.message : 'unknown_error',
       });
-      setError(err.message || (language === 'he' ? 'אירעה שגיאה בהתחברות עם גוגל.' : 'Google sign-in failed. Please try again.'));
+      setError(err instanceof Error ? err.message :(language === 'he' ? 'אירעה שגיאה בהתחברות עם גוגל.' : 'Google sign-in failed. Please try again.'));
     } finally {
       setIsLoading(false);
     }

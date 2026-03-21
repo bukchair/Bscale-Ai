@@ -4,10 +4,11 @@ import React from 'react';
 import { ChevronDown, ChevronUp, Loader2, Pencil } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { MetaAdset } from '../../services/metaService';
+import type { CampaignRow } from './types';
 import { toAmount, normalizeCampaignStatus, getStatusBadgeClass, formatPercent, hasMetaMetrics, hasGoogleMetrics } from './utils';
 
 type CampaignTableProps = {
-  filteredAndSortedCampaigns: any[];
+  filteredAndSortedCampaigns: CampaignRow[];
   platforms: string[];
   statuses: string[];
   searchQuery: string;
@@ -35,9 +36,9 @@ type CampaignTableProps = {
   setStatusFilter: (v: string) => void;
   setSortField: (v: string) => void;
   setSortOrder: React.Dispatch<React.SetStateAction<'asc' | 'desc'>>;
-  toggleCampaignExpand: (campaign: any) => void;
-  openEditCampaign: (campaign: any) => void;
-  isEditablePlatformCampaign: (campaign: any) => boolean;
+  toggleCampaignExpand: (campaign: CampaignRow) => void;
+  openEditCampaign: (campaign: CampaignRow) => void;
+  isEditablePlatformCampaign: (campaign: CampaignRow) => boolean;
   formatCurrency: (amount: number) => string;
   t: (key: string) => string;
 };
@@ -196,21 +197,24 @@ export function CampaignTable({
                     const isExpanded = expandedCampaigns.has(campaignRowId);
                     const isLoadingAdsets = loadingAdsetsCampaignId === campaignRowId;
                     const campaignAdsets = adsetsByCampaignId[campaignRowId] || [];
-                    const metaFacebookSpend = toAmount(campaign?.metaChannels?.facebook?.spend);
-                    const metaInstagramSpend = toAmount(campaign?.metaChannels?.instagram?.spend);
-                    const metaWhatsappSpend = toAmount(campaign?.metaChannels?.whatsapp?.spend);
-                    const metaWhatsappConversations = toAmount(campaign?.metaChannels?.whatsapp?.conversations);
+                    type MetaChannels = { facebook?: { spend?: unknown }; instagram?: { spend?: unknown }; whatsapp?: { spend?: unknown; conversations?: unknown; enabled?: unknown } };
+                    const metaChannels = campaign?.metaChannels as MetaChannels | undefined;
+                    const metaFacebookSpend = toAmount(metaChannels?.facebook?.spend);
+                    const metaInstagramSpend = toAmount(metaChannels?.instagram?.spend);
+                    const metaWhatsappSpend = toAmount(metaChannels?.whatsapp?.spend);
+                    const metaWhatsappConversations = toAmount(metaChannels?.whatsapp?.conversations);
                     const hasMetaChannels =
                       platform === 'Meta' &&
                       (metaFacebookSpend > 0 ||
                         metaInstagramSpend > 0 ||
-                        Boolean(campaign?.metaChannels?.whatsapp?.enabled));
-                    const typeOrObjective =
+                        Boolean(metaChannels?.whatsapp?.enabled));
+                    const typeOrObjective = String(
                       platform === 'Meta'
                         ? campaign.objective || '—'
                         : platform === 'Google'
                           ? campaign.advertisingChannelSubType || campaign.advertisingChannelType || '—'
-                          : campaign.campaignType || campaign.objective || '—';
+                          : campaign.campaignType || campaign.objective || '—'
+                    );
                     const hasMetrics =
                       platform === 'Meta'
                         ? hasMetaMetrics(campaign)
@@ -237,7 +241,7 @@ export function CampaignTable({
                           </td>
                           <td className="px-4 py-2.5 text-sm font-medium text-gray-900">
                             <div className="max-w-[200px] truncate" title={String(campaign?.name || campaign?.campaignName || '')}>
-                              {campaign?.name || campaign?.campaignName || (isHebrew ? 'ללא שם' : 'Unnamed')}
+                              {String(campaign?.name || campaign?.campaignName || (isHebrew ? 'ללא שם' : 'Unnamed'))}
                             </div>
                             {hasMetaChannels && (
                               <div className="mt-1 flex flex-wrap gap-1">
@@ -247,7 +251,7 @@ export function CampaignTable({
                                 <span className="inline-flex items-center rounded-full bg-pink-50 text-pink-700 border border-pink-200 px-1.5 py-0.5 text-[10px] font-semibold">
                                   IG {metaInstagramSpend > 0 ? formatCurrency(metaInstagramSpend) : '—'}
                                 </span>
-                                {campaign?.metaChannels?.whatsapp?.enabled && (
+                                {metaChannels?.whatsapp?.enabled && (
                                   <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold">
                                     WA {metaWhatsappSpend > 0 ? formatCurrency(metaWhatsappSpend) : ''}
                                     {metaWhatsappConversations > 0 ? ` · ${Math.round(metaWhatsappConversations)}` : ''}

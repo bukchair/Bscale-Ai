@@ -50,7 +50,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const resolveFromLanguage = (lang: Language): string | null => {
       const langTranslations = translations[lang as keyof typeof translations];
       if (!langTranslations) return null;
-      let value: any = langTranslations;
+      let value: unknown = langTranslations;
       for (const k of keys) {
         if (value && typeof value === 'object' && k in value) {
           value = value[k];

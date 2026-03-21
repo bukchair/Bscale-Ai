@@ -123,7 +123,7 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
           });
 
         const allRows: CampaignBudgetRow[] = unifiedCampaignRows
-          .map((row: any) => {
+          .map((row: Record<string, unknown>) => {
             const platformRaw = String(row?.platform || '').toLowerCase();
             const platform: PlatformId | null =
               platformRaw === 'google'

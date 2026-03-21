@@ -1,6 +1,7 @@
 import { prisma } from '@/src/lib/db/prisma';
 import { providerFactory } from '@/src/lib/integrations/core/provider-factory';
 import { tokenService } from '@/src/lib/integrations/services/token-service';
+import type { Platform } from '@/src/lib/integrations/core/types';
 import type { RefreshTokensPayload } from '@/src/lib/sync/queue/payloads';
 
 export const processRefreshTokens = async (payload: RefreshTokensPayload) => {
@@ -32,7 +33,7 @@ export const processRefreshTokens = async (payload: RefreshTokensPayload) => {
   let failed = 0;
   for (const connection of connections) {
     try {
-      const provider = providerFactory.get(connection.platform as any);
+      const provider = providerFactory.get(connection.platform as Platform);
       const tokenSet = await provider.refreshToken({
         connectionId: connection.id,
         userId: connection.userId,

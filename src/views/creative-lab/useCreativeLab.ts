@@ -1,4 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+
+type GeneratedCreativeContent = {
+  type?: string;
+  url?: string;
+  variations?: string[];
+  bgPrompt?: string;
+  options?: Array<{ headline: string; primaryText: string; description: string; [key: string]: unknown }>;
+  script?: Array<{ time?: string; visual?: string; audio?: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
 import { generateCreativeCopy, getAIKeysFromConnections } from '../../lib/gemini';
 import { auth, saveAdToFirestore, getSavedAds, type SavedAd } from '../../lib/firebase';
 import { fetchWooCommerceProducts } from '../../services/woocommerceService';
@@ -44,7 +54,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
   const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [activeTab, setActiveTab] = useState<'image' | 'copy' | 'video'>('image');
-  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [generatedContent, setGeneratedContent] = useState<GeneratedCreativeContent | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<CreativeProduct | null>(null);
   const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
   const [products, setProducts] = useState<CreativeProduct[]>(mockProductsFallback);
@@ -91,15 +101,15 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
     fetchWooCommerceProducts(storeUrl, wooKey, wooSecret)
       .then((list) => {
         setProducts(
-          list.map((p: any) => {
+          list.map((p: Record<string, unknown>) => {
             const images: string[] = Array.isArray(p.images)
-              ? p.images.map((img: any) => img?.src).filter(Boolean)
+              ? (p.images as Record<string, unknown>[]).map((img) => String(img?.src || '')).filter(Boolean)
               : [];
             return {
-              id: p.id,
-              name: stripHtmlToText(p.name),
-              shortDesc: stripHtmlToText(p.short_description),
-              longDesc: stripHtmlToText(p.description),
+              id: Number(p.id),
+              name: stripHtmlToText(String(p.name || '')),
+              shortDesc: stripHtmlToText(String(p.short_description || '')),
+              longDesc: stripHtmlToText(String(p.description || '')),
               price: p.price ? String(p.price) : '',
               imageUrl: images[0] || null,
               galleryUrls: images.slice(1, 4),
@@ -271,7 +281,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
   };
 
   const updateCopyOption = (idx: number, field: 'headline' | 'primaryText' | 'description', value: string) => {
-    setGeneratedContent((prev: any) => {
+    setGeneratedContent((prev) => {
       if (!prev?.options) return prev;
       const next = { ...prev, options: [...prev.options] };
       next.options[idx] = { ...next.options[idx], [field]: value };

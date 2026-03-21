@@ -856,7 +856,7 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{notif.title}</p>
                             <div className="flex items-center gap-2">
-                              {(notif as any).unread && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                              {notif.unread && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
                               <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">{notif.time}</span>
                             </div>
                           </div>

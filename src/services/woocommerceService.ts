@@ -310,7 +310,7 @@ export interface WooCommerceOrder {
     total_tax: string;
     sku?: string;
   }[];
-  meta_data?: { key: string; value: any }[];
+  meta_data?: { key: string; value: unknown }[];
 }
 
 export async function fetchWooCommerceSalesByRange(
@@ -462,17 +462,17 @@ export async function fetchWooCommerceOrdersByRange(
     return 0;
   };
 
-  const parseRows = (payload: unknown): any[] => {
-    if (Array.isArray(payload)) return payload;
+  const parseRows = (payload: unknown): Record<string, unknown>[] => {
+    if (Array.isArray(payload)) return payload as Record<string, unknown>[];
     if (payload && typeof payload === 'object') {
       const asObj = payload as Record<string, unknown>;
-      if (Array.isArray(asObj.orders)) return asObj.orders as any[];
-      if (Array.isArray(asObj.data)) return asObj.data as any[];
+      if (Array.isArray(asObj.orders)) return asObj.orders as Record<string, unknown>[];
+      if (Array.isArray(asObj.data)) return asObj.data as Record<string, unknown>[];
     }
     return [];
   };
 
-  const fetchPage = async (page: number, perPage: number): Promise<any[]> => {
+  const fetchPage = async (page: number, perPage: number): Promise<Record<string, unknown>[]> => {
     const endpoint =
       `orders?per_page=${perPage}&page=${page}&orderby=date&order=desc` +
       `&after=${encodeURIComponent(dateMinISO)}&before=${encodeURIComponent(dateMaxISO)}`;
@@ -496,7 +496,7 @@ export async function fetchWooCommerceOrdersByRange(
       return [];
     }
 
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch {
@@ -505,7 +505,7 @@ export async function fetchWooCommerceOrdersByRange(
 
     if (!response.ok) {
       const rawMessage =
-        (parsed && typeof parsed.message === 'string' && parsed.message) ||
+        (parsed && typeof parsed === 'object' && 'message' in parsed && typeof (parsed as Record<string, unknown>).message === 'string' && (parsed as Record<string, unknown>).message as string) ||
         `WooCommerce API error (${response.status})`;
       throw new Error(sanitizeErrorText(rawMessage));
     }
@@ -516,7 +516,7 @@ export async function fetchWooCommerceOrdersByRange(
   try {
     const perPage = 100;
     const maxPages = 10;
-    const rawOrders: any[] = [];
+    const rawOrders: Record<string, unknown>[] = [];
 
     for (let page = 1; page <= maxPages; page += 1) {
       const pageRows = await fetchPage(page, perPage);
@@ -538,18 +538,18 @@ export async function fetchWooCommerceOrdersByRange(
       date_modified: typeof row.date_modified === 'string' ? row.date_modified : '',
       date_completed: typeof row.date_completed === 'string' ? row.date_completed : null,
       customer_note: typeof row.customer_note === 'string' ? row.customer_note : '',
-      billing: row.billing || {
+      billing: (row.billing as WooCommerceOrder['billing']) || {
         first_name: '',
         last_name: '',
         email: '',
         phone: '',
       },
-      shipping: row.shipping || {
+      shipping: (row.shipping as WooCommerceOrder['shipping']) || {
         first_name: '',
         last_name: '',
       },
-      line_items: Array.isArray(row.line_items) ? row.line_items : [],
-      meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
+      line_items: Array.isArray(row.line_items) ? row.line_items as WooCommerceOrder['line_items'] : [],
+      meta_data: Array.isArray(row.meta_data) ? row.meta_data as WooCommerceOrder['meta_data'] : [],
     }));
   } catch (error) {
     console.error('WooCommerce orders fetch error:', error);
@@ -609,12 +609,12 @@ export async function fetchWooCommerceLatestOrders(
     return 0;
   };
 
-  const parseRows = (payload: unknown): any[] => {
-    if (Array.isArray(payload)) return payload;
+  const parseRows = (payload: unknown): Record<string, unknown>[] => {
+    if (Array.isArray(payload)) return payload as Record<string, unknown>[];
     if (payload && typeof payload === 'object') {
       const asObj = payload as Record<string, unknown>;
-      if (Array.isArray(asObj.orders)) return asObj.orders as any[];
-      if (Array.isArray(asObj.data)) return asObj.data as any[];
+      if (Array.isArray(asObj.orders)) return asObj.orders as Record<string, unknown>[];
+      if (Array.isArray(asObj.data)) return asObj.data as Record<string, unknown>[];
     }
     return [];
   };
@@ -639,7 +639,7 @@ export async function fetchWooCommerceLatestOrders(
     return [];
   }
 
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
@@ -648,7 +648,7 @@ export async function fetchWooCommerceLatestOrders(
 
   if (!response.ok) {
     const rawMessage =
-      (parsed && typeof parsed.message === 'string' && parsed.message) ||
+      (parsed && typeof parsed === 'object' && 'message' in parsed && typeof (parsed as Record<string, unknown>).message === 'string' && (parsed as Record<string, unknown>).message as string) ||
       `WooCommerce API error (${response.status})`;
     throw new Error(sanitizeWooErrorText(rawMessage));
   }
@@ -667,18 +667,18 @@ export async function fetchWooCommerceLatestOrders(
     date_modified: typeof row.date_modified === 'string' ? row.date_modified : '',
     date_completed: typeof row.date_completed === 'string' ? row.date_completed : null,
     customer_note: typeof row.customer_note === 'string' ? row.customer_note : '',
-    billing: row.billing || {
+    billing: (row.billing as WooCommerceOrder['billing']) || {
       first_name: '',
       last_name: '',
       email: '',
       phone: '',
     },
-    shipping: row.shipping || {
+    shipping: (row.shipping as WooCommerceOrder['shipping']) || {
       first_name: '',
       last_name: '',
     },
-    line_items: Array.isArray(row.line_items) ? row.line_items : [],
-    meta_data: Array.isArray(row.meta_data) ? row.meta_data : [],
+    line_items: Array.isArray(row.line_items) ? row.line_items as WooCommerceOrder['line_items'] : [],
+    meta_data: Array.isArray(row.meta_data) ? row.meta_data as WooCommerceOrder['meta_data'] : [],
   }));
 }
 

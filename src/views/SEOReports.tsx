@@ -41,7 +41,7 @@ export function SEOReports() {
     { id: 3, name: 'שעון Garmin Forerunner', shortDesc: 'שעון חכם למעקב.', longDesc: 'שעון חכם עם מד דופק, GPS ומעקב שינה. עמיד במים.', image: 'https://picsum.photos/seed/garmin/100/100', seoScore: 45, issues: ['אין תיאור מוצר', 'תמונה באיכות נמוכה', 'כותרת לא ברורה'] },
   ];
 
-  const handleOptimizeProduct = async (product: any) => {
+  const handleOptimizeProduct = async (product: { id: number; name: string; longDesc: string }) => {
     setOptimizingId(product.id);
     try {
       const res = await optimizeProductSEO(product.name, product.longDesc, aiKeys);

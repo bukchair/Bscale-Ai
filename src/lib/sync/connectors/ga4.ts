@@ -52,12 +52,14 @@ export const ga4Connector = {
       }
     );
 
-    const payload = (await response.json().catch(() => ({}))) as any;
-    const rows: any[] = Array.isArray(payload?.rows) ? payload.rows : [];
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const rows = Array.isArray(payload?.rows) ? (payload.rows as Record<string, unknown>[]) : [];
 
-    return rows.map((row: any) => {
-      const dim = (i: number) => String(row?.dimensionValues?.[i]?.value ?? '');
-      const met = (i: number) => toNumber(row?.metricValues?.[i]?.value);
+    return rows.map((row) => {
+      const dims = row?.dimensionValues as Array<Record<string, unknown>> | undefined;
+      const mets = row?.metricValues as Array<Record<string, unknown>> | undefined;
+      const dim = (i: number) => String(dims?.[i]?.value ?? '');
+      const met = (i: number) => toNumber(mets?.[i]?.value);
       return {
         date: normaliseDate(dim(0)),
         sessions: Math.round(met(0)),

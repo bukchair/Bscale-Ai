@@ -107,7 +107,7 @@ export function AIRecommendations() {
         The user is looking for ways to optimize their marketing spend and increase ROAS.
       `;
       const newRecs = await generateAIRecommendations(aiKeys, context);
-      setRecs(Array.isArray(newRecs) ? newRecs.map((r: any) => ({ ...r, status: 'pending' })) : mockRecommendations);
+      setRecs(Array.isArray(newRecs) ? newRecs.map((r) => ({ ...r, status: 'pending' as const })) : mockRecommendations);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(

@@ -43,7 +43,7 @@ function buildPlatformDataSummary(
     parts.push(`${name}: ${status}.`);
     const data = campaignsByPlatform[c.id];
     if (data && Array.isArray(data)) {
-      parts.push(`קמפיינים: ${(data as any[]).length}. דוגמאות: ${JSON.stringify((data as any[]).slice(0, 2)).slice(0, 200)}.`);
+      parts.push(`קמפיינים: ${(data as unknown[]).length}. דוגמאות: ${JSON.stringify((data as unknown[]).slice(0, 2)).slice(0, 200)}.`);
     }
   }
   return parts.length

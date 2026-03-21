@@ -21,7 +21,7 @@ const parseRetryAfterMs = (value: string | null): number | null => {
 
 const isRetryableStatus = (status: number) => status === 429 || status >= 500;
 
-const isRetryableBody = (body: any): boolean => {
+const isRetryableBody = (body: unknown): boolean => {
   const text = JSON.stringify(body || {}).toLowerCase();
   return (
     text.includes('deadline_exceeded') ||

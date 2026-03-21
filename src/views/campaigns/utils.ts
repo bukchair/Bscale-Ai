@@ -1,4 +1,5 @@
 // Pure helper functions extracted from Campaigns.tsx
+import type { CampaignRow } from './types';
 
 export const toAmount = (value: unknown): number => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -56,20 +57,20 @@ export const formatPercent = (value: unknown, fractionDigits = 2) => {
   return `${numeric.toFixed(fractionDigits)}%`;
 };
 
-export const hasMetaMetrics = (campaign: any) => {
+export const hasMetaMetrics = (campaign: CampaignRow) => {
   const keys = ['spend', 'impressions', 'clicks', 'conversions', 'conversionValue', 'ctr', 'cpc', 'cpm', 'reach', 'frequency'];
   return keys.some((key) => toAmount(campaign?.[key]) > 0);
 };
 
-export const hasGoogleMetrics = (campaign: any) => {
+export const hasGoogleMetrics = (campaign: CampaignRow) => {
   const keys = ['spend', 'impressions', 'clicks', 'conversions', 'conversionValue', 'ctr', 'cpc', 'cpm', 'costPerConversion'];
   return keys.some((key) => toAmount(campaign?.[key]) > 0);
 };
 
 export const mergePlatformCampaignsPreferRich = (
-  existingRows: any[],
-  incomingRows: any[],
-  hasMetrics: (row: any) => boolean
+  existingRows: CampaignRow[],
+  incomingRows: CampaignRow[],
+  hasMetrics: (row: CampaignRow) => boolean
 ) => {
   const existingById = new Map(
     existingRows.map((row) => [String(row?.id || row?.campaignId || ''), row])

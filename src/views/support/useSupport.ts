@@ -187,7 +187,7 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
                   id: row.id,
                   ownerUid,
                   docId: row.id,
-                  ...(row.data() as any),
+                  ...(row.data() as Record<string, unknown>),
                 } as SupportThreadRow;
               })
               .filter((row) => Boolean(row.ownerUid))
@@ -207,8 +207,8 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
                 id: row.id,
                 ownerUid: currentUid,
                 docId: row.id,
-                ...(row.data() as any),
-              }))
+                ...(row.data() as Record<string, unknown>),
+              } as SupportThreadRow))
               .filter((row) => row.kind === 'support_thread')
               .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()) as SupportThreadRow[];
             setThreads(rows);

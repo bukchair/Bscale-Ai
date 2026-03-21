@@ -118,33 +118,41 @@ export async function GET(request: Request) {
       adsets = await fetchAdsets('account', resolvedAccountId);
     }
 
+    type InsightsData = {
+      spend?: string; impressions?: string; clicks?: string; reach?: string;
+      ctr?: string; cpc?: string; cpm?: string; frequency?: string;
+      unique_clicks?: string; unique_ctr?: string;
+      actions?: Array<{ action_type?: string; value?: string }>;
+      action_values?: Array<{ action_type?: string; value?: string }>;
+      purchase_roas?: Array<{ value?: string }>;
+    };
     // Map adsets to a clean format with flattened insights
-    const mapped = (adsets as any[]).map((a) => {
-      const insights = a.insights?.data?.[0] || {};
-      const spend = parseFloat(insights.spend || 0) || 0;
-      const impressions = parseFloat(insights.impressions || 0) || 0;
-      const clicks = parseFloat(insights.clicks || 0) || 0;
-      const reach = parseFloat(insights.reach || 0) || 0;
-      const ctr = parseFloat(insights.ctr || 0) || (impressions > 0 ? (clicks / impressions) * 100 : 0);
-      const cpc = parseFloat(insights.cpc || 0) || (clicks > 0 ? spend / clicks : 0);
-      const cpm = parseFloat(insights.cpm || 0) || (impressions > 0 ? (spend / impressions) * 1000 : 0);
-      const frequency = parseFloat(insights.frequency || 0) || (reach > 0 ? impressions / reach : 0);
-      const uniqueClicks = parseFloat(insights.unique_clicks || 0) || 0;
-      const uniqueCtr = parseFloat(insights.unique_ctr || 0) || 0;
+    const mapped = (adsets as Record<string, unknown>[]).map((a) => {
+      const insights = ((a.insights as { data?: InsightsData[] } | undefined)?.data?.[0]) ?? ({} as InsightsData);
+      const spend = parseFloat(insights.spend || '0') || 0;
+      const impressions = parseFloat(insights.impressions || '0') || 0;
+      const clicks = parseFloat(insights.clicks || '0') || 0;
+      const reach = parseFloat(insights.reach || '0') || 0;
+      const ctr = parseFloat(insights.ctr || '0') || (impressions > 0 ? (clicks / impressions) * 100 : 0);
+      const cpc = parseFloat(insights.cpc || '0') || (clicks > 0 ? spend / clicks : 0);
+      const cpm = parseFloat(insights.cpm || '0') || (impressions > 0 ? (spend / impressions) * 1000 : 0);
+      const frequency = parseFloat(insights.frequency || '0') || (reach > 0 ? impressions / reach : 0);
+      const uniqueClicks = parseFloat(insights.unique_clicks || '0') || 0;
+      const uniqueCtr = parseFloat(insights.unique_ctr || '0') || 0;
       const actions = Array.isArray(insights.actions) ? insights.actions : [];
       const actionValues = Array.isArray(insights.action_values) ? insights.action_values : [];
       const purchaseTypes = new Set(['purchase', 'offsite_conversion.purchase', 'omni_purchase', 'onsite_conversion.purchase']);
-      const conversions = actions.reduce((sum: number, action: any) => {
+      const conversions = actions.reduce((sum: number, action) => {
         if (!purchaseTypes.has(String(action?.action_type || ''))) return sum;
-        return sum + (parseFloat(action?.value || 0) || 0);
+        return sum + (parseFloat(String(action?.value || 0)) || 0);
       }, 0);
-      const conversionValue = actionValues.reduce((sum: number, action: any) => {
+      const conversionValue = actionValues.reduce((sum: number, action) => {
         if (!purchaseTypes.has(String(action?.action_type || ''))) return sum;
-        return sum + (parseFloat(action?.value || 0) || 0);
+        return sum + (parseFloat(String(action?.value || 0)) || 0);
       }, 0);
       const roasFromInsight =
         Array.isArray(insights.purchase_roas) && insights.purchase_roas[0]?.value != null
-          ? parseFloat(insights.purchase_roas[0].value || 0)
+          ? parseFloat(insights.purchase_roas[0].value || '0')
           : 0;
       const roas = roasFromInsight > 0 ? roasFromInsight : spend > 0 ? conversionValue / spend : 0;
       const cpa = conversions > 0 ? spend / conversions : 0;
@@ -154,13 +162,13 @@ export async function GET(request: Request) {
         name: a.name,
         status: a.effective_status || a.status,
         campaignId: a.campaign_id,
-        dailyBudget: parseFloat(a.daily_budget || 0) / 100 || 0,
-        lifetimeBudget: parseFloat(a.lifetime_budget || 0) / 100 || 0,
-        optimizationGoal: a.optimization_goal || '',
-        bidStrategy: a.bid_strategy || '',
-        billingEvent: a.billing_event || '',
-        startTime: a.start_time || '',
-        endTime: a.end_time || '',
+        dailyBudget: parseFloat(String(a.daily_budget || 0)) / 100 || 0,
+        lifetimeBudget: parseFloat(String(a.lifetime_budget || 0)) / 100 || 0,
+        optimizationGoal: String(a.optimization_goal || ''),
+        bidStrategy: String(a.bid_strategy || ''),
+        billingEvent: String(a.billing_event || ''),
+        startTime: String(a.start_time || ''),
+        endTime: String(a.end_time || ''),
         spend,
         impressions,
         clicks,

@@ -21,10 +21,10 @@ export const processSyncCampaigns = async (payload: SyncCampaignsPayload) => {
     return { synced: 0, skipped: true, reason: 'Connected account not found.' };
   }
 
-  let rows: any[] = [];
+  let rows: unknown[] = [];
   if (payload.platform === 'GOOGLE_ADS') {
     rows = await googleAdsConnector.fetchCampaigns(payload.connectionId, payload.userId, account.externalAccountId.replace(/\D/g, ''));
-    const layer = mapGoogleCampaignRowsToUnifiedLayer(rows, {
+    const layer = mapGoogleCampaignRowsToUnifiedLayer(rows as Record<string, unknown>[], {
       accountExternalId: account.externalAccountId,
       currency: account.currency || undefined,
       timezone: account.timezone || undefined,
@@ -35,7 +35,7 @@ export const processSyncCampaigns = async (payload: SyncCampaignsPayload) => {
 
   if (payload.platform === 'META') {
     rows = await metaAdsConnector.fetchCampaigns(payload.connectionId, payload.userId, account.externalAccountId);
-    const layer = mapMetaCampaignRowsToUnifiedLayer(rows, {
+    const layer = mapMetaCampaignRowsToUnifiedLayer(rows as Record<string, unknown>[], {
       accountExternalId: account.externalAccountId,
       currency: account.currency || undefined,
       timezone: account.timezone || undefined,
@@ -49,7 +49,7 @@ export const processSyncCampaigns = async (payload: SyncCampaignsPayload) => {
       return { synced: 0, skipped: true, reason: 'TIKTOK_SYNC_ENABLED=false' };
     }
     rows = await tiktokAdsConnector.fetchCampaigns(payload.connectionId, payload.userId, account.externalAccountId);
-    const layer = mapTikTokCampaignRowsToUnifiedLayer(rows, {
+    const layer = mapTikTokCampaignRowsToUnifiedLayer(rows as Record<string, unknown>[], {
       accountExternalId: account.externalAccountId,
       currency: account.currency || undefined,
       timezone: account.timezone || undefined,

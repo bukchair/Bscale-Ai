@@ -4,8 +4,15 @@ import React from 'react';
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Loader2, Mail, Zap } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+type AiRecommendation = {
+  impact: 'High' | 'Medium' | 'Low';
+  platform: string;
+  title: string;
+  description: string;
+};
+
 type RecommendationsPanelProps = {
-  recommendations: any[];
+  recommendations: Record<string, unknown>[];
   loading: boolean;
   appliedRecs: number[];
   expandedRecs: number[];
@@ -52,7 +59,9 @@ export function RecommendationsPanel({
           </div>
         ) : recommendations.length > 0 ? (
           <ul className="space-y-1.5 max-h-[250px] overflow-y-auto pe-1">
-            {recommendations.map((rec, index) => (
+            {recommendations.map((rawRec, index) => {
+              const rec = rawRec as AiRecommendation;
+              return (
               <li key={`ai-rec-${index}`} className="bg-white border rounded-lg shadow-sm overflow-hidden">
                 <button
                   type="button"
@@ -111,7 +120,8 @@ export function RecommendationsPanel({
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         ) : (
           <div className="text-center text-gray-500 py-8">

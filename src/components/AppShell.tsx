@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { dir } = useLanguage();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<Awaited<ReturnType<typeof syncUserProfile>>>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const activeTab = PATH_TO_TAB[pathname] ?? 'dashboard';

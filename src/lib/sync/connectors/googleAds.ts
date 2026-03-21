@@ -45,17 +45,20 @@ export const googleAdsConnector = {
         }),
       }
     );
-    const payload = (await response.json().catch(() => ({}))) as any;
-    const rows = Array.isArray(payload?.results) ? payload.results : [];
-    return rows.map((row: any) => ({
-      id: String(row?.campaign?.id || ''),
-      campaignId: String(row?.campaign?.id || ''),
-      name: String(row?.campaign?.name || ''),
-      status: String(row?.campaign?.status || ''),
-      objective: String(row?.campaign?.advertisingChannelType || ''),
-      startDate: String(row?.campaign?.startDate || ''),
-      endDate: String(row?.campaign?.endDate || ''),
-    }));
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const rows = Array.isArray(payload?.results) ? (payload.results as Record<string, unknown>[]) : [];
+    return rows.map((row) => {
+      const campaign = row?.campaign as Record<string, unknown> | undefined;
+      return {
+        id: String(campaign?.id || ''),
+        campaignId: String(campaign?.id || ''),
+        name: String(campaign?.name || ''),
+        status: String(campaign?.status || ''),
+        objective: String(campaign?.advertisingChannelType || ''),
+        startDate: String(campaign?.startDate || ''),
+        endDate: String(campaign?.endDate || ''),
+      };
+    });
   },
 
   async fetchCampaignMetricsByDay(
@@ -99,16 +102,21 @@ export const googleAdsConnector = {
         }),
       }
     );
-    const payload = (await response.json().catch(() => ({}))) as any;
-    const rows = Array.isArray(payload?.results) ? payload.results : [];
-    return rows.map((row: any) => ({
-      campaignId: String(row?.campaign?.id || ''),
-      date: String(row?.segments?.date || ''),
-      impressions: Math.round(toNumber(row?.metrics?.impressions)),
-      clicks: Math.round(toNumber(row?.metrics?.clicks)),
-      spend: toNumber(row?.metrics?.costMicros) / 1_000_000,
-      conversions: toNumber(row?.metrics?.conversions),
-      revenue: toNumber(row?.metrics?.conversionsValue),
-    }));
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const rows = Array.isArray(payload?.results) ? (payload.results as Record<string, unknown>[]) : [];
+    return rows.map((row) => {
+      const campaign = row?.campaign as Record<string, unknown> | undefined;
+      const segments = row?.segments as Record<string, unknown> | undefined;
+      const metrics = row?.metrics as Record<string, unknown> | undefined;
+      return {
+        campaignId: String(campaign?.id || ''),
+        date: String(segments?.date || ''),
+        impressions: Math.round(toNumber(metrics?.impressions)),
+        clicks: Math.round(toNumber(metrics?.clicks)),
+        spend: toNumber(metrics?.costMicros) / 1_000_000,
+        conversions: toNumber(metrics?.conversions),
+        revenue: toNumber(metrics?.conversionsValue),
+      };
+    });
   },
 };

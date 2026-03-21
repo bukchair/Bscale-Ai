@@ -18,12 +18,13 @@ export const tiktokAdsConnector = {
         'Access-Token': accessToken,
       },
     });
-    const payload = (await response.json().catch(() => null)) as any;
+    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
     if (!response.ok || Number(payload?.code) !== 0) {
-      throw new Error(payload?.message || `TikTok campaigns fetch failed (${response.status})`);
+      throw new Error(String(payload?.message || '') || `TikTok campaigns fetch failed (${response.status})`);
     }
-    const rows = Array.isArray(payload?.data?.list) ? payload.data.list : [];
-    return rows.map((row: any) => ({
+    const data = payload?.data as Record<string, unknown> | undefined;
+    const rows = Array.isArray(data?.list) ? (data.list as Record<string, unknown>[]) : [];
+    return rows.map((row) => ({
       id: String(row?.campaign_id || row?.id || ''),
       campaignId: String(row?.campaign_id || row?.id || ''),
       name: String(row?.campaign_name || row?.name || ''),
@@ -59,19 +60,24 @@ export const tiktokAdsConnector = {
         page_size: 1000,
       }),
     });
-    const payload = (await response.json().catch(() => null)) as any;
-    if (!response.ok || Number(payload?.code) !== 0) {
-      throw new Error(payload?.message || `TikTok metrics fetch failed (${response.status})`);
+    const payload2 = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok || Number(payload2?.code) !== 0) {
+      throw new Error(String(payload2?.message || '') || `TikTok metrics fetch failed (${response.status})`);
     }
-    const rows = Array.isArray(payload?.data?.list) ? payload.data.list : [];
-    return rows.map((row: any) => ({
-      campaignId: String(row?.dimensions?.campaign_id || row?.campaign_id || ''),
-      date: String(row?.dimensions?.stat_time_day || row?.stat_time_day || endDate),
-      impressions: Math.round(toNumber(row?.metrics?.impressions || row?.impressions)),
-      clicks: Math.round(toNumber(row?.metrics?.clicks || row?.clicks)),
-      spend: toNumber(row?.metrics?.spend || row?.spend),
-      conversions: toNumber(row?.metrics?.conversions || row?.conversions),
-      revenue: toNumber(row?.metrics?.conversion_value || row?.conversion_value),
-    }));
+    const data2 = payload2?.data as Record<string, unknown> | undefined;
+    const rows2 = Array.isArray(data2?.list) ? (data2.list as Record<string, unknown>[]) : [];
+    return rows2.map((row) => {
+      const dims = row?.dimensions as Record<string, unknown> | undefined;
+      const mets = row?.metrics as Record<string, unknown> | undefined;
+      return {
+        campaignId: String(dims?.campaign_id || row?.campaign_id || ''),
+        date: String(dims?.stat_time_day || row?.stat_time_day || endDate),
+        impressions: Math.round(toNumber(mets?.impressions ?? row?.impressions)),
+        clicks: Math.round(toNumber(mets?.clicks ?? row?.clicks)),
+        spend: toNumber(mets?.spend ?? row?.spend),
+        conversions: toNumber(mets?.conversions ?? row?.conversions),
+        revenue: toNumber(mets?.conversion_value ?? row?.conversion_value),
+      };
+    });
   },
 };

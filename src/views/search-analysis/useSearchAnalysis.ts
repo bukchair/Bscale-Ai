@@ -154,7 +154,7 @@ export function useSearchAnalysis({
 
   // ── Helper ────────────────────────────────────────────────────────────────
   const gscSignalsByTerm = (
-    rows: any[]
+    rows: Record<string, unknown>[]
   ): Map<string, { clicks: number; impressions: number; position: number; ctr: number }> => {
     const map = new Map<string, { clicks: number; impressions: number; position: number; ctr: number }>();
     rows.forEach((row) => {
@@ -213,7 +213,7 @@ export function useSearchAnalysis({
 
       if (adsResult.status === 'fulfilled') {
         const adsRows = Array.isArray(adsResult.value) ? adsResult.value : [];
-        adsRows.forEach((row: any) => {
+        adsRows.forEach((row: Record<string, unknown>) => {
           const term = String(row?.term || '').trim();
           if (!term) return;
           const normalized = term.toLowerCase();
@@ -273,7 +273,7 @@ export function useSearchAnalysis({
       }
 
       if (gscResult.status === 'fulfilled') {
-        gscRows.forEach((row: any) => {
+        gscRows.forEach((row: Record<string, unknown>) => {
           const term = String(row?.keys?.[0] || '').trim();
           if (!term) return;
           const impressions = Number(row?.impressions || 0);
@@ -433,7 +433,7 @@ export function useSearchAnalysis({
       const failedRows = Array.isArray(payload?.failed) ? payload.failed : [];
 
       setNegativeKeywords((prev) => [
-        ...appliedRows.map((item: any) => ({
+        ...appliedRows.map((item: Record<string, unknown>) => ({
           id: `${item.scope}-${item.campaignId || item.adGroupId || item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
@@ -448,7 +448,7 @@ export function useSearchAnalysis({
           addedDate: nowDate,
           result: 'applied' as const,
         })),
-        ...failedRows.map((item: any) => ({
+        ...failedRows.map((item: Record<string, unknown>) => ({
           id: `${item.scope}-${item.campaignId || item.adGroupId || item.term}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           term: String(item.term || ''),
           matchType: (item.matchType || 'PHRASE') as 'BROAD' | 'PHRASE' | 'EXACT',
@@ -468,7 +468,7 @@ export function useSearchAnalysis({
       ]);
 
       const appliedSet = new Set(
-        appliedRows.map((item: any) =>
+        appliedRows.map((item: Record<string, unknown>) =>
           negativeApplyScope === 'ad_group'
             ? `${String(item.adGroupId || '')}:${String(item.term || '').toLowerCase()}`
             : `${String(item.campaignId || '')}:${String(item.term || '').toLowerCase()}`

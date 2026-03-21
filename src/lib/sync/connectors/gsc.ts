@@ -41,11 +41,11 @@ export const gscConnector = {
       }
     );
 
-    const payload = (await response.json().catch(() => ({}))) as any;
-    const rows: any[] = Array.isArray(payload?.rows) ? payload.rows : [];
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    const rows = Array.isArray(payload?.rows) ? (payload.rows as Record<string, unknown>[]) : [];
 
-    return rows.map((row: any) => ({
-      date: String(row?.keys?.[0] ?? ''),
+    return rows.map((row) => ({
+      date: String((row?.keys as unknown[])?.[0] ?? ''),
       clicks: Math.round(toNumber(row?.clicks)),
       impressions: Math.round(toNumber(row?.impressions)),
       ctr: toNumber(row?.ctr),
