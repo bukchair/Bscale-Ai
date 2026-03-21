@@ -27,9 +27,21 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
     setIsLoading(true);
     trackEvent('bscale_login_google_start', { page_path: window.location.pathname });
     try {
-      await signInWithPopup(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+      const idToken = await credential.user.getIdToken(true);
+      const bootstrapRes = await fetch('/api/auth/session/bootstrap', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ idToken }),
+      });
+      if (!bootstrapRes.ok) {
+        const body = (await bootstrapRes.json().catch(() => null)) as { message?: string } | null;
+        const detail = body?.message?.trim() || `HTTP ${bootstrapRes.status}`;
+        throw new Error(detail);
+      }
       trackEvent('bscale_login_google_success', { page_path: window.location.pathname });
-      // App.tsx will handle the redirect/state change via onAuthStateChanged
+      onLogin();
     } catch (err: unknown) {
       console.error("Google Login Error:", err);
       trackEvent('bscale_login_google_error', {
