@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getAIKeysFromConnections,
   hasAnyAIKey,
@@ -11,16 +11,12 @@ import type {
   ContentType,
   ProductType,
   ObjectiveType,
-  DayKey,
   RuleAction,
   PlatformName,
-  UploadedAsset,
   TimeRule,
   WeeklySchedule,
   MediaLimits,
   PlatformCopyDraft,
-  WooCampaignProduct,
-  WooPublishScope,
   CampaignRow,
 } from './types';
 import {
@@ -30,10 +26,11 @@ import {
   SMART_AUDIENCE_BY_PRODUCT,
   SMART_AUDIENCE_BY_OBJECTIVE,
   createEmptyDaySchedule,
-  stripHtmlToText,
 } from './types';
 import type { Connection } from '../../contexts/ConnectionsContext';
-import { fetchWooCommerceProducts } from '../../services/woocommerceService';
+import { useWooProducts } from './useWooProducts';
+import { useMediaAssets } from './useMediaAssets';
+import { useCampaignSchedule, normalizeHour, sanitizeHours } from './useCampaignSchedule';
 import { resolveWooCredentials } from '../../lib/integrations/woocommerceCredentials';
 
 export interface UseCampaignBuilderProps {
@@ -57,7 +54,7 @@ export function useCampaignBuilder({
   realCampaigns,
   onCampaignsCreated,
 }: UseCampaignBuilderProps) {
-  // ── Form fields ──────────────────────────────────────────────────
+  // ── Form fields ──────────────────────────────────────────────────────────
   const [campaignNameInput, setCampaignNameInput] = useState('');
   const [shortTitleInput, setShortTitleInput] = useState('');
   const [objective, setObjective] = useState<ObjectiveType>('sales');
@@ -70,17 +67,17 @@ export function useCampaignBuilder({
   const [customAudience, setCustomAudience] = useState('');
   const [builderMessage, setBuilderMessage] = useState<string | null>(null);
 
-  // ── Platform copy & preview ──────────────────────────────────────
+  // ── Platform copy & preview ──────────────────────────────────────────────
   const [platformCopyDrafts, setPlatformCopyDrafts] = useState<Partial<Record<PlatformName, PlatformCopyDraft>>>({});
   const [selectedCopyPlatform, setSelectedCopyPlatform] = useState<PlatformName>('Google');
   const [selectedPreviewPlatform, setSelectedPreviewPlatform] = useState<PlatformName>('Google');
   const [oneClickOpen, setOneClickOpen] = useState(false);
 
-  // ── Refs ─────────────────────────────────────────────────────────
+  // ── Refs ─────────────────────────────────────────────────────────────────
   const builderSectionRef = useRef<HTMLElement | null>(null);
   const shortTitleInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ── Audience suggestions ─────────────────────────────────────────
+  // ── Audience suggestions ─────────────────────────────────────────────────
   const audienceSuggestions = useMemo(() => {
     const combined = [
       ...SMART_AUDIENCE_BY_CONTENT[contentType],
@@ -158,7 +155,7 @@ export function useCampaignBuilder({
     builderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // ── Media limits (computed from selected platforms) ──────────────
+  // ── Media limits (computed from selected platforms) ──────────────────────
   const effectiveMediaLimits = useMemo((): MediaLimits => {
     const activePlatforms = selectedPlatforms.filter((p): p is PlatformName =>
       p === 'Google' || p === 'Meta' || p === 'TikTok'
@@ -175,476 +172,46 @@ export function useCampaignBuilder({
     }, PLATFORM_MEDIA_LIMITS[activePlatforms[0]]);
   }, [selectedPlatforms]);
 
-  // ── WooCommerce state ────────────────────────────────────────────
-  const wooAutoBriefRef = useRef('');
-  const [wooProducts, setWooProducts] = useState<WooCampaignProduct[]>([]);
-  const [wooLoading, setWooLoading] = useState(false);
-  const [useWooProductData, setUseWooProductData] = useState(false);
-  const [wooPublishScope, setWooPublishScope] = useState<WooPublishScope>('category');
-  const [selectedWooCategory, setSelectedWooCategory] = useState('');
-  const [selectedWooProductId, setSelectedWooProductId] = useState<string>('');
+  // ── Sub-hooks ────────────────────────────────────────────────────────────
+  const woo = useWooProducts({
+    wooConnection, isHebrew, isWooConnected,
+    setBuilderMessage, setContentType, setShortTitleInput,
+    setCampaignNameInput, setServiceTypeInput, setCampaignBrief,
+  });
 
-  const wooCategoryOptions = useMemo(() => {
-    const names = wooProducts.flatMap((product) => product.categories);
-    return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  }, [wooProducts]);
+  const media = useMediaAssets({
+    effectiveMediaLimits,
+    isHebrew,
+    onMessage: setBuilderMessage,
+  });
 
-  const wooProductsFiltered = useMemo(() => {
-    if (wooPublishScope !== 'category') return wooProducts;
-    if (!selectedWooCategory) return wooProducts;
-    return wooProducts.filter((product) => product.categories.includes(selectedWooCategory));
-  }, [wooProducts, wooPublishScope, selectedWooCategory]);
-
-  const selectedWooProduct = useMemo(() => {
-    if (!selectedWooProductId) return null;
-    return wooProducts.find((product) => String(product.id) === String(selectedWooProductId)) || null;
-  }, [wooProducts, selectedWooProductId]);
-
-  const inferredWooTitle = useMemo(() => {
-    if (!useWooProductData || !isWooConnected) return '';
-    if (wooPublishScope === 'product' && selectedWooProduct?.name) return selectedWooProduct.name;
-    if (wooPublishScope === 'category' && selectedWooCategory) return `${selectedWooCategory} Campaign`;
-    return '';
-  }, [useWooProductData, isWooConnected, wooPublishScope, selectedWooProduct?.name, selectedWooCategory]);
-
-  // Load Woo products when wooConnection changes
-  useEffect(() => {
-    if (!wooConnection?.settings) {
-      setWooProducts([]);
-      setSelectedWooCategory('');
-      setSelectedWooProductId('');
-      return;
-    }
-    const { storeUrl, wooKey, wooSecret } = resolveWooCredentials(
-      wooConnection.settings as Record<string, unknown>
-    );
-    if (!storeUrl || !wooKey || !wooSecret) {
-      setWooProducts([]);
-      return;
-    }
-    let cancelled = false;
-    setWooLoading(true);
-    fetchWooCommerceProducts(storeUrl, wooKey, wooSecret, { fallbackToMock: false })
-      .then((list) => {
-        if (cancelled) return;
-        const mapped = (Array.isArray(list) ? list : [])
-          .map((item: Record<string, unknown>) => ({
-            id: Number(item?.id || 0),
-            name: stripHtmlToText(String(item?.name || '')),
-            categories: Array.isArray(item?.categories)
-              ? (item.categories as Record<string, unknown>[])
-                  .map((category) => stripHtmlToText(String(category?.name || '')))
-                  .filter(Boolean)
-              : [],
-            price: item?.price != null ? String(item.price) : '',
-            shortDescription: stripHtmlToText(item?.short_description || ''),
-            description: stripHtmlToText(item?.description || ''),
-            sku: stripHtmlToText(item?.sku || ''),
-            stockQuantity:
-              typeof item?.stock_quantity === 'number' && Number.isFinite(item.stock_quantity)
-                ? item.stock_quantity
-                : null,
-            productUrl: stripHtmlToText(item?.permalink || ''),
-            imageUrl: Array.isArray(item?.images)
-              ? stripHtmlToText(
-                  String(
-                    ((item.images as Array<Record<string, unknown>>)[0] || {}).src || ''
-                  )
-                )
-              : '',
-          }))
-          .filter((item: WooCampaignProduct) => item.id > 0 && item.name);
-        setWooProducts(mapped);
-      })
-      .catch(() => {
-        if (!cancelled) setWooProducts([]);
-      })
-      .finally(() => {
-        if (!cancelled) setWooLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [wooConnection?.settings]);
-
-  // Auto-select woo category
-  useEffect(() => {
-    if (!useWooProductData) return;
-    if (wooPublishScope === 'product') return;
-    if (!selectedWooCategory && wooCategoryOptions.length > 0) {
-      setSelectedWooCategory(wooCategoryOptions[0]);
-    }
-  }, [useWooProductData, wooPublishScope, wooCategoryOptions, selectedWooCategory]);
-
-  // Auto-select woo product
-  useEffect(() => {
-    if (!useWooProductData) return;
-    if (wooPublishScope !== 'product') return;
-    if (!selectedWooProductId && wooProductsFiltered.length > 0) {
-      setSelectedWooProductId(String(wooProductsFiltered[0].id));
-    }
-  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
-
-  // Keep selected product valid when filtered list changes
-  useEffect(() => {
-    if (!useWooProductData) return;
-    if (wooPublishScope !== 'product') return;
-    if (!selectedWooProductId) return;
-    const exists = wooProductsFiltered.some(
-      (product) => String(product.id) === String(selectedWooProductId)
-    );
-    if (!exists) {
-      setSelectedWooProductId(wooProductsFiltered.length > 0 ? String(wooProductsFiltered[0].id) : '');
-    }
-  }, [useWooProductData, wooPublishScope, selectedWooProductId, wooProductsFiltered]);
-
-  // Auto-fill title from woo
-  useEffect(() => {
-    if (!useWooProductData) return;
-    if (!inferredWooTitle) return;
-    setShortTitleInput((prev) => (prev.trim() ? prev : inferredWooTitle));
-    setCampaignNameInput((prev) => (prev.trim() ? prev : inferredWooTitle));
-  }, [useWooProductData, inferredWooTitle]);
-
-  const buildWooProductBrief = (product: WooCampaignProduct): string => {
-    const longDescription =
-      (product.shortDescription && product.shortDescription.trim()) ||
-      (product.description && product.description.trim()) ||
-      '';
-    const compactDescription =
-      longDescription.length > 420 ? `${longDescription.slice(0, 417).trim()}...` : longDescription;
-    const categoryLabel =
-      product.categories.length > 0
-        ? `${isHebrew ? 'קטגוריות' : 'Categories'}: ${product.categories.join(', ')}`
-        : '';
-    const priceLabel = product.price ? `${isHebrew ? 'מחיר' : 'Price'}: ${product.price}` : '';
-    const skuLabel = product.sku ? `SKU: ${product.sku}` : '';
-    const stockLabel =
-      typeof product.stockQuantity === 'number'
-        ? `${isHebrew ? 'מלאי' : 'Stock'}: ${product.stockQuantity}`
-        : '';
-    return [
-      `${isHebrew ? 'מוצר' : 'Product'}: ${product.name}`,
-      categoryLabel,
-      priceLabel,
-      skuLabel,
-      stockLabel,
-      compactDescription,
-    ]
-      .filter((item) => item && item.trim().length > 0)
-      .join('\n');
-  };
-
-  const importWooProductToBuilder = (
-    product: WooCampaignProduct,
-    options?: { overwriteExisting?: boolean; notify?: boolean }
-  ) => {
-    const overwriteExisting = options?.overwriteExisting ?? true;
-    const notify = options?.notify ?? false;
-    const productBrief = buildWooProductBrief(product);
-    if (!productBrief.trim()) {
-      if (notify)
-        setBuilderMessage(
-          isHebrew ? 'למוצר הנבחר אין מספיק פרטים לייבוא.' : 'Selected product has insufficient data for import.'
-        );
-      return;
-    }
-    const priceStr = product.price ? ` – ₪${product.price}` : '';
-    const titleWithPrice = `${product.name}${priceStr}`.slice(0, 90);
-    setContentType('product');
-    setShortTitleInput((prev) => (overwriteExisting || !prev.trim() ? titleWithPrice : prev));
-    setCampaignNameInput((prev) => (overwriteExisting || !prev.trim() ? product.name : prev));
-    setServiceTypeInput((prev) => {
-      const nextCategory = product.categories[0] || '';
-      if (!nextCategory) return prev;
-      return overwriteExisting || !prev.trim() ? nextCategory : prev;
-    });
-    setCampaignBrief((prev) =>
-      overwriteExisting || !prev.trim() || prev.trim() === wooAutoBriefRef.current.trim()
-        ? productBrief
-        : prev
-    );
-    wooAutoBriefRef.current = productBrief;
-    if (notify)
-      setBuilderMessage(
-        isHebrew ? 'פרטי המוצר יובאו בהצלחה מ-WooCommerce.' : 'Product details imported successfully from WooCommerce.'
-      );
-  };
+  const schedule = useCampaignSchedule({
+    connectedAdPlatforms,
+    selectedPlatforms,
+    isHebrew,
+    onMessage: setBuilderMessage,
+  });
 
   const disableWooImportMode = () => {
-    setUseWooProductData(false);
+    woo.setUseWooProductData(false);
     setBuilderMessage(isHebrew ? 'מצב עריכה ידני' : 'Manual editing mode');
     window.setTimeout(() => shortTitleInputRef.current?.focus(), 0);
   };
 
-  // Auto-import product when selected woo product changes
-  useEffect(() => {
-    if (!useWooProductData) return;
-    if (wooPublishScope !== 'product' || !selectedWooProduct) return;
-    importWooProductToBuilder(selectedWooProduct, { overwriteExisting: false, notify: false });
-  }, [useWooProductData, wooPublishScope, selectedWooProduct]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Media upload ─────────────────────────────────────────────────
-  const [uploadedAssets, setUploadedAssets] = useState<UploadedAsset[]>([]);
-
-  // Revoke object URLs on unmount / change
-  useEffect(() => {
-    return () => {
-      uploadedAssets.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
-    };
-  }, [uploadedAssets]);
-
-  const normalizeHour = (value: number) => {
-    if (!Number.isFinite(value)) return 0;
-    return Math.max(0, Math.min(23, Math.round(value)));
-  };
-
-  const sanitizeHours = (hours: number[]) =>
-    [...new Set(hours.map((hour) => normalizeHour(hour)))].sort((a, b) => a - b);
-
-  const loadImageElement = (file: File) =>
-    new Promise<HTMLImageElement>((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image.')); };
-      img.src = url;
-    });
-
-  const resizeImageForPlatforms = async (file: File) => {
-    const img = await loadImageElement(file);
-    const { width, height } = img;
-    const scale = Math.min(
-      1,
-      effectiveMediaLimits.maxImageWidth / Math.max(width, 1),
-      effectiveMediaLimits.maxImageHeight / Math.max(height, 1)
-    );
-    if (scale >= 1) return { file, width, height };
-    const targetWidth = Math.max(1, Math.round(width * scale));
-    const targetHeight = Math.max(1, Math.round(height * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return { file, width, height };
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-    const preferredType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-    const quality = preferredType === 'image/png' ? undefined : 0.92;
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, preferredType, quality)
-    );
-    if (!blob) return { file, width, height };
-    const ext = preferredType === 'image/png' ? '.png' : '.jpg';
-    const baseName = file.name.replace(/\.[^.]+$/, '');
-    const nextFile = new File([blob], `${baseName}${ext}`, {
-      type: preferredType,
-      lastModified: Date.now(),
-    });
-    return { file: nextFile, width: targetWidth, height: targetHeight };
-  };
-
-  const handleAssetUpload: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
-    const files = Array.from(event.target.files || []) as File[];
-    if (!files.length) return;
-    const imageMaxBytes = effectiveMediaLimits.imageMaxMb * 1024 * 1024;
-    const videoMaxBytes = effectiveMediaLimits.videoMaxMb * 1024 * 1024;
-    const mapped: UploadedAsset[] = [];
-    for (const file of files) {
-      const isImage = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
-      if (!isImage && !isVideo) continue;
-      if (isImage && file.size > imageMaxBytes) {
-        setBuilderMessage(
-          isHebrew
-            ? `קובץ תמונה "${file.name}" גדול מדי לתנאי הפלטפורמות שנבחרו.`
-            : `Image "${file.name}" is too large for selected platform requirements.`
-        );
-        continue;
-      }
-      if (isVideo && file.size > videoMaxBytes) {
-        setBuilderMessage(
-          isHebrew
-            ? `קובץ וידאו "${file.name}" גדול מדי לתנאי הפלטפורמות שנבחרו.`
-            : `Video "${file.name}" is too large for selected platform requirements.`
-        );
-        continue;
-      }
-      let optimizedFile = file;
-      let width: number | undefined;
-      let height: number | undefined;
-      if (isImage) {
-        try {
-          const optimized = await resizeImageForPlatforms(file);
-          optimizedFile = optimized.file;
-          width = optimized.width;
-          height = optimized.height;
-        } catch {
-          optimizedFile = file;
-        }
-      }
-      mapped.push({
-        id: `${optimizedFile.name}-${optimizedFile.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: optimizedFile.name,
-        size: optimizedFile.size,
-        type: optimizedFile.type,
-        file: optimizedFile,
-        previewUrl: URL.createObjectURL(optimizedFile),
-        mediaType: isVideo ? 'video' : 'image',
-        width,
-        height,
-      });
-    }
-    if (mapped.length > 0) {
-      setUploadedAssets((prev) => [...prev, ...mapped].slice(0, 12));
-      setBuilderMessage(null);
-    }
-    event.target.value = '';
-  };
-
-  const removeAsset = (id: string) => {
-    setUploadedAssets((prev) => {
-      const target = prev.find((asset) => asset.id === id);
-      if (target) URL.revokeObjectURL(target.previewUrl);
-      return prev.filter((asset) => asset.id !== id);
-    });
-  };
-
-  const clearUploadedMedia = () => {
-    setUploadedAssets((prev) => {
-      prev.forEach((asset) => URL.revokeObjectURL(asset.previewUrl));
-      return [];
-    });
-  };
-
-  // ── Schedule ─────────────────────────────────────────────────────
-  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>({});
-  const [selectedSchedulePlatform, setSelectedSchedulePlatform] = useState<string>('Google');
-  const [selectedScheduleDay, setSelectedScheduleDay] = useState<DayKey>('mon');
-
-  // Sync weekly schedule keys with selected platforms
-  useEffect(() => {
-    setWeeklySchedule((prev) => {
-      const next: WeeklySchedule = { ...prev };
-      selectedPlatforms.forEach((platform) => {
-        if (!next[platform]) next[platform] = createEmptyDaySchedule();
-      });
-      Object.keys(next).forEach((platform) => {
-        if (!selectedPlatforms.includes(platform)) delete next[platform];
-      });
-      return next;
-    });
-  }, [selectedPlatforms]);
-
-  // Sync schedule platform selector
-  useEffect(() => {
-    if (connectedAdPlatforms.length === 0) return;
-    setSelectedSchedulePlatform((prev) =>
-      connectedAdPlatforms.includes(prev) ? prev : connectedAdPlatforms[0]
-    );
-  }, [connectedAdPlatforms]);
-
-  const toggleScheduleHour = (platform: string, day: DayKey, hour: number) => {
-    setWeeklySchedule((prev) => {
-      const next: WeeklySchedule = { ...prev };
-      if (!next[platform]) next[platform] = createEmptyDaySchedule();
-      const normalizedHour = normalizeHour(hour);
-      const currentHours = Array.isArray(next[platform][day]) ? next[platform][day] : [];
-      const hasHour = currentHours.includes(normalizedHour);
-      next[platform] = {
-        ...next[platform],
-        [day]: hasHour
-          ? currentHours.filter((value) => value !== normalizedHour)
-          : sanitizeHours([...currentHours, normalizedHour]),
-      };
-      return next;
-    });
-  };
-
-  const isFullDaySelected = (platform: string, day: DayKey) => {
-    const hours = weeklySchedule[platform]?.[day] || [];
-    return Array.isArray(hours) && hours.length === 24;
-  };
-
-  const toggleFullDay = (platform: string, day: DayKey) => {
-    setWeeklySchedule((prev) => {
-      const next: WeeklySchedule = { ...prev };
-      if (!next[platform]) next[platform] = createEmptyDaySchedule();
-      const currentHours = Array.isArray(next[platform][day]) ? next[platform][day] : [];
-      const fullDay = Array.from({ length: 24 }, (_, hour) => hour);
-      next[platform] = {
-        ...next[platform],
-        [day]: currentHours.length === 24 ? [] : fullDay,
-      };
-      return next;
-    });
-  };
-
-  const getActiveSlotsCount = (platform: string): number => {
-    const schedule = weeklySchedule[platform];
-    if (!schedule) return 0;
-    return DAY_KEYS.reduce((sum, day) => sum + (schedule[day]?.length || 0), 0);
-  };
-
-  // ── Time rules ───────────────────────────────────────────────────
-  const [timeRules, setTimeRules] = useState<TimeRule[]>([]);
-  const [rulePlatform, setRulePlatform] = useState<PlatformName>('Google');
-  const [ruleStartHour, setRuleStartHour] = useState<number>(18);
-  const [ruleEndHour, setRuleEndHour] = useState<number>(22);
-  const [ruleAction, setRuleAction] = useState<RuleAction>('boost');
-  const [ruleMinRoas, setRuleMinRoas] = useState<number>(3);
-  const [ruleReason, setRuleReason] = useState<string>('');
-
-  // Sync rule platform with connected platforms
-  useEffect(() => {
-    if (connectedAdPlatforms.length === 0) return;
-    setRulePlatform((prev) =>
-      connectedAdPlatforms.includes(prev)
-        ? (prev as PlatformName)
-        : ((connectedAdPlatforms[0] || 'Google') as PlatformName)
-    );
-  }, [connectedAdPlatforms]);
-
-  const addTimeRule = () => {
-    if (!rulePlatform) return;
-    const startHour = normalizeHour(ruleStartHour);
-    const endHour = normalizeHour(ruleEndHour);
-    if (endHour <= startHour) {
-      setBuilderMessage(
-        isHebrew ? 'שעת סיום חייבת להיות גדולה משעת התחלה.' : 'End hour must be greater than start hour.'
-      );
-      return;
-    }
-    const next: TimeRule = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      platform: rulePlatform,
-      startHour,
-      endHour,
-      action: ruleAction,
-      minRoas: ruleMinRoas,
-      reason: ruleReason.trim() || undefined,
-    };
-    setTimeRules((prev) => [next, ...prev]);
-    setRuleReason('');
-  };
-
-  const removeTimeRule = (id: string) => {
-    setTimeRules((prev) => prev.filter((rule) => rule.id !== id));
-  };
-
-  // ── AI processing brief ──────────────────────────────────────────
+  // ── AI processing brief ──────────────────────────────────────────────────
   const aiProcessingBrief = useMemo(() => {
     const baseBrief = campaignBrief.trim();
     const productBrief =
-      useWooProductData && wooPublishScope === 'product' && selectedWooProduct
-        ? buildWooProductBrief(selectedWooProduct)
+      woo.useWooProductData && woo.wooPublishScope === 'product' && woo.selectedWooProduct
+        ? woo.buildWooProductBrief(woo.selectedWooProduct)
         : '';
     if (!productBrief) return baseBrief;
     if (!baseBrief) return productBrief;
     if (baseBrief.includes(productBrief)) return baseBrief;
     return `${baseBrief}\n\n${isHebrew ? 'נתוני מוצר מ-WooCommerce:' : 'WooCommerce product data:'}\n${productBrief}`;
-  }, [campaignBrief, useWooProductData, wooPublishScope, selectedWooProduct, isHebrew]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [campaignBrief, woo.useWooProductData, woo.wooPublishScope, woo.selectedWooProduct, isHebrew]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── AI state ─────────────────────────────────────────────────────
+  // ── AI state ─────────────────────────────────────────────────────────────
   const [aiAudienceLoading, setAiAudienceLoading] = useState(false);
   const [aiAudienceProvider, setAiAudienceProvider] = useState<string>('');
   const [aiGeneratedAudienceNames, setAiGeneratedAudienceNames] = useState<string[]>([]);
@@ -753,27 +320,27 @@ export function useCampaignBuilder({
         Meta: { titleMax: 40, descriptionMax: 125, note: 'Feed/Reels style hook headline and conversational primary text.' },
         TikTok: { titleMax: 40, descriptionMax: 100, note: 'Short hook and mobile-first caption style.' },
       };
-      const wooContext = isWooConnected && useWooProductData
+      const wooContext = isWooConnected && woo.useWooProductData
         ? {
-            publishScope: wooPublishScope,
-            category: selectedWooCategory || null,
+            publishScope: woo.wooPublishScope,
+            category: woo.selectedWooCategory || null,
             product:
-              wooPublishScope === 'product' && selectedWooProduct
+              woo.wooPublishScope === 'product' && woo.selectedWooProduct
                 ? {
-                    id: selectedWooProduct.id,
-                    name: selectedWooProduct.name,
-                    categories: selectedWooProduct.categories,
-                    price: selectedWooProduct.price || null,
-                    shortDescription: selectedWooProduct.shortDescription || null,
-                    description: selectedWooProduct.description || null,
-                    sku: selectedWooProduct.sku || null,
-                    stockQuantity: selectedWooProduct.stockQuantity ?? null,
+                    id: woo.selectedWooProduct.id,
+                    name: woo.selectedWooProduct.name,
+                    categories: woo.selectedWooProduct.categories,
+                    price: woo.selectedWooProduct.price || null,
+                    shortDescription: woo.selectedWooProduct.shortDescription || null,
+                    description: woo.selectedWooProduct.description || null,
+                    sku: woo.selectedWooProduct.sku || null,
+                    stockQuantity: woo.selectedWooProduct.stockQuantity ?? null,
                   }
                 : null,
           }
         : null;
       const fallbackTitle =
-        shortTitleInput.trim() || inferredWooTitle || selectedWooProduct?.name || campaignNameInput.trim();
+        shortTitleInput.trim() || woo.inferredWooTitle || woo.selectedWooProduct?.name || campaignNameInput.trim();
       const contextPayload = {
         shortTitle: fallbackTitle,
         currentForm: { campaignNameInput, objective, contentType, productType, serviceTypeInput, campaignBrief: aiProcessingBrief },
@@ -790,7 +357,7 @@ export function useCampaignBuilder({
       ]);
       setAiAudienceProvider('AI');
       if (strategyResult?.shortTitle) setShortTitleInput(String(strategyResult.shortTitle).trim());
-      else if (!shortTitleInput.trim() && inferredWooTitle) setShortTitleInput(inferredWooTitle);
+      else if (!shortTitleInput.trim() && woo.inferredWooTitle) setShortTitleInput(woo.inferredWooTitle);
       if (strategyResult?.campaignName) setCampaignNameInput(strategyResult.campaignName);
       if (strategyResult?.objective && ['sales','traffic','leads','awareness','retargeting'].includes(strategyResult.objective))
         setObjective(strategyResult.objective);
@@ -841,7 +408,7 @@ export function useCampaignBuilder({
       });
       setAiRecommendedHoursByPlatform(sanitizedHourMap);
       if (Object.keys(sanitizedHourMap).length > 0) {
-        setWeeklySchedule((prev) => {
+        schedule.setWeeklySchedule((prev) => {
           const next: WeeklySchedule = { ...prev };
           Object.entries(sanitizedHourMap).forEach(([platform, hours]) => {
             if (!next[platform]) next[platform] = createEmptyDaySchedule();
@@ -873,7 +440,7 @@ export function useCampaignBuilder({
             };
           })
           .filter(Boolean) as TimeRule[];
-        if (aiRules.length > 0) setTimeRules((prev) => [...aiRules, ...prev]);
+        if (aiRules.length > 0) schedule.setTimeRules((prev) => [...aiRules, ...prev]);
       }
     } catch (error) {
       setBuilderMessage(error instanceof Error ? error.message : 'AI generation failed.');
@@ -903,7 +470,7 @@ export function useCampaignBuilder({
       }
       const responseLanguage = resolveLanguage();
       const contextPayload = {
-        shortTitle: shortTitleInput.trim() || selectedWooProduct?.name || inferredWooTitle || campaignNameInput.trim(),
+        shortTitle: shortTitleInput.trim() || woo.selectedWooProduct?.name || woo.inferredWooTitle || campaignNameInput.trim(),
         currentForm: { campaignNameInput, objective, contentType, productType, serviceTypeInput, campaignBrief: aiProcessingBrief },
         connectedPlatforms: connectedAdPlatforms,
         selectedPlatforms,
@@ -929,7 +496,7 @@ export function useCampaignBuilder({
     }
   };
 
-  // ── Campaign creation ────────────────────────────────────────────
+  // ── Campaign creation ────────────────────────────────────────────────────
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; message: string; campaignId?: string }>>([]);
 
@@ -975,31 +542,27 @@ export function useCampaignBuilder({
       ) as PlatformName[]
     );
     const resolvedCampaignName =
-      campaignNameInput.trim() || shortTitleInput.trim() || inferredWooTitle || selectedWooProduct?.name || '';
+      campaignNameInput.trim() || shortTitleInput.trim() || woo.inferredWooTitle || woo.selectedWooProduct?.name || '';
     if (!resolvedCampaignName || resolvedPlatforms.length === 0) {
       setBuilderMessage(isHebrew ? 'נדרש שם קמפיין ובחירת לפחות פלטפורמה אחת.' : 'Campaign name and at least one platform are required.');
       return;
     }
-    if (uploadedAssets.length === 0) {
-      setBuilderMessage(isHebrew ? 'יש להעלות לפחות קובץ מדיה אחד כדי ליצור קמפיין.' : 'Upload at least one media file to create campaign.');
-      return;
-    }
-    if (useWooProductData && isWooConnected && wooProducts.length > 0) {
-      if (wooPublishScope === 'category' && !selectedWooCategory) {
+    if (woo.useWooProductData && isWooConnected && woo.wooProducts.length > 0) {
+      if (woo.wooPublishScope === 'category' && !woo.selectedWooCategory) {
         setBuilderMessage(isHebrew ? 'בחר קטגוריה או מוצר לפרסום מתוך WooCommerce.' : 'Select a WooCommerce category or product to promote.');
         return;
       }
-      if (wooPublishScope === 'product' && !selectedWooProductId) {
+      if (woo.wooPublishScope === 'product' && !woo.selectedWooProductId) {
         setBuilderMessage(isHebrew ? 'בחר קטגוריה או מוצר לפרסום מתוך WooCommerce.' : 'Select a WooCommerce category or product to promote.');
         return;
       }
     }
     setIsCreatingCampaign(true);
-    const mediaCount = uploadedAssets.length;
+    const mediaCount = media.uploadedAssets.length;
     const selectedImageAsset =
-      uploadedAssets.find((asset) => asset.mediaType === 'image') || null;
+      media.uploadedAssets.find((asset) => asset.mediaType === 'image') || null;
     const hasTikTokTarget = resolvedPlatforms.includes('TikTok');
-    const hasWooImage = Boolean(selectedWooProduct?.imageUrl);
+    const hasWooImage = Boolean(woo.selectedWooProduct?.imageUrl);
     if (hasTikTokTarget && !selectedImageAsset && !hasWooImage) {
       setBuilderMessage(
         isHebrew
@@ -1015,29 +578,29 @@ export function useCampaignBuilder({
       );
       const productPayload = {
         name:
-          (isWooConnected && useWooProductData ? selectedWooProduct?.name : '') ||
-          inferredWooTitle ||
+          (isWooConnected && woo.useWooProductData ? woo.selectedWooProduct?.name : '') ||
+          woo.inferredWooTitle ||
           shortTitleInput.trim() ||
           resolvedCampaignName,
         description: (
-          isWooConnected && useWooProductData && selectedWooProduct
-            ? buildWooProductBrief(selectedWooProduct)
+          isWooConnected && woo.useWooProductData && woo.selectedWooProduct
+            ? woo.buildWooProductBrief(woo.selectedWooProduct)
             : aiProcessingBrief || campaignBrief.trim()
         ).slice(0, 500),
         price:
-          isWooConnected && useWooProductData && selectedWooProduct?.price
-            ? selectedWooProduct.price
+          isWooConnected && woo.useWooProductData && woo.selectedWooProduct?.price
+            ? woo.selectedWooProduct.price
             : '',
         url:
-          (isWooConnected && useWooProductData ? selectedWooProduct?.productUrl : '') ||
+          (isWooConnected && woo.useWooProductData ? woo.selectedWooProduct?.productUrl : '') ||
           resolvedStoreUrl ||
           '',
         imageUrl:
-          isWooConnected && useWooProductData && selectedWooProduct?.imageUrl
-            ? selectedWooProduct.imageUrl
+          isWooConnected && woo.useWooProductData && woo.selectedWooProduct?.imageUrl
+            ? woo.selectedWooProduct.imageUrl
             : '',
       };
-      const payload = {
+      const requestPayload = {
         campaignName: resolvedCampaignName,
         shortTitle: shortTitleInput.trim(),
         objective,
@@ -1047,22 +610,22 @@ export function useCampaignBuilder({
         brief: campaignBrief.trim(),
         platforms: resolvedPlatforms,
         audiences: selectedAudiences,
-        timeRules,
-        weeklySchedule,
+        timeRules: schedule.timeRules,
+        weeklySchedule: schedule.weeklySchedule,
         country: language === 'he' ? 'IL' : 'US',
         dailyBudget: 20,
-        wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
+        wooPublishMode: isWooConnected && woo.useWooProductData ? woo.wooPublishScope : null,
         wooCategory:
-          isWooConnected && useWooProductData && wooPublishScope === 'category'
-            ? selectedWooCategory || null
+          isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'category'
+            ? woo.selectedWooCategory || null
             : null,
         wooProductId:
-          isWooConnected && useWooProductData && wooPublishScope === 'product'
-            ? selectedWooProductId || null
+          isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'product'
+            ? woo.selectedWooProductId || null
             : null,
         wooProductName:
-          isWooConnected && useWooProductData && wooPublishScope === 'product'
-            ? selectedWooProduct?.name || null
+          isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'product'
+            ? woo.selectedWooProduct?.name || null
             : null,
         platformCopyDrafts,
         product:
@@ -1073,7 +636,7 @@ export function useCampaignBuilder({
       const response = selectedImageAsset
         ? await (() => {
             const form = new FormData();
-            form.append('body', JSON.stringify(payload));
+            form.append('body', JSON.stringify(requestPayload));
             form.append('media', selectedImageAsset.file, selectedImageAsset.name);
             return fetch('/api/campaigns/scheduled', {
               method: 'POST',
@@ -1083,7 +646,7 @@ export function useCampaignBuilder({
         : await fetch('/api/campaigns/scheduled', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(requestPayload),
           });
       const responsePayload = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -1103,7 +666,7 @@ export function useCampaignBuilder({
       }
       setPublishResults(results);
       const created = resolvedPlatforms.map((platform) => {
-        const activeHours = getActiveSlotsCount(platform);
+        const activeHours = schedule.getActiveSlotsCount(platform);
         const platformResult = results.find((item: Record<string, unknown>) => String(item?.platform || '') === platform);
         return {
           id: `live-${platform}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1115,9 +678,9 @@ export function useCampaignBuilder({
           brief: campaignBrief.trim(),
           audiences: selectedAudiences,
           mediaCount,
-          wooPublishMode: isWooConnected && useWooProductData ? wooPublishScope : null,
-          wooCategory: isWooConnected && useWooProductData && wooPublishScope === 'category' ? selectedWooCategory || null : null,
-          wooProductName: isWooConnected && useWooProductData && wooPublishScope === 'product' ? selectedWooProduct?.name || null : null,
+          wooPublishMode: isWooConnected && woo.useWooProductData ? woo.wooPublishScope : null,
+          wooCategory: isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'category' ? woo.selectedWooCategory || null : null,
+          wooProductName: isWooConnected && woo.useWooProductData && woo.wooPublishScope === 'product' ? woo.selectedWooProduct?.name || null : null,
         };
       });
       onCampaignsCreated(created);
@@ -1135,11 +698,11 @@ export function useCampaignBuilder({
       setSelectedAudiences([]);
       setAiGeneratedAudienceNames([]);
       setPlatformCopyDrafts({});
-      setTimeRules([]);
+      schedule.setTimeRules([]);
     } catch (error) {
       setBuilderMessage(error instanceof Error ? error.message : 'Failed to create scheduled campaign.');
     } finally {
-      clearUploadedMedia();
+      media.clearUploadedMedia();
       setIsCreatingCampaign(false);
     }
   };
@@ -1176,31 +739,12 @@ export function useCampaignBuilder({
     toggleAudienceSelection,
     addCustomAudience,
     scrollToBuilderSection,
-    // media
-    uploadedAssets,
-    handleAssetUpload,
-    removeAsset,
-    clearUploadedMedia,
+    // media (from sub-hook)
+    ...media,
     normalizeHour,
     sanitizeHours,
-    // schedule
-    weeklySchedule, setWeeklySchedule,
-    selectedSchedulePlatform, setSelectedSchedulePlatform,
-    selectedScheduleDay, setSelectedScheduleDay,
-    toggleScheduleHour,
-    isFullDaySelected,
-    toggleFullDay,
-    getActiveSlotsCount,
-    // time rules
-    timeRules, setTimeRules,
-    rulePlatform, setRulePlatform,
-    ruleStartHour, setRuleStartHour,
-    ruleEndHour, setRuleEndHour,
-    ruleAction, setRuleAction,
-    ruleMinRoas, setRuleMinRoas,
-    ruleReason, setRuleReason,
-    addTimeRule,
-    removeTimeRule,
+    // schedule (from sub-hook)
+    ...schedule,
     // AI
     aiAudienceLoading,
     aiAudienceProvider,
@@ -1219,19 +763,8 @@ export function useCampaignBuilder({
     isCreatingCampaign,
     publishResults,
     handleCreateScheduledCampaign,
-    // woo
-    wooProducts,
-    wooLoading,
-    useWooProductData, setUseWooProductData,
-    wooPublishScope, setWooPublishScope,
-    selectedWooCategory, setSelectedWooCategory,
-    selectedWooProductId, setSelectedWooProductId,
-    wooCategoryOptions,
-    wooProductsFiltered,
-    selectedWooProduct,
-    inferredWooTitle,
-    buildWooProductBrief,
-    importWooProductToBuilder,
+    // woo (from sub-hook)
+    ...woo,
     disableWooImportMode,
   };
 }
