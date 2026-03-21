@@ -214,6 +214,11 @@ export class TikTokProvider implements IntegrationProvider {
     return merged;
   }
 
+  async getAccessTokenForConnection(connectionId: string, userId: string): Promise<string> {
+    const { accessToken } = await this.getValidAccessToken(connectionId, userId);
+    return accessToken;
+  }
+
   async testConnection(connectionId: string, userId: string, accountId?: string): Promise<TestResult> {
     const connection = await prisma.platformConnection.findFirst({
       where: { id: connectionId, userId },

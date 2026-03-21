@@ -1,4 +1,34 @@
+import { auth, onAuthStateChanged } from '../lib/firebase';
 import { API_BASE } from '../lib/utils/client-api-base';
+
+const ensureManagedApiSession = async (accessToken: string) => {
+  if (accessToken !== 'server-managed') return;
+  const user =
+    auth.currentUser ||
+    (await new Promise<import('firebase/auth').User | null>((resolve) => {
+      let settled = false;
+      const timeoutId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        unsubscribe();
+        resolve(auth.currentUser);
+      }, 3000);
+      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeoutId);
+        unsubscribe();
+        resolve(nextUser);
+      });
+    }));
+  if (!user) return;
+  const idToken = await user.getIdToken();
+  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+};
 
 export async function fetchTikTokCampaigns(
   accessToken: string,
@@ -6,8 +36,9 @@ export async function fetchTikTokCampaigns(
   startDate?: string,
   endDate?: string
 ) {
+  await ensureManagedApiSession(accessToken);
   const query = new URLSearchParams();
-  query.set('advertiser_id', advertiserId);
+  if (advertiserId) query.set('advertiser_id', advertiserId);
   if (startDate) query.set('start_date', startDate);
   if (endDate) query.set('end_date', endDate);
 

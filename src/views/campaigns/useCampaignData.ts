@@ -127,9 +127,19 @@ export function useCampaignData({
 
   const syncTikTokData = async () => {
     const tiktokConn = connections.find((c) => c.id === 'tiktok');
-    const token = tiktokConn?.settings?.tiktokToken || tiktokConn?.settings?.tiktokAccessToken;
-    const advertiserId = tiktokConn?.settings?.tiktokAdvertiserId || tiktokConn?.settings?.advertiserId;
-    if (tiktokConn?.status === 'connected' && token && advertiserId) {
+    const token =
+      tiktokConn?.status === 'connected'
+        ? tiktokConn?.settings?.tiktokToken ||
+          tiktokConn?.settings?.tiktokAccessToken ||
+          'server-managed'
+        : '';
+    const advertiserId =
+      tiktokConn?.settings?.tiktokAdvertiserId ||
+      tiktokConn?.settings?.advertiserId ||
+      tiktokConn?.settings?.tiktokAdsId ||
+      tiktokConn?.settings?.adAccountId ||
+      '';
+    if (tiktokConn?.status === 'connected' && token) {
       try {
         const campaigns = await fetchTikTokCampaigns(token, advertiserId, startDateIso, endDateIso);
         const unifiedLayer = mapTikTokCampaignRowsToUnifiedLayer(campaigns, {

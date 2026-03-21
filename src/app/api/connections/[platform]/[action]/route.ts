@@ -5,6 +5,7 @@ import { parsePlatformParam, toRoutePlatform } from '@/src/lib/integrations/util
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { connectionService } from '@/src/lib/integrations/services/connection-service';
 import { MetaProvider } from '@/src/lib/integrations/providers/meta/provider';
+import { TikTokProvider } from '@/src/lib/integrations/providers/tiktok/provider';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
 import { ok, toErrorResponse } from '@/src/lib/integrations/utils/api-response';
 import {
@@ -175,12 +176,87 @@ const handleMetaAssets = async (userId: string) => {
 
 const handleTikTokCampaigns = async (request: Request) => {
   const url = new URL(request.url);
-  const advertiserId = (url.searchParams.get('advertiser_id') || '').trim();
+  let advertiserId = (url.searchParams.get('advertiser_id') || '').trim();
   const startDateParam = (url.searchParams.get('start_date') || '').trim();
   const endDateParam = (url.searchParams.get('end_date') || '').trim();
-  const accessToken = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  let accessToken = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+
+  const discoverAdvertiserIdByToken = async (token: string): Promise<string> => {
+    if (!token) return '';
+    try {
+      const discoverUrl = new URL(`${TIKTOK_API_BASE}/oauth2/advertiser/get/`);
+      discoverUrl.searchParams.set('app_id', integrationsEnv.TIKTOK_APP_ID || '');
+      discoverUrl.searchParams.set('secret', integrationsEnv.TIKTOK_CLIENT_SECRET || '');
+      const discoverResponse = await fetch(discoverUrl.toString(), {
+        headers: { 'Access-Token': token },
+      });
+      const discoverPayload = (await discoverResponse.json().catch(() => null)) as
+        | { code?: number; data?: { list?: Array<{ advertiser_id?: string }>; advertiser_ids?: string[] } }
+        | null;
+      if (!discoverResponse.ok || discoverPayload?.code !== 0) return '';
+      const fromList = (discoverPayload?.data?.list || [])
+        .map((item) => String(item?.advertiser_id || '').trim())
+        .filter(Boolean);
+      const fromIds = (discoverPayload?.data?.advertiser_ids || [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean);
+      return fromList[0] || fromIds[0] || '';
+    } catch {
+      return '';
+    }
+  };
+
+  // Use managed server token when client token is missing or intentionally masked.
+  if (!accessToken || accessToken === 'server-managed') {
+    const user = await requireAuthenticatedUser();
+    const managedConnection = await connectionService.getByUserPlatform(user.id, 'TIKTOK');
+    if (!managedConnection) {
+      return NextResponse.json(
+        { message: 'TikTok connection is not available for this user.' },
+        { status: 400 }
+      );
+    }
+    if (!advertiserId) {
+      advertiserId =
+        managedConnection.connectedAccounts.find(
+          (account) => account.isSelected && account.status !== 'ARCHIVED'
+        )?.externalAccountId ||
+        managedConnection.connectedAccounts.find((account) => account.status !== 'ARCHIVED')
+          ?.externalAccountId ||
+        '';
+    }
+    if (!advertiserId) {
+      try {
+        const discovered = await new TikTokProvider().discoverAccounts(managedConnection.id, user.id);
+        if (discovered.length > 0) {
+          await connectionService.saveDiscoveredAccounts(
+            user.id,
+            managedConnection.id,
+            'TIKTOK',
+            discovered
+          );
+          await connectionService.setSelectedAccounts(user.id, managedConnection.id, [
+            discovered[0].externalAccountId,
+          ]);
+          advertiserId = discovered[0].externalAccountId;
+        }
+      } catch {
+        // Keep explicit message below if account discovery fails.
+      }
+    }
+    accessToken = await new TikTokProvider().getAccessTokenForConnection(managedConnection.id, user.id);
+  }
+
+  // Token-only mode fallback for legacy/manual tokens.
+  if (!advertiserId && accessToken) {
+    advertiserId = await discoverAdvertiserIdByToken(accessToken);
+  }
+
   if (!accessToken || !advertiserId) {
-    return NextResponse.json({ message: 'Missing access token or advertiser ID' }, { status: 400 });
+    return NextResponse.json(
+      { message: 'Missing access token or advertiser ID. Reconnect TikTok and select an advertiser account.' },
+      { status: 400 }
+    );
   }
 
   const campaignUrl = `https://business-api.tiktok.com/open_api/v1.3/campaign/get/?advertiser_id=${encodeURIComponent(advertiserId)}`;
@@ -190,12 +266,12 @@ const handleTikTokCampaigns = async (request: Request) => {
     },
   });
   const campaignsData = (await campaignsResponse.json()) as Record<string, unknown>;
-  if (!campaignsResponse.ok) {
+  if (!campaignsResponse.ok || campaignsData?.code !== 0) {
     return NextResponse.json(
       {
         message: (campaignsData?.message as string | undefined) || 'TikTok API error',
       },
-      { status: campaignsResponse.status }
+      { status: campaignsResponse.ok ? 502 : campaignsResponse.status }
     );
   }
   const campaignData = campaignsData?.data as { list?: unknown[] } | undefined;
