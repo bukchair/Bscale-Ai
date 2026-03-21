@@ -3,7 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Users as UsersIcon, Shield, UserPlus, MoreVertical, Search, Edit2, Trash2, Building, Mail, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { db, auth } from '../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, query, doc, updateDoc, deleteDoc, setDoc, writeBatch, getDoc } from 'firebase/firestore';
 
 interface UserProfile {
   uid: string;
@@ -31,9 +31,14 @@ export function Users() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newUserUid, setNewUserUid] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserProfile['role']>('viewer');
+  const [newUserStoreIds, setNewUserStoreIds] = useState('');
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [storeIdDraftByUser, setStoreIdDraftByUser] = useState<Record<string, string>>({});
+  const [storeIdSaveState, setStoreIdSaveState] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   const [systemTarget, setSystemTarget] = useState<'all' | 'single'>('all');
   const [systemSelectedUserId, setSystemSelectedUserId] = useState('');
   const [systemTitle, setSystemTitle] = useState('');
@@ -58,6 +63,27 @@ export function Users() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    setStoreIdDraftByUser((prev) => {
+      const next = { ...prev };
+      const existingUids = new Set(users.map((user) => user.uid));
+      users.forEach((user) => {
+        if (typeof next[user.uid] === 'string') return;
+        next[user.uid] = Array.isArray(user.storeIds) ? user.storeIds.join(', ') : '';
+      });
+      Object.keys(next).forEach((uid) => {
+        if (!existingUids.has(uid)) delete next[uid];
+      });
+      return next;
+    });
+  }, [users]);
+
+  const parseStoreIdsInput = (value: string): string[] =>
+    [...new Set(String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean))];
+
   const handleRoleChange = async (userId: string, newRole: UserProfile['role']) => {
     try {
       await updateDoc(doc(db, 'users', userId), { role: newRole });
@@ -78,23 +104,58 @@ export function Users() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUserName.trim() || !newUserEmail.trim()) return;
-    const uid = crypto.randomUUID();
+    setCreateUserError(null);
+    const uid = newUserUid.trim();
+    if (!uid || !newUserName.trim() || !newUserEmail.trim()) {
+      setCreateUserError(isHebrew ? 'יש למלא UID, שם ואימייל.' : 'UID, name and email are required.');
+      return;
+    }
+
+    const normalizedStoreIds = parseStoreIdsInput(newUserStoreIds);
     try {
+      const existing = await getDoc(doc(db, 'users', uid));
+      if (existing.exists()) {
+        setCreateUserError(
+          isHebrew ? 'UID זה כבר קיים. הזן UID של משתמש Auth קיים אחר.' : 'This UID already exists. Use another existing Auth UID.'
+        );
+        return;
+      }
       await setDoc(doc(db, 'users', uid), {
         uid,
         name: newUserName.trim(),
         email: newUserEmail.trim(),
         role: newUserRole,
         createdAt: new Date().toISOString(),
-        storeIds: [],
+        storeIds: normalizedStoreIds,
       });
       setIsCreateModalOpen(false);
+      setNewUserUid('');
       setNewUserName('');
       setNewUserEmail('');
       setNewUserRole('viewer');
+      setNewUserStoreIds('');
+      setCreateUserError(null);
     } catch (error) {
       console.error('Error creating user:', error);
+      setCreateUserError(isHebrew ? 'יצירת משתמש נכשלה.' : 'Failed to create user.');
+    }
+  };
+
+  const handleStoreIdsSave = async (userId: string) => {
+    setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'saving' }));
+    try {
+      const normalizedStoreIds = parseStoreIdsInput(storeIdDraftByUser[userId] || '');
+      await updateDoc(doc(db, 'users', userId), { storeIds: normalizedStoreIds });
+      setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'saved' }));
+      window.setTimeout(() => {
+        setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'idle' }));
+      }, 1400);
+    } catch (error) {
+      console.error('Error updating storeIds:', error);
+      setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'error' }));
+      window.setTimeout(() => {
+        setStoreIdSaveState((prev) => ({ ...prev, [userId]: 'idle' }));
+      }, 1800);
     }
   };
 
@@ -351,7 +412,7 @@ export function Users() {
                       </select>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 mb-2">
                         {(user.storeIds || []).slice(0, 2).map((store, idx) => (
                           <span key={idx} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs font-medium border border-gray-200/50">
                             {store}
@@ -365,6 +426,49 @@ export function Users() {
                         {(user.storeIds || []).length === 0 && (
                           <span className="text-gray-400 text-xs italic">{t('users.noStores')}</span>
                         )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          value={storeIdDraftByUser[user.uid] ?? ''}
+                          onChange={(e) =>
+                            setStoreIdDraftByUser((prev) => ({ ...prev, [user.uid]: e.target.value }))
+                          }
+                          className="w-full border border-gray-200 bg-gray-50 rounded-md px-2 py-1 text-[11px] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                          placeholder={
+                            isHebrew
+                              ? 'Store IDs מופרדים בפסיק'
+                              : 'Comma-separated store IDs'
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleStoreIdsSave(user.uid)}
+                          className={cn(
+                            'px-2 py-1 rounded-md text-[11px] font-bold border whitespace-nowrap',
+                            storeIdSaveState[user.uid] === 'saved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : storeIdSaveState[user.uid] === 'error'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                          )}
+                          disabled={storeIdSaveState[user.uid] === 'saving'}
+                        >
+                          {storeIdSaveState[user.uid] === 'saving'
+                            ? isHebrew
+                              ? 'שומר...'
+                              : 'Saving...'
+                            : storeIdSaveState[user.uid] === 'saved'
+                            ? isHebrew
+                              ? 'נשמר'
+                              : 'Saved'
+                            : storeIdSaveState[user.uid] === 'error'
+                            ? isHebrew
+                              ? 'שגיאה'
+                              : 'Error'
+                            : isHebrew
+                            ? 'שמור'
+                            : 'Save'}
+                        </button>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -537,7 +641,18 @@ export function Users() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <h3 className="text-lg font-bold text-gray-900 mb-4">{t('users.addNewUser')}</h3>
+            <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mb-3">
+              {isHebrew
+                ? 'יש להזין UID אמיתי של משתמש שקיים כבר ב-Firebase Auth.'
+                : 'Enter an existing Firebase Auth UID for this user.'}
+            </p>
             <div className="space-y-3">
+              <input
+                value={newUserUid}
+                onChange={(e) => setNewUserUid(e.target.value)}
+                placeholder="Firebase UID"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
               <input
                 value={newUserName}
                 onChange={(e) => setNewUserName(e.target.value)}
@@ -559,10 +674,24 @@ export function Users() {
                   <option key={key} value={key}>{t(role.labelKey)}</option>
                 ))}
               </select>
+              <input
+                value={newUserStoreIds}
+                onChange={(e) => setNewUserStoreIds(e.target.value)}
+                placeholder={isHebrew ? 'Store IDs (מופרד בפסיק)' : 'Store IDs (comma-separated)'}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              />
             </div>
+            {createUserError && (
+              <p className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5">
+                {createUserError}
+              </p>
+            )}
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setCreateUserError(null);
+                }}
                 className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50"
               >
                 {t('users.cancel')}
