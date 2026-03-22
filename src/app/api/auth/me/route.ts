@@ -1,16 +1,28 @@
 import { NextResponse } from 'next/server';
-import { requireAuthenticatedUser } from '@/src/lib/auth/session';
+import { requireAuthenticatedUser, SESSION_COOKIE_NAME } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
 
 const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim().toLowerCase();
 const TRIAL_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
+function unauthResponse(clearCookie = false) {
+  const res = NextResponse.json({ authenticated: false }, { status: 401 });
+  if (clearCookie) {
+    res.cookies.set(SESSION_COOKIE_NAME, '', { maxAge: 0, path: '/' });
+  }
+  return res;
+}
+
 export async function GET() {
   let user;
   try {
     user = await requireAuthenticatedUser();
-  } catch {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+  } catch (err) {
+    // If a cookie exists but is invalid (stale/wrong-format JWT from old system),
+    // clear it so the next login can set a fresh valid cookie.
+    const msg = err instanceof Error ? err.message : '';
+    const hasStaleToken = msg.includes('Invalid user session');
+    return unauthResponse(hasStaleToken);
   }
 
   // Load full user row including subscription fields
