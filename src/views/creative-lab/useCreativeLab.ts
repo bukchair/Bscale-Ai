@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 
 type GeneratedCreativeContent = {
   type?: string;
@@ -202,7 +202,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
       : `Replace the background of the product photo "${name}" with: ${bgStyle}.\nIMPORTANT: Do NOT modify, crop, distort or touch the product itself in any way. The product must remain centered, sharp and prominent. Only the background should change.`;
   };
 
-  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProductImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();

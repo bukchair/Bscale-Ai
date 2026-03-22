@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Connection } from '../../contexts/ConnectionsContext';
 
 export type ManagedGoogleAdsAccount = {
@@ -55,5 +56,5 @@ export type WizardDraft = {
 
 export type TabId = 'overview' | 'google' | 'meta' | 'tiktok' | 'whatsapp' | 'more';
 
-export type RenderConnectionCard = (integration: Connection) => React.ReactNode;
-export type RenderIntegrationSettings = (integration: Connection) => React.ReactNode;
+export type RenderConnectionCard = (integration: Connection) => ReactNode;
+export type RenderIntegrationSettings = (integration: Connection) => ReactNode;

@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { Globe, Loader2, ShoppingCart, Target } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { COUNTRIES, LANGUAGES, ProductSource, WizardProduct, stripHtml } from './wizard-types';
@@ -21,7 +22,7 @@ interface Props {
   setSelectedWooId: (v: string) => void;
   selectedWooProduct: WooProduct | undefined;
   manualProduct: WizardProduct;
-  setManualProduct: React.Dispatch<React.SetStateAction<WizardProduct>>;
+  setManualProduct: Dispatch<SetStateAction<WizardProduct>>;
   activeProduct: WizardProduct;
   mediaFile: File | null;
   setMediaFile: (v: File | null) => void;

@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { AlertCircle, Check } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { OneClickPlatform } from '../../../lib/one-click/types';
@@ -6,7 +7,7 @@ import { PLATFORM_COLORS, PLATFORM_ICONS, PLATFORM_SELECTED } from './wizard-typ
 interface Props {
   connectedPlatforms: OneClickPlatform[];
   selectedPlatforms: OneClickPlatform[];
-  setSelectedPlatforms: React.Dispatch<React.SetStateAction<OneClickPlatform[]>>;
+  setSelectedPlatforms: Dispatch<SetStateAction<OneClickPlatform[]>>;
   tx: {
     step1Title: string;
     step1Hint: string;

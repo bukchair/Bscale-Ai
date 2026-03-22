@@ -236,7 +236,7 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
     });
   }, [campaignRows, savedAllocations, connectedPlatformIds, minPlatformSpend, targetRoas]);
 
-  const totalSpend = sumBy(platformSummaries, (p) => p.currentSpend);
+  const totalSpend = sumBy(platformSummaries, (p: PlatformSummary) => p.currentSpend);
   const remainingBudget = totalBudget - totalSpend;
 
   const currentAllocations = useMemo(
@@ -275,8 +275,8 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
     if (!transferPlan) return [] as Array<{ id: string; name: string; platform: string; currentBudget: number; targetBudget: number }>;
     const fromCampaigns = campaignRows.filter((r) => r.platform === transferPlan.from).slice(0, 4);
     const toCampaigns = campaignRows.filter((r) => r.platform === transferPlan.to).slice(0, 4);
-    const fromTotal = Math.max(sumBy(fromCampaigns, (r) => Math.max(r.budget, r.spend, 1)), 1);
-    const toTotal = Math.max(sumBy(toCampaigns, (r) => Math.max(r.budget, r.spend, 1)), 1);
+    const fromTotal = Math.max(sumBy(fromCampaigns, (r: CampaignBudgetRow) => Math.max(r.budget, r.spend, 1)), 1);
+    const toTotal = Math.max(sumBy(toCampaigns, (r: CampaignBudgetRow) => Math.max(r.budget, r.spend, 1)), 1);
 
     const decreases = fromCampaigns.map((campaign) => {
       const baseline = Math.max(campaign.budget, campaign.spend, 1);

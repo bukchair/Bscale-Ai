@@ -39,7 +39,7 @@ export function useWooProducts({
 
   const wooCategoryOptions = useMemo(() => {
     const names = wooProducts.flatMap((p) => p.categories);
-    return [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    return ([...new Set(names)] as string[]).filter(Boolean).sort((a, b) => a.localeCompare(b));
   }, [wooProducts]);
 
   const wooProductsFiltered = useMemo(() => {
