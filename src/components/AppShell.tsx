@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { SalesBot } from './SalesBot';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { SiteLegalNotice } from './SiteLegalNotice';
 import { useLanguage } from '../contexts/LanguageContext';
 import {
@@ -152,6 +153,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <SalesBot />
+      <PwaInstallPrompt />
     </UserProfileProvider>
   );
 }

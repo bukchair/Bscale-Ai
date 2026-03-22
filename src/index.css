@@ -3,6 +3,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --breakpoint-xs: 30rem; /* 480px — used for xs: responsive prefix */
+}
+
 :root {
   font-family: 'Inter', 'Noto Sans Hebrew', 'Noto Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   text-rendering: optimizeLegibility;
