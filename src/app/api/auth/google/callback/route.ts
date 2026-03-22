@@ -94,7 +94,7 @@ export async function GET(request: Request) {
     name: userInfo.name ?? null,
   });
 
-  const response = NextResponse.redirect(`${appBase}/`);
+  const response = NextResponse.redirect(`${appBase}/app`);
 
   // Clear state cookie
   response.cookies.set(STATE_COOKIE, '', { maxAge: 0, path: '/' });
