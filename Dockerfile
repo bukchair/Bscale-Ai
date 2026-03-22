@@ -13,6 +13,9 @@ RUN npm ci
 # Copy source
 COPY . .
 
+# Admin email – baked into client bundle at build time and available at runtime
+ENV NEXT_PUBLIC_ADMIN_EMAIL="asher205@gmail.com"
+
 # Build: runs prisma generate + next build
 RUN npm run build
 
@@ -22,6 +25,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV NEXT_PUBLIC_ADMIN_EMAIL="asher205@gmail.com"
 
 # Install build tools needed for native modules (e.g. better-sqlite3)
 # python-is-python3 creates /usr/bin/python symlink required by node-gyp
@@ -34,7 +38,6 @@ RUN npm ci --omit=dev
 # Copy build artifacts
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/.env.production ./.env.production
 
 # Copy runtime source files
 COPY server.ts .
