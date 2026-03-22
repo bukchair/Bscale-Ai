@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { httpStatusFromError } from '@/src/lib/integrations/core/errors';
+import { logWithUserContext } from '@/src/lib/logging/server-structured-log';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { googleLegacyBridge } from '@/src/lib/integrations/services/google-legacy-bridge';
 import { connectionService } from '@/src/lib/integrations/services/connection-service';
@@ -539,6 +540,12 @@ export async function POST(request: Request) {
       message: `${updated.platform} campaign updated successfully.${adsMsg}`,
     });
   } catch (error) {
+    if (httpStatusFromError(error) >= 500) {
+      logWithUserContext('ERROR', 'campaign update failed', {
+        path: '/api/campaigns/update',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return NextResponse.json(
       {
         success: false,

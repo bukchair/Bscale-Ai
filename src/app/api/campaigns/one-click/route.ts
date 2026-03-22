@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { logWithUserContext } from '@/src/lib/logging/server-structured-log';
 import { getCampaignBuilderSuggestions } from '@/src/lib/gemini';
 import { sanitize } from '@/src/lib/one-click/shared';
 import { createGoogleDraft } from '@/src/lib/one-click/builders/google';
@@ -293,7 +294,10 @@ export async function POST(request: Request) {
       status: finalStatus === 'FAILED' ? 422 : 200,
     });
   } catch (err) {
-    console.error('[one-click] Unexpected error:', err);
+    logWithUserContext('ERROR', 'one-click campaign unexpected error', {
+      path: '/api/campaigns/one-click',
+      error: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Unexpected server error.' },
       { status: 500 }

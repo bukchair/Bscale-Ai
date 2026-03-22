@@ -3,6 +3,7 @@ import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { enqueueSyncJob } from '@/src/lib/sync/queue/enqueue';
 import { JOBS } from '@/src/lib/sync/queue/job-names';
 import { actionPayloadSchema } from '@/src/lib/sync/queue/payloads';
+import { logWithUserContext } from '@/src/lib/logging/server-structured-log';
 
 export async function POST(request: Request) {
   try {
@@ -29,6 +30,12 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     const status = (error as { statusCode?: number })?.statusCode ?? 500;
     const message = error instanceof Error ? error.message : 'Failed to enqueue action.';
+    if (status >= 500) {
+      logWithUserContext('ERROR', 'unified action enqueue failed', {
+        path: '/api/unified/actions',
+        error: message,
+      });
+    }
     return NextResponse.json({ error: message }, { status });
   }
 }

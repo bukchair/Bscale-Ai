@@ -1,9 +1,10 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/src/lib/db/prisma';
 import { integrationsEnv } from '@/src/lib/env/integrations-env';
 import { IntegrationError } from '@/src/lib/integrations/core/errors';
+import { logWithUserContext } from '@/src/lib/logging/server-structured-log';
 
 export const SESSION_COOKIE_NAME = 'saas_session';
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -98,11 +99,24 @@ async function updateUser(id: string, email: string, name: string | null) {
   }
 }
 
+async function getRequestPath(): Promise<string> {
+  try {
+    const h = await headers();
+    const nextUrl = h.get('next-url') || h.get('x-invoke-path') || '';
+    if (!nextUrl) return 'unknown';
+    return nextUrl.startsWith('http') ? new URL(nextUrl).pathname : nextUrl;
+  } catch {
+    return 'unknown';
+  }
+}
+
 export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => {
   const cookieStore = await cookies();
   const rawToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (!rawToken) {
+    const path = await getRequestPath();
+    logWithUserContext('WARNING', 'Unauthenticated API access', { path });
     throw new IntegrationError('UNAUTHORIZED', 'Missing user session.', 401);
   }
 
@@ -117,6 +131,8 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
       name: verifiedPayload.name ? String(verifiedPayload.name) : undefined,
     };
   } catch {
+    const path = await getRequestPath();
+    logWithUserContext('WARNING', 'Invalid session token', { path });
     throw new IntegrationError('UNAUTHORIZED', 'Invalid user session.', 401);
   }
 
@@ -131,6 +147,13 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
   } else if (user.email !== payload.email || user.name !== (payload.name ?? null)) {
     user = await updateUser(payload.sub, payload.email, payload.name ?? null);
   }
+
+  const path = await getRequestPath();
+  logWithUserContext('INFO', `API ${path}`, {
+    userEmail: user.email,
+    userId: user.id,
+    path,
+  });
 
   return user;
 };

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { httpStatusFromError } from '@/src/lib/integrations/core/errors';
+import { logWithUserContext } from '@/src/lib/logging/server-structured-log';
 import { connectionService } from '@/src/lib/integrations/services/connection-service';
 import { createGoogleDraft } from '@/src/lib/one-click/builders/google';
 import { createMetaDraft } from '@/src/lib/one-click/builders/meta';
@@ -342,6 +343,12 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error) {
+    if (httpStatusFromError(error) >= 500) {
+      logWithUserContext('ERROR', 'scheduled campaign creation failed', {
+        path: '/api/campaigns/scheduled',
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return NextResponse.json(
       {
         success: false,
