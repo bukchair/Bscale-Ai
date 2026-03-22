@@ -9,13 +9,15 @@ async function requireAdmin() {
 }
 
 // PATCH /api/admin/users/[id] — update a user's role/subscription (admin only)
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin();
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unauthorized';
     return NextResponse.json({ error: msg }, { status: msg === 'Forbidden' ? 403 : 401 });
   }
+
+  const { id } = await params;
 
   let body: Record<string, unknown>;
   try {
@@ -35,7 +37,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   await prisma.user.update({
-    where: { id: params.id },
+    where: { id },
     data: data as Parameters<typeof prisma.user.update>[0]['data'],
   });
 
@@ -43,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/admin/users/[id] — delete a user (admin only)
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await requireAdmin();
   } catch (e) {
@@ -51,6 +53,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     return NextResponse.json({ error: msg }, { status: msg === 'Forbidden' ? 403 : 401 });
   }
 
-  await prisma.user.delete({ where: { id: params.id } });
+  const { id } = await params;
+  await prisma.user.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

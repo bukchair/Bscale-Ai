@@ -3,7 +3,7 @@ import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
 
 // PATCH /api/support/[id] — send reply, update status, or mark seen
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try {
     user = await requireAuthenticatedUser();
@@ -11,7 +11,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const thread = await prisma.supportThread.findUnique({ where: { id: params.id } });
+  const { id } = await params;
+
+  const thread = await prisma.supportThread.findUnique({ where: { id } });
   if (!thread) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const isAdmin = user.role === 'admin';
@@ -66,7 +68,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   await prisma.supportThread.update({
-    where: { id: params.id },
+    where: { id },
     data: data as Parameters<typeof prisma.supportThread.update>[0]['data'],
   });
 
