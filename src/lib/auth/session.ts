@@ -115,8 +115,6 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
   const rawToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (!rawToken) {
-    const path = await getRequestPath();
-    logWithUserContext('WARNING', 'Unauthenticated API access', { path });
     throw new IntegrationError('UNAUTHORIZED', 'Missing user session.', 401);
   }
 
