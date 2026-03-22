@@ -48,17 +48,18 @@ function isMissingColumnError(err: unknown): boolean {
   return false;
 }
 
-async function findUser(id: string) {
+async function findUser(id: string, email?: string) {
+  const where = email ? { OR: [{ id }, { email }] } : { id };
   try {
     return await prisma.user.findFirst({
-      where: { id },
+      where,
       select: { id: true, email: true, name: true, role: true },
     });
   } catch (err) {
     if (!isMissingColumnError(err)) throw err;
     // role column missing — migration pending; fall back to query without it
     const row = await prisma.user.findFirst({
-      where: { id },
+      where,
       select: { id: true, email: true, name: true },
     });
     return row ? { ...row, role: 'user' as const } : null;
@@ -153,12 +154,12 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
     throw new IntegrationError('UNAUTHORIZED', 'Session payload is missing user claims.', 401);
   }
 
-  let user = await findUser(payload.sub);
+  let user = await findUser(payload.sub, payload.email);
 
   if (!user) {
     user = await createUser(payload.sub, payload.email, payload.name ?? null);
   } else if (user.email !== payload.email || user.name !== (payload.name ?? null)) {
-    user = await updateUser(payload.sub, payload.email, payload.name ?? null);
+    user = await updateUser(user.id, payload.email, payload.name ?? null);
   }
 
   const path = await getRequestPath();
