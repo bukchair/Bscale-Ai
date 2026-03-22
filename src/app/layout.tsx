@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import { Providers } from './providers';
 import '../index.css';
 
@@ -27,6 +28,13 @@ export default function RootLayout({ children }: Props) {
         <link rel="apple-touch-icon" href="/favicon.svg" />
       </head>
       <body className="bg-slate-50 text-slate-900">
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-1TMNPV7WM0" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-1TMNPV7WM0');
+        `}</Script>
         <Providers>{children}</Providers>
       </body>
     </html>
