@@ -5,7 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Sparkles, Image as ImageIcon, Type, Send, Wand2, Layout, Loader2, Download, ShoppingCart, ChevronDown, Save, Edit3, UploadCloud, Copy, ArrowRight, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { type SavedAd } from '../lib/firebase';
+import type { SavedAd } from '../lib/firebase';
 import { useCreativeLab, type CreativeProduct } from './creative-lab/useCreativeLab';
 
 export function CreativeLab() {

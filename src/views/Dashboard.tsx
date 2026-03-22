@@ -5,7 +5,6 @@ import { Loader2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDateRange, useDateRangeBounds } from '../contexts/DateRangeContext';
 import { useConnections } from '../contexts/ConnectionsContext';
-import { auth } from '../lib/firebase';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { STATUS_LABELS } from './dashboard/types';
 import { RevenueCard } from './dashboard/RevenueCard';
@@ -20,9 +19,8 @@ export function Dashboard() {
   const { dir, language } = useLanguage();
   const { dateRange } = useDateRange();
   const bounds = useDateRangeBounds();
-  const { connections } = useConnections();
+  const { connections, workspaceOwnerName } = useConnections();
   const { format: formatCurrency } = useCurrency();
-  const currentUser = auth.currentUser;
   const isHebrew = language === 'he';
   const { statusLabels } = { statusLabels: STATUS_LABELS[language as keyof typeof STATUS_LABELS] || STATUS_LABELS.en };
 
@@ -53,7 +51,7 @@ export function Dashboard() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="ui-display text-2xl sm:text-3xl text-gray-900 dark:text-white">
-            {text.title}, {currentUser?.displayName?.split(' ')[0] || 'User'} 👋
+            {text.title}, {workspaceOwnerName?.split(' ')[0] || 'User'} 👋
           </h1>
           <p className="ui-subtitle text-gray-500 dark:text-gray-400 mt-1">
             {text.subtitle}

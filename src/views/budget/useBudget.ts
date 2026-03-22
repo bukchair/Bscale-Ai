@@ -1,5 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auth, getBudgetAutomationSettings, getBudgetPlatformAllocations, setBudgetAutomationSettings, setBudgetPlatformAllocations } from '../../lib/firebase';
+import type { BudgetAutomationSettings, BudgetPlatformAllocations } from '../../lib/firebase';
+
+async function fetchBudgetSettings(): Promise<{ automation: BudgetAutomationSettings | null; allocations: BudgetPlatformAllocations | null }> {
+  const res = await fetch('/api/user/settings', { credentials: 'include' });
+  if (!res.ok) return { automation: null, allocations: null };
+  const d = (await res.json()) as { settings?: Record<string, unknown> };
+  return {
+    automation: (d.settings?.budgetAutomation as BudgetAutomationSettings) || null,
+    allocations: (d.settings?.budgetAllocations as BudgetPlatformAllocations) || null,
+  };
+}
+
+async function saveBudgetSettings(automation: Partial<BudgetAutomationSettings>, allocations: Partial<BudgetPlatformAllocations>): Promise<void> {
+  await fetch('/api/user/settings', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ budgetAutomation: { ...automation, updatedAt: new Date().toISOString() }, budgetAllocations: { ...allocations, updatedAt: new Date().toISOString() } }),
+  });
+}
 import { loadUnifiedCampaignLayerFromConnections } from '../../lib/unified-data/loaders';
 import type { Connection } from '../../contexts/ConnectionsContext';
 
@@ -64,7 +83,7 @@ export interface UseBudgetProps {
 }
 
 export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, startDate, endDate, isHebrew }: UseBudgetProps) {
-  const currentWorkspaceUid = dataOwnerUid || auth.currentUser?.uid || null;
+  const currentWorkspaceUid = dataOwnerUid || null;
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
@@ -82,10 +101,7 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
   useEffect(() => {
     if (!currentWorkspaceUid) return;
     let cancelled = false;
-    Promise.all([
-      getBudgetAutomationSettings(currentWorkspaceUid).catch(() => null),
-      getBudgetPlatformAllocations(currentWorkspaceUid).catch(() => null),
-    ]).then(([automation, allocations]) => {
+    fetchBudgetSettings().then(({ automation, allocations }) => {
       if (cancelled) return;
       if (automation) {
         setSmartEnabled(Boolean(automation.enabled));
@@ -309,13 +325,10 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
   // ── Handlers ───────────────────────────────────────────────────────────────
   const saveAutomationSettings = async () => {
     if (!currentWorkspaceUid || isWorkspaceReadOnly) return;
-    await setBudgetAutomationSettings(currentWorkspaceUid, {
-      enabled: smartEnabled,
-      targetRoas,
-      minPlatformSpend,
-      reallocationPercent,
-    });
-    await setBudgetPlatformAllocations(currentWorkspaceUid, currentAllocations);
+    await saveBudgetSettings(
+      { enabled: smartEnabled, targetRoas, minPlatformSpend, reallocationPercent },
+      currentAllocations
+    );
   };
 
   const applyTransferPlan = async () => {
@@ -330,7 +343,6 @@ export function useBudget({ connections, dataOwnerUid, isWorkspaceReadOnly, star
     try {
       setSavedAllocations(next);
       if (currentWorkspaceUid && !isWorkspaceReadOnly) {
-        await setBudgetPlatformAllocations(currentWorkspaceUid, next);
         await saveAutomationSettings();
       }
     } finally {

@@ -6,8 +6,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { ThemeSwitcher } from '../components/ThemeSwitcher';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { SiteLegalNotice } from '../components/SiteLegalNotice';
-import { auth, signOut, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 import { trackEvent } from '../lib/tracking';
 
@@ -44,22 +42,19 @@ export function SubscriptionRequired({ onGoToPricing }: SubscriptionRequiredProp
   });
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    window.location.href = '/auth';
   };
 
   const handleEnterDemo = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(
-        userRef,
-        {
-          subscriptionStatus: 'demo',
-          plan: 'demo',
-        },
-        { merge: true }
-      );
+      const res = await fetch('/api/user/subscription', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode: 'demo' }),
+      });
+      if (!res.ok) throw new Error('Failed');
       window.location.reload();
     } catch (err) {
       console.error('Failed to activate demo mode:', err);

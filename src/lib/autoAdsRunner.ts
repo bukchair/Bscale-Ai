@@ -1,6 +1,4 @@
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from './firebase';
-import { getAutoAdsSchedule, setAutoAdsSchedule, saveAdToFirestore, type AutoAdsSchedule } from './firebase';
+import type { AutoAdsSchedule } from './firebase';
 import { fetchWooCommerceProducts } from '../services/woocommerceService';
 import { getAIKeysFromConnections } from './gemini';
 import { generateCreativeCopy } from './gemini';
@@ -15,22 +13,62 @@ function nextRunAt(schedule: AutoAdsSchedule): string {
   return d.toISOString();
 }
 
-export async function runAutoAdsIfNeeded(uid: string, runNow = false): Promise<{ ran: boolean; created?: number }> {
-  const schedule = await getAutoAdsSchedule(uid);
+async function fetchSchedule(): Promise<AutoAdsSchedule | null> {
+  try {
+    const res = await fetch('/api/user/settings', { credentials: 'include' });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { settings?: Record<string, unknown> };
+    return (d.settings?.autoAdsSchedule as AutoAdsSchedule) || null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveSchedule(update: Partial<AutoAdsSchedule>): Promise<void> {
+  try {
+    const current = await fetchSchedule();
+    await fetch('/api/user/settings', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ autoAdsSchedule: { ...(current ?? {}), ...update } }),
+    });
+  } catch { /* best effort */ }
+}
+
+async function saveAd(ad: { type: string; createdAt: string; productName?: string; payload: Record<string, unknown> }): Promise<void> {
+  await fetch('/api/saved-ads', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(ad),
+  });
+}
+
+async function fetchConnections(): Promise<Array<{ id: string; settings?: Record<string, string> }>> {
+  try {
+    const res = await fetch('/api/user/connections', { credentials: 'include' });
+    if (!res.ok) return [];
+    const d = (await res.json()) as { connections?: Array<{ id: string; settings?: Record<string, string> }> };
+    return d.connections ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function runAutoAdsIfNeeded(_uid: string, runNow = false): Promise<{ ran: boolean; created?: number }> {
+  const schedule = await fetchSchedule();
   if (!schedule?.enabled && !runNow) return { ran: false };
   const now = new Date().toISOString();
   if (!runNow && schedule?.nextRunAt && schedule.nextRunAt > now) return { ran: false };
 
-  const settingsRef = doc(db, 'users', uid, 'settings', 'connections');
-  const settingsSnap = await getDoc(settingsRef);
-  const items = settingsSnap.data()?.items as Array<{ id: string; settings?: Record<string, string> }> | undefined;
-  const woo = items?.find((c) => c.id === 'woocommerce');
-  const aiKeys = items ? getAIKeysFromConnections(items) : {};
-  const { storeUrl, wooKey, wooSecret } = resolveWooCredentials(
-    woo?.settings as Record<string, unknown> | undefined
-  );
+  const items = await fetchConnections();
+  const woo = items.find((c) => c.id === 'woocommerce');
+  const aiKeys = getAIKeysFromConnections(items);
+  const { storeUrl, wooKey, wooSecret } = resolveWooCredentials(woo?.settings as Record<string, unknown> | undefined);
+
   if (!storeUrl || !wooKey || !wooSecret) {
-    if (schedule?.enabled) await setAutoAdsSchedule(uid, { lastRunAt: now, nextRunAt: nextRunAt(schedule!) });
+    if (schedule?.enabled) await saveSchedule({ lastRunAt: now, nextRunAt: nextRunAt(schedule) });
     return { ran: false };
   }
 
@@ -38,7 +76,7 @@ export async function runAutoAdsIfNeeded(uid: string, runNow = false): Promise<{
   try {
     products = await fetchWooCommerceProducts(storeUrl, wooKey, wooSecret);
   } catch {
-    if (schedule?.enabled) await setAutoAdsSchedule(uid, { lastRunAt: now, nextRunAt: nextRunAt(schedule!) });
+    if (schedule?.enabled) await saveSchedule({ lastRunAt: now, nextRunAt: nextRunAt(schedule) });
     return { ran: false };
   }
 
@@ -50,15 +88,9 @@ export async function runAutoAdsIfNeeded(uid: string, runNow = false): Promise<{
     const desc = (p.description || p.short_description || '').slice(0, 500);
     try {
       const res = await generateCreativeCopy(name, desc, 'צור קופירייטינג למודעות רשתות חברתיות.', aiKeys);
-      const options = res?.options || [];
-      const first = options[0];
+      const first = res?.options?.[0];
       if (first) {
-        await saveAdToFirestore(uid, {
-          type: 'copy',
-          createdAt: now,
-          productName: name,
-          payload: { headline: first.headline, primaryText: first.primaryText, description: first.description },
-        });
+        await saveAd({ type: 'copy', createdAt: now, productName: name, payload: { headline: first.headline, primaryText: first.primaryText, description: first.description } });
         created++;
       }
     } catch (e) {
@@ -67,10 +99,7 @@ export async function runAutoAdsIfNeeded(uid: string, runNow = false): Promise<{
   }
 
   if (schedule) {
-    await setAutoAdsSchedule(uid, {
-      lastRunAt: now,
-      nextRunAt: schedule.enabled ? nextRunAt(schedule) : (schedule.nextRunAt ?? null),
-    });
+    await saveSchedule({ lastRunAt: now, nextRunAt: schedule.enabled ? nextRunAt(schedule) : (schedule.nextRunAt ?? null) });
   }
   return { ran: true, created };
 }

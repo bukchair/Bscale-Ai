@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface UseAdminSettingsProps {
   isAdmin: boolean;
@@ -25,31 +23,18 @@ export function useAdminSettings({ isAdmin, isHebrew }: UseAdminSettingsProps) {
   useEffect(() => {
     if (!isAdmin) return;
     setIsLoadingPayment(true);
-    const ref = doc(db, 'appSettings', 'payment');
-    getDoc(ref)
-      .then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as { providerToken?: string };
-          if (data?.providerToken) setPaymentToken(data.providerToken);
-        }
-      })
-      .finally(() => setIsLoadingPayment(false));
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
     setIsLoadingEmailSettings(true);
-    const ref = doc(db, 'appSettings', 'email');
-    getDoc(ref)
-      .then((snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as { imapUser?: string; imapHost?: string; imapPort?: string };
-          if (data?.imapUser) setImapUser(data.imapUser);
-          if (data?.imapHost) setImapHost(data.imapHost);
-          if (data?.imapPort) setImapPort(data.imapPort);
-        }
+    fetch('/api/admin/settings', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d: { settings?: Record<string, unknown> }) => {
+        const s = d.settings ?? {};
+        if (typeof s.paymentProviderToken === 'string') setPaymentToken(s.paymentProviderToken);
+        if (typeof s.imapUser === 'string') setImapUser(s.imapUser);
+        if (typeof s.imapHost === 'string') setImapHost(s.imapHost);
+        if (typeof s.imapPort === 'string') setImapPort(s.imapPort);
       })
-      .finally(() => setIsLoadingEmailSettings(false));
+      .catch((e) => console.error('Failed to load admin settings', e))
+      .finally(() => { setIsLoadingPayment(false); setIsLoadingEmailSettings(false); });
   }, [isAdmin]);
 
   const handleSavePaymentToken = async () => {
@@ -57,8 +42,12 @@ export function useAdminSettings({ isAdmin, isHebrew }: UseAdminSettingsProps) {
     setIsSavingPayment(true);
     setPaymentMessage(null);
     try {
-      const ref = doc(db, 'appSettings', 'payment');
-      await setDoc(ref, { providerToken: paymentToken || null }, { merge: true });
+      await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentProviderToken: paymentToken || null }),
+      });
       setPaymentMessage(isHebrew ? 'טוקן הסליקה נשמר בהצלחה.' : 'Payment provider token saved successfully.');
     } catch (e) {
       console.error('Failed to save payment token', e);
@@ -74,16 +63,16 @@ export function useAdminSettings({ isAdmin, isHebrew }: UseAdminSettingsProps) {
     setIsSavingEmailSettings(true);
     setEmailSettingsMessage(null);
     try {
-      const ref = doc(db, 'appSettings', 'email');
-      await setDoc(
-        ref,
-        {
+      await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
           imapUser: imapUser || null,
           imapHost: imapHost || null,
           imapPort: imapPort || null,
-        },
-        { merge: true }
-      );
+        }),
+      });
       setEmailSettingsMessage(isHebrew ? 'הגדרות ה‑IMAP נשמרו בהצלחה.' : 'IMAP settings saved successfully.');
     } catch (e) {
       console.error('Failed to save email settings', e);

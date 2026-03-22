@@ -2,9 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { AlertCircle, Lock, Loader2 } from 'lucide-react';
-import { auth } from '@/src/lib/firebase';
 import { useLanguage } from '@/src/contexts/LanguageContext';
 import { SiteLegalNotice } from '@/src/components/SiteLegalNotice';
 import { trackEvent } from '@/src/lib/tracking';
@@ -56,17 +54,16 @@ export default function CompleteEmailClient() {
       if (!emailToUse) {
         throw new Error(isHebrew ? 'חסר אימייל בתשובה השרת.' : 'Missing email in server response.');
       }
-      const cred = await signInWithEmailAndPassword(auth, emailToUse, password);
-      const idToken = await cred.user.getIdToken(true);
-      const bootstrapRes = await fetch('/api/auth/session/bootstrap', {
+      // Sign in to get the session cookie
+      const loginRes = await fetch('/api/auth/email-login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ email: emailToUse, password }),
       });
-      if (!bootstrapRes.ok) {
-        const b = (await bootstrapRes.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(b?.message || (isHebrew ? 'התחברות נכשלה.' : 'Sign-in bootstrap failed.'));
+      if (!loginRes.ok) {
+        const b = (await loginRes.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(b?.message || (isHebrew ? 'התחברות נכשלה.' : 'Sign-in failed.'));
       }
       trackEvent('bscale_email_signup_complete_ok', {});
       router.push('/app');

@@ -1,7 +1,5 @@
 "use client";
 
-'use client';
-
 import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,14 +9,8 @@ import { SalesBot } from './SalesBot';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { SiteLegalNotice } from './SiteLegalNotice';
 import { useLanguage } from '../contexts/LanguageContext';
-import {
-  auth,
-  onAuthStateChanged,
-  syncUserProfile,
-  resolveWorkspaceScope,
-} from '../lib/firebase';
-import { runAutoAdsIfNeeded } from '../lib/autoAdsRunner';
 import { UserProfileProvider } from '../contexts/UserProfileContext';
+import type { UserProfile } from '../contexts/UserProfileContext';
 
 const PATH_TO_TAB: Record<string, string> = {
   '/':                    'dashboard',
@@ -66,13 +58,25 @@ const TAB_TO_PATH: Record<string, string> = {
   'cloud-run-logs':       '/cloud-run-logs',
 };
 
+type MeResponse = {
+  authenticated: boolean;
+  user?: UserProfile & { uid?: string };
+  workspace?: {
+    ownerUid: string;
+    accessMode: 'owner' | 'shared';
+    sharedRole?: string;
+    ownerName?: string;
+    ownerEmail?: string;
+  };
+};
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { dir } = useLanguage();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<Awaited<ReturnType<typeof syncUserProfile>>>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const activeTab = PATH_TO_TAB[pathname] ?? 'dashboard';
@@ -82,22 +86,27 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const profile = await syncUserProfile(user);
-        setUserProfile(profile);
+    let cancelled = false;
 
-        let scopeOwnerUid = user.uid;
-        try {
-          const scope = await resolveWorkspaceScope({ uid: user.uid, email: user.email });
-          scopeOwnerUid = scope?.ownerUid || user.uid;
-        } catch (err) {
-          console.error('[AppShell] resolveWorkspaceScope failed, falling back to user uid:', err);
-          scopeOwnerUid = user.uid;
+    async function bootstrap() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (cancelled) return;
+
+        if (!res.ok) {
+          router.push('/auth');
+          return;
         }
-        runAutoAdsIfNeeded(scopeOwnerUid).catch((err) => {
-          console.error('[AppShell] runAutoAdsIfNeeded failed:', err);
-        });
+
+        const data = (await res.json()) as MeResponse;
+        if (cancelled) return;
+
+        if (!data.authenticated || !data.user) {
+          router.push('/auth');
+          return;
+        }
+
+        setUserProfile(data.user);
 
         // Handle invitation acceptance from email link
         const urlParams = new URLSearchParams(window.location.search);
@@ -106,19 +115,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           fetch('/api/invitations/accept', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({ token: inviteToken }),
           }).catch((err) => {
             console.error('[AppShell] Failed to accept invitation:', err);
           });
           window.history.replaceState({}, '', window.location.pathname);
         }
-      } else {
-        setUserProfile(null);
-        router.push('/auth');
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[AppShell] bootstrap failed:', err);
+          router.push('/auth');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-      setIsLoading(false);
-    });
-    return () => unsubscribe();
+    }
+
+    void bootstrap();
+    return () => { cancelled = true; };
   }, [router]);
 
   if (isLoading) {

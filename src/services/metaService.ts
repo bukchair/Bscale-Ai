@@ -1,4 +1,3 @@
-import { auth, onAuthStateChanged } from '../lib/firebase';
 import { API_BASE } from '../lib/utils/client-api-base';
 
 type MetaApiPayload = { data?: unknown[]; meta?: Record<string, unknown>; message?: string; success?: boolean } | null;

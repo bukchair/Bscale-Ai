@@ -10,7 +10,25 @@ type GeneratedCreativeContent = {
   [key: string]: unknown;
 };
 import { generateCreativeCopy, getAIKeysFromConnections } from '../../lib/gemini';
-import { auth, saveAdToFirestore, getSavedAds, type SavedAd } from '../../lib/firebase';
+import type { SavedAd } from '../../lib/firebase';
+
+async function fetchSavedAds(): Promise<SavedAd[]> {
+  const res = await fetch('/api/saved-ads', { credentials: 'include' });
+  if (!res.ok) return [];
+  const d = (await res.json()) as { ads?: SavedAd[] };
+  return d.ads ?? [];
+}
+
+async function postSavedAd(ad: Omit<SavedAd, 'id'>): Promise<string> {
+  const res = await fetch('/api/saved-ads', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(ad),
+  });
+  const d = (await res.json()) as { id?: string };
+  return d.id ?? '';
+}
 import { fetchWooCommerceProducts } from '../../services/woocommerceService';
 import type { Connection } from '../../contexts/ConnectionsContext';
 import { resolveWooCredentials } from '../../lib/integrations/woocommerceCredentials';
@@ -76,7 +94,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
   const wooConnection = connections.find((c) => c.id === 'woocommerce');
   const isWooConnected = wooConnection?.status === 'connected';
   const aiKeys = getAIKeysFromConnections(connections);
-  const scopedUid = dataOwnerUid || auth.currentUser?.uid;
+  const scopedUid = dataOwnerUid;
 
   // AI generation elapsed timer
   useEffect(() => {
@@ -124,7 +142,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
   // Load saved ads
   useEffect(() => {
     if (!scopedUid) return;
-    getSavedAds(scopedUid).then(setSavedAds);
+    fetchSavedAds().then(setSavedAds);
   }, [scopedUid]);
 
   // Close product dropdown on outside click / Escape
@@ -244,7 +262,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
       return;
     }
     try {
-      const id = await saveAdToFirestore(scopedUid, {
+      const id = await postSavedAd({
         type: 'copy',
         createdAt: new Date().toISOString(),
         productName: selectedProduct?.name,
@@ -267,7 +285,7 @@ export function useCreativeLab({ connections, dataOwnerUid, isWorkspaceReadOnly,
       return;
     }
     try {
-      await saveAdToFirestore(scopedUid, {
+      await postSavedAd({
         type: 'image',
         createdAt: new Date().toISOString(),
         productName: selectedProduct?.name,

@@ -1,26 +1,10 @@
 "use client";
 
 /**
- * Manages all real-time Firebase notification subscriptions for the Header:
- *   - Sales leads
- *   - Pending user approvals
- *   - Support threads (admin view + user view)
- *
- * Extracted from Header.tsx to keep the component focused on layout/JSX.
+ * Manages notification data for the Header via polling.
+ * Replaces the previous Firebase/Firestore real-time subscriptions.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  collection,
-  collectionGroup,
-  doc,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  updateDoc,
-  where,
-} from 'firebase/firestore';
-import { auth, db } from '../../lib/firebase';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,6 +67,8 @@ interface Options {
   supportCurrentUid: string;
 }
 
+const POLL_INTERVAL_MS = 30_000; // 30 seconds
+
 const playAlertSound = () => {
   try {
     const AudioCtx =
@@ -137,106 +123,80 @@ export function useNotificationData({
   const hasInitializedPendingFeed = useRef(false);
   const hasInitializedSupportFeed = useRef(false);
 
-  // ── Firebase: leads ─────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Polling: leads ──────────────────────────────────────────────────────────
+  const fetchLeads = useCallback(async () => {
     if (!canViewLeads) { setLeadNotifications([]); return; }
-    const q = query(collection(db, 'salesLeads'), orderBy('createdAt', 'desc'), limit(25));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const leads = snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<LeadNotification, 'id'>) }));
-        if (!hasInitializedLeadFeed.current) {
-          hasInitializedLeadFeed.current = true;
-          previousNewestLeadRef.current = leads[0]?.id || null;
-        }
-        setLeadNotifications(leads);
-      },
-      (err) => console.error('[notifications] leads subscription error:', err)
-    );
+    try {
+      const res = await fetch('/api/leads', { credentials: 'include' });
+      if (!res.ok) return;
+      const d = (await res.json()) as { leads?: LeadNotification[] };
+      const leads = (d.leads ?? []).slice(0, 25).sort((a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+      if (!hasInitializedLeadFeed.current) {
+        hasInitializedLeadFeed.current = true;
+        previousNewestLeadRef.current = leads[0]?.id || null;
+      }
+      setLeadNotifications(leads);
+    } catch (err) {
+      console.error('[notifications] leads fetch error:', err);
+    }
   }, [canViewLeads]);
 
-  // ── Firebase: pending user approvals ────────────────────────────────────────
-  useEffect(() => {
+  // ── Polling: pending user approvals ─────────────────────────────────────────
+  const fetchPendingUsers = useCallback(async () => {
     if (!canApproveUsers) { setPendingUserApprovals([]); return; }
-    const q = query(collection(db, 'users'), where('subscriptionStatus', '==', 'demo'), limit(50));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const users = snapshot.docs
-          .map((d) => ({ uid: d.id, ...(d.data() as Omit<PendingUserApproval, 'uid'>) }))
-          .filter((u) => u.role !== 'admin')
-          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        if (!hasInitializedPendingFeed.current) {
-          hasInitializedPendingFeed.current = true;
-          previousNewestPendingUserRef.current = users[0]?.uid || null;
-        }
-        setPendingUserApprovals(users);
-      },
-      (err) => console.error('[notifications] pending users subscription error:', err)
-    );
+    try {
+      const res = await fetch('/api/admin/users', { credentials: 'include' });
+      if (!res.ok) return;
+      const d = (await res.json()) as { users?: PendingUserApproval[] };
+      const users = (d.users ?? [])
+        .filter((u) => u.subscriptionStatus === 'demo' && u.role !== 'admin')
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      if (!hasInitializedPendingFeed.current) {
+        hasInitializedPendingFeed.current = true;
+        previousNewestPendingUserRef.current = users[0]?.uid || null;
+      }
+      setPendingUserApprovals(users);
+    } catch (err) {
+      console.error('[notifications] pending users fetch error:', err);
+    }
   }, [canApproveUsers]);
 
-  // ── Firebase: support notifications (admin bell) ────────────────────────────
-  useEffect(() => {
-    if (!canViewSupport) { setSupportNotifications([]); return; }
-    const q = query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50));
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const rows = snapshot.docs
-          .map((d) => ({ id: d.id, docId: d.id, ownerUid: d.ref.parent.parent?.id || '', ...(d.data() as object) } as SupportThreadNotification))
-          .filter((r) => Boolean(r.ownerUid))
-          .sort((a, b) => new Date(b.updatedAt || b.lastMessageAt || 0).getTime() - new Date(a.updatedAt || a.lastMessageAt || 0).getTime());
-        if (!hasInitializedSupportFeed.current) {
-          hasInitializedSupportFeed.current = true;
-          previousNewestSupportRef.current = rows[0]?.id || null;
-        }
-        setSupportNotifications(rows);
-      },
-      (err) => console.error('[notifications] support notifications subscription error:', err)
-    );
-  }, [canViewSupport]);
-
-  // ── Firebase: support widget threads (user + admin) ─────────────────────────
-  useEffect(() => {
-    if (!supportCurrentUid) {
-      setSupportThreads([]);
-      setSupportSelectedThreadId(null);
-      return;
-    }
-
-    const sort = (rows: SupportThreadNotification[]) =>
-      rows.sort((a, b) =>
+  // ── Polling: support notifications ──────────────────────────────────────────
+  const fetchSupport = useCallback(async () => {
+    if (!supportCurrentUid) { setSupportNotifications([]); setSupportThreads([]); return; }
+    try {
+      const res = await fetch('/api/support', { credentials: 'include' });
+      if (!res.ok) return;
+      const d = (await res.json()) as { threads?: SupportThreadNotification[] };
+      const rows = (d.threads ?? []).sort((a, b) =>
         new Date(b.updatedAt || b.lastMessageAt || 0).getTime() -
         new Date(a.updatedAt || a.lastMessageAt || 0).getTime()
       );
-
-    const setAndAutoSelect = (rows: SupportThreadNotification[]) => {
+      if (!hasInitializedSupportFeed.current) {
+        hasInitializedSupportFeed.current = true;
+        previousNewestSupportRef.current = rows[0]?.id || null;
+      }
+      if (canViewSupport) setSupportNotifications(rows);
       setSupportThreads(rows);
       setSupportSelectedThreadId((prev) =>
         prev && rows.some((t) => t.id === prev) ? prev : rows[0]?.id || null
       );
-    };
-
-    const q = canViewSupport
-      ? query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread'), limit(50))
-      : collection(db, 'users', supportCurrentUid, 'settings');
-
-    return onSnapshot(
-      q,
-      (snapshot) => {
-        const rows = canViewSupport
-          ? snapshot.docs
-              .map((d) => ({ id: d.id, docId: d.id, ownerUid: d.ref.parent.parent?.id || '', ...(d.data() as object) } as SupportThreadNotification))
-              .filter((r) => Boolean(r.ownerUid))
-          : snapshot.docs
-              .map((d) => ({ id: d.id, docId: d.id, ownerUid: supportCurrentUid, ...(d.data() as object) } as SupportThreadNotification))
-              .filter((r) => r.kind === 'support_thread');
-        setAndAutoSelect(sort(rows));
-      },
-      (err) => console.error('[notifications] support widget subscription error:', err)
-    );
+    } catch (err) {
+      console.error('[notifications] support fetch error:', err);
+    }
   }, [canViewSupport, supportCurrentUid]);
+
+  // Initial fetch + polling
+  useEffect(() => { void fetchLeads(); }, [fetchLeads]);
+  useEffect(() => { void fetchPendingUsers(); }, [fetchPendingUsers]);
+  useEffect(() => { void fetchSupport(); }, [fetchSupport]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => { void fetchLeads(); void fetchPendingUsers(); void fetchSupport(); }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [fetchLeads, fetchPendingUsers, fetchSupport]);
 
   // ── Toast triggers ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -320,17 +280,21 @@ export function useNotificationData({
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleApproveUserNoPayment = async (userId: string, mode: 'active' | 'free' = 'active') => {
-    if (!auth.currentUser?.uid) return;
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        subscriptionStatus: mode,
-        plan: mode === 'active' ? 'granted_by_admin' : 'free_by_admin',
-        approvedByAdminUid: auth.currentUser.uid,
-        approvedAt: new Date().toISOString(),
-        trialStartedAt: null,
-        trialEndsAt: null,
-        trialExpiredAt: null,
+      const nowIso = new Date().toISOString();
+      await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          subscriptionStatus: mode,
+          plan: mode === 'active' ? 'granted_by_admin' : 'free_by_admin',
+          approvedAt: nowIso,
+          trialStartedAt: null,
+          trialEndsAt: null,
+        }),
       });
+      setPendingUserApprovals((prev) => prev.filter((u) => u.uid !== userId));
     } catch (err) {
       console.error('[notifications] Failed to approve user:', err);
     }
@@ -341,30 +305,17 @@ export function useNotificationData({
     const unreadLeads = leadNotifications.filter((l) => !l.readBy?.[currentUid]);
     await Promise.all(
       unreadLeads.map((l) =>
-        updateDoc(doc(db, 'salesLeads', l.id), {
-          [`readBy.${currentUid}`]: new Date().toISOString(),
+        fetch(`/api/leads/${l.id}/read`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
         }).catch((err) => console.error('[useNotificationData] markLead read failed:', err))
       )
     );
-    const unreadPending = pendingUserApprovals.filter((u) => !u.approvalReadBy?.[currentUid]);
-    await Promise.all(
-      unreadPending.map((u) =>
-        updateDoc(doc(db, 'users', u.uid), {
-          [`approvalReadBy.${currentUid}`]: new Date().toISOString(),
-        }).catch((err) => console.error('[useNotificationData] markApproval read failed:', err))
-      )
-    );
-    const unreadSupport = supportNotifications.filter((t) => {
-      if (t.lastMessageFrom !== 'user') return false;
-      return (t.lastMessageAt ? new Date(t.lastMessageAt).getTime() : 0) >
-             (t.adminSeenAt ? new Date(t.adminSeenAt).getTime() : 0);
-    });
-    await Promise.all(
-      unreadSupport.map((t) =>
-        updateDoc(doc(db, 'users', t.ownerUid, 'settings', t.docId), {
-          adminSeenAt: new Date().toISOString(),
-        }).catch((err) => console.error('[useNotificationData] markSupport seen failed:', err))
-      )
+    // Optimistically update local state
+    const now = new Date().toISOString();
+    setLeadNotifications((prev) =>
+      prev.map((l) => (!l.readBy?.[currentUid] ? { ...l, readBy: { ...(l.readBy ?? {}), [currentUid]: now } } : l))
     );
   };
 

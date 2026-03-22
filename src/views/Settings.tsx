@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Save, Bell, Lock, Globe, User, Building, CreditCard, Shield, Mail, Share2, UserPlus, Trash2, CheckCircle2, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { auth, type SharedAccessRole } from '../lib/firebase';
+import type { SharedAccessRole } from './settings/useSharingSettings';
 import { createPayPalCheckoutUrl, PAYPAL_BUSINESS_EMAIL } from '../lib/paypal';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { useCurrency } from '../contexts/CurrencyContext';
@@ -17,13 +17,13 @@ export function Settings({ userProfile }: { userProfile?: { role?: string } | nu
   const { currency, setCurrency, availableCurrencies, format: formatCurrency } = useCurrency();
   const {
     dataAccessMode,
+    dataOwnerUid,
     workspaceOwnerName,
     workspaceOwnerEmail,
   } = useConnections();
   const [activeTab, setActiveTab] = useState<'profile' | 'agency' | 'billing' | 'notifications' | 'security' | 'sharing'>('profile');
   const isAdmin = userProfile?.role === 'admin';
-  const currentUser = auth.currentUser;
-  const uid = currentUser?.uid;
+  const uid = dataOwnerUid ?? undefined;
 
   const {
     paymentToken, setPaymentToken,

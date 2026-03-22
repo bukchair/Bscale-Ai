@@ -3,7 +3,6 @@
  * Accepts ownerUid as a parameter so it can be used outside React state.
  */
 
-import { auth } from '../../lib/firebase';
 import {
   parseManagedPayload,
   type ManagedApiConnection,
@@ -13,55 +12,18 @@ import {
 
 // ── Auth helpers ─────────────────────────────────────────────────────────────
 
-export const waitForCurrentUser = async () => {
-  if (auth.currentUser) return auth.currentUser;
-  return new Promise<import('firebase/auth').User | null>((resolve) => {
-    let settled = false;
-    const timeoutId = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      unsubscribe();
-      resolve(auth.currentUser);
-    }, 2500);
-    const unsubscribe = auth.onAuthStateChanged((nextUser) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeoutId);
-      unsubscribe();
-      resolve(nextUser);
-    });
-  });
-};
+// Session is cookie-based; no Firebase token needed.
+export const waitForCurrentUser = async () => null;
 
-export const buildWorkspaceHeaders = (dataOwnerUid: string | null): Record<string, string> => {
-  const currentUid = auth.currentUser?.uid;
-  if (dataOwnerUid && currentUid && dataOwnerUid !== currentUid) {
-    return { 'X-Owner-UID': dataOwnerUid };
-  }
+export const buildWorkspaceHeaders = (_dataOwnerUid: string | null): Record<string, string> => {
+  // Workspace is resolved server-side via the session cookie.
   return {};
 };
 
 // ── Session bootstrap ─────────────────────────────────────────────────────────
 
 export const ensureManagedApiSession = async () => {
-  const sessionCheck = await fetch('/api/connections', {
-    method: 'GET',
-    cache: 'no-store',
-    credentials: 'include',
-  });
-  if (sessionCheck.ok) return;
-
-  const user = await waitForCurrentUser();
-  if (!user) throw new Error('Missing sign-in session. Please refresh and sign in again.');
-
-  const idToken = await user.getIdToken(true);
-  const response = await fetch('/api/auth/session/bootstrap', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ idToken }),
-    credentials: 'include',
-  });
-  if (!response.ok) throw new Error('Failed to initialize managed API session.');
+  // Session is maintained via httpOnly cookie — no bootstrap needed.
 };
 
 // ── Connections fetch ─────────────────────────────────────────────────────────

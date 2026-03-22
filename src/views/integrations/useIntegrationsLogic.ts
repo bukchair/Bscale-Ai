@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { auth, onAuthStateChanged } from '../../lib/firebase';
 import { normalizeGoogleAdsAccountId } from './integrationUtils';
 import type { Connection } from '../../contexts/ConnectionsContext';
 import type { MetaAssetsPayload } from './integrationUtils';
@@ -260,39 +259,14 @@ export function useIntegrationsLogic({
 
   // ── Managed connections ──────────────────────────────────────────────────
 
-  const bootstrapManagedSession = async (timeoutMs = 3000): Promise<boolean> => {
+  // Session is maintained via httpOnly cookie — no bootstrap needed.
+  const bootstrapManagedSession = async (_timeoutMs = 3000): Promise<boolean> => {
     try {
       const sessionCheck = await fetch(`${API_BASE}/api/connections`, { method: 'GET', cache: 'no-store' });
-      if (sessionCheck.ok) return true;
-    } catch { /* proceed to re-bootstrap */ }
-
-    const currentUser =
-      auth.currentUser ||
-      (await new Promise<import('firebase/auth').User | null>((resolve) => {
-        let settled = false;
-        const timeoutId = window.setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          unsubscribe();
-          resolve(auth.currentUser);
-        }, timeoutMs);
-        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-          if (settled) return;
-          settled = true;
-          window.clearTimeout(timeoutId);
-          unsubscribe();
-          resolve(nextUser);
-        });
-      }));
-
-    if (!currentUser) return false;
-    const idToken = await currentUser.getIdToken(true);
-    const bootstrapRes = await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
-    return bootstrapRes.ok;
+      return sessionCheck.ok;
+    } catch {
+      return false;
+    }
   };
 
   const persistManagedGoogleSelection = async (googleAdsId: string) => {

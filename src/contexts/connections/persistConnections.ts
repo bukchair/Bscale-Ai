@@ -1,36 +1,31 @@
 /**
- * Firestore persistence helpers for connection state.
+ * Connection persistence helpers — stores to /api/user/connections instead of Firestore.
  */
 
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../../lib/firebase';
 import { AI_CONNECTION_IDS, PLATFORM_CONNECTION_IDS } from '../connectionsData';
 import { stripUndefinedDeep } from '../connectionsUtils';
 import type { Connection } from '../ConnectionsContext';
 
 export const persistUserConnections = async (
   items: Connection[],
-  dataOwnerUid: string | null
+  _dataOwnerUid: string | null
 ): Promise<void> => {
-  const user = auth.currentUser;
-  if (!user) return;
-  const scopedOwnerUid = dataOwnerUid || user.uid;
-  const ref = doc(db, 'users', scopedOwnerUid, 'settings', 'connections');
   try {
-    await setDoc(ref, { items: stripUndefinedDeep(items) }, { merge: true });
+    await fetch('/api/user/connections', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ connections: stripUndefinedDeep(items) }),
+    });
   } catch (err) {
     console.error('Error persisting user connections:', err);
   }
 };
 
-export const persistGlobalAiConnections = async (items: Connection[]): Promise<void> => {
-  const ref = doc(db, 'appSettings', 'connections');
-  const aiOnly = items.filter((c) => (AI_CONNECTION_IDS as readonly string[]).includes(c.id));
-  try {
-    await setDoc(ref, { items: stripUndefinedDeep(aiOnly) }, { merge: true });
-  } catch (err) {
-    console.error('Error persisting global AI connections:', err);
-  }
+export const persistGlobalAiConnections = async (_items: Connection[]): Promise<void> => {
+  // Global AI connections were previously stored in Firestore appSettings.
+  // Now a no-op; AI key settings are stored per-user via persistUserConnections.
+  void _items;
 };
 
 export const persistConnections = async (
@@ -38,8 +33,9 @@ export const persistConnections = async (
   dataOwnerUid: string | null,
   updatedId?: string
 ): Promise<void> => {
+  void updatedId;
   await persistUserConnections(newConnections, dataOwnerUid);
-  if (updatedId && (AI_CONNECTION_IDS as readonly string[]).includes(updatedId)) {
-    await persistGlobalAiConnections(newConnections);
-  }
 };
+
+void PLATFORM_CONNECTION_IDS;
+void AI_CONNECTION_IDS;

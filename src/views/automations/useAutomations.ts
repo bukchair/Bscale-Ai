@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auth, getAutoAdsSchedule, setAutoAdsSchedule, type AutoAdsSchedule } from '../../lib/firebase';
+import type { AutoAdsSchedule } from '../../lib/firebase';
 import { runAutoAdsIfNeeded } from '../../lib/autoAdsRunner';
+
+async function fetchAutoAdsSchedule(): Promise<AutoAdsSchedule | null> {
+  const res = await fetch('/api/user/settings', { credentials: 'include' });
+  if (!res.ok) return null;
+  const d = (await res.json()) as { settings?: Record<string, unknown> };
+  return (d.settings?.autoAdsSchedule as AutoAdsSchedule) || null;
+}
+
+async function saveAutoAdsSchedule(schedule: Partial<AutoAdsSchedule>): Promise<void> {
+  await fetch('/api/user/settings', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ autoAdsSchedule: schedule }),
+  });
+}
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -12,7 +28,7 @@ export interface UseAutomationsProps {
 }
 
 export function useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, formatCurrency }: UseAutomationsProps) {
-  const uid = dataOwnerUid || auth.currentUser?.uid;
+  const uid = dataOwnerUid;
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'approvals' | 'rules' | 'log' | 'auto-ads'>('approvals');
@@ -94,7 +110,7 @@ export function useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, fo
   // ── Effect: load schedule ──────────────────────────────────────────────────
   useEffect(() => {
     if (!uid) return;
-    getAutoAdsSchedule(uid).then((s) => {
+    fetchAutoAdsSchedule().then((s) => {
       if (s) {
         setAutoSchedule(s);
         setAutoScheduleForm({
@@ -119,7 +135,7 @@ export function useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, fo
     else nextRun.setDate(nextRun.getDate() + 7);
     const isFirstEnable = autoScheduleForm.enabled && !autoSchedule?.nextRunAt;
     try {
-      await setAutoAdsSchedule(uid, {
+      await saveAutoAdsSchedule({
         enabled: autoScheduleForm.enabled,
         frequency: autoScheduleForm.frequency,
         platforms: autoScheduleForm.platforms,
@@ -127,7 +143,7 @@ export function useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, fo
         lastRunAt: autoSchedule?.lastRunAt ?? null,
         nextRunAt: autoScheduleForm.enabled ? (isFirstEnable ? now : nextRun.toISOString()) : null,
       });
-      setAutoSchedule(await getAutoAdsSchedule(uid));
+      setAutoSchedule(await fetchAutoAdsSchedule());
     } finally {
       setAutoScheduleSaving(false);
     }
@@ -138,7 +154,7 @@ export function useAutomations({ dataOwnerUid, isWorkspaceReadOnly, isHebrew, fo
     if (!uid) return;
     const result = await runAutoAdsIfNeeded(uid);
     setLastRunResult(result);
-    setAutoSchedule(await getAutoAdsSchedule(uid));
+    setAutoSchedule(await fetchAutoAdsSchedule());
   };
 
   return {

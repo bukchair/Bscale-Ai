@@ -3,11 +3,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { User } from 'firebase/auth';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { ConnectionCard, type ConnectionCardData } from '@/src/components/connections/ConnectionCard';
 import { AccountPickerDialog } from '@/src/components/connections/AccountPickerDialog';
-import { auth, onAuthStateChanged } from '@/src/lib/firebase';
 import { cn } from '@/src/lib/utils';
 
 type ApiSuccess<T> = { success: true; message: string; data: T };
@@ -63,58 +61,12 @@ export function ConnectionsPage() {
     return payload;
   };
 
-  const waitForFirebaseUser = async (): Promise<User | null> => {
-    const current = auth.currentUser;
-    if (current) return current;
-
-    return new Promise((resolve) => {
-      let settled = false;
-      const timeout = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        unsubscribe();
-        resolve(auth.currentUser);
-      }, 1500);
-
-      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timeout);
-        unsubscribe();
-        resolve(nextUser);
-      });
-    });
-  };
-
+  // Session is maintained via httpOnly cookie — no bootstrap needed.
   const ensureServerSession = async (): Promise<boolean> => {
     if (sessionBootstrappedRef.current) return true;
-
-    const currentUser = await waitForFirebaseUser();
-    if (!currentUser) {
-      setAuthHint('Please sign in to your account first, then click Refresh.');
-      return false;
-    }
-
-    try {
-      const idToken = await currentUser.getIdToken(true);
-      const response = await fetch('/api/auth/session/bootstrap', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-
-      if (!response.ok) {
-        setAuthHint('Session setup failed. Please sign in again and click Refresh.');
-        return false;
-      }
-
-      sessionBootstrappedRef.current = true;
-      setAuthHint(null);
-      return true;
-    } catch {
-      setAuthHint('Session setup failed. Please sign in again and click Refresh.');
-      return false;
-    }
+    sessionBootstrappedRef.current = true;
+    setAuthHint(null);
+    return true;
   };
 
   const loadConnections = async () => {

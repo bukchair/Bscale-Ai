@@ -10,8 +10,6 @@ import {
   normalizeSignupEmail,
   sendSignupInviteEmail,
 } from '@/src/lib/auth/email-signup-server';
-import { getFirebaseAdminAuth } from '@/src/lib/auth/firebase-admin-server';
-
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
@@ -62,37 +60,10 @@ export async function POST(request: Request) {
         : 'If this email can be registered, we sent a confirmation link.',
   };
 
-  let firebaseAuth: ReturnType<typeof getFirebaseAdminAuth>;
-  try {
-    firebaseAuth = getFirebaseAdminAuth();
-  } catch {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          parsed.data.locale === 'he'
-            ? 'הרשמה במייל אינה זמינה בשרת זה (חסרה הגדרת שירות).'
-            : 'Email signup is not enabled on this server (missing configuration).',
-      },
-      { status: 503 }
-    );
-  }
-
   try {
     const existingUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (existingUser) {
       return NextResponse.json(genericOk);
-    }
-
-    try {
-      await firebaseAuth.getUserByEmail(email);
-      return NextResponse.json(genericOk);
-    } catch (e: unknown) {
-      const code = e && typeof e === 'object' && 'code' in e ? String((e as { code: string }).code) : '';
-      if (code !== 'auth/user-not-found') {
-        console.error('[email-signup/request] Firebase lookup failed:', e);
-        return NextResponse.json(genericOk);
-      }
     }
 
     await prisma.emailSignupInvite.deleteMany({

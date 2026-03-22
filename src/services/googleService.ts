@@ -1,29 +1,7 @@
-import { auth, onAuthStateChanged } from '../lib/firebase';
 import { API_BASE } from '../lib/utils/client-api-base';
 
-const ensureManagedApiSession = async (accessToken: string) => {
-  if (accessToken !== 'server-managed') return;
-  const user =
-    auth.currentUser ||
-    (await new Promise<import('firebase/auth').User | null>((resolve) => {
-      const timeoutId = window.setTimeout(() => {
-        unsubscribe();
-        resolve(auth.currentUser);
-      }, 3000);
-      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-        window.clearTimeout(timeoutId);
-        unsubscribe();
-        resolve(nextUser);
-      });
-    }));
-  if (!user) return;
-  const idToken = await user.getIdToken();
-  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ idToken }),
-  });
-};
+// Session is now managed via cookie — no Firebase token refresh needed.
+const ensureManagedApiSession = async (_accessToken: string) => { return; };
 
 export async function fetchGoogleAdAccounts(accessToken: string) {
   await ensureManagedApiSession(accessToken);

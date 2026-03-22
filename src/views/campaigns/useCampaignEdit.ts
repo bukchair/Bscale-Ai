@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { auth, onAuthStateChanged } from '../../lib/firebase';
 import { normalizeCampaignStatus, toAmount } from './utils';
 import type { EditCampaignDraft, EditableStatus, CampaignRow, PlatformName } from './types';
 
@@ -50,38 +49,8 @@ export function useCampaignEdit({ isHebrew, onUpdateCampaigns }: UseCampaignEdit
     setEditLoading(false);
   };
 
-  const ensureManagedApiSession = async () => {
-    const currentUser =
-      auth.currentUser ||
-      (await new Promise<import('firebase/auth').User | null>((resolve) => {
-        const timeoutId = window.setTimeout(() => { unsubscribe(); resolve(auth.currentUser); }, 3000);
-        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-          window.clearTimeout(timeoutId);
-          unsubscribe();
-          resolve(nextUser);
-        });
-      }));
-    if (!currentUser) {
-      throw new Error(
-        isHebrew
-          ? 'נדרש להתחבר מחדש למערכת לפני עדכון הקמפיין.'
-          : 'Please sign in again before updating the campaign.'
-      );
-    }
-    const idToken = await currentUser.getIdToken(true);
-    const response = await fetch('/api/auth/session/bootstrap', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.success === false) {
-      throw new Error(
-        payload?.message ||
-          (isHebrew ? 'אימות הסשן נכשל. התחבר מחדש ונסה שוב.' : 'Session bootstrap failed. Please sign in again.')
-      );
-    }
-  };
+  // Session is maintained via httpOnly cookie — no bootstrap needed.
+  const ensureManagedApiSession = async () => { /* no-op */ };
 
   const saveEditedCampaign = async () => {
     if (!editingCampaign) return;

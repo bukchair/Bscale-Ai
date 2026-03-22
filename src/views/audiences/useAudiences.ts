@@ -1,14 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
-import { auth } from '../../lib/firebase';
-import {
-  getAudiences,
-  saveAudience,
-  updateAudience,
-  deleteAudience,
-  type Audience,
-  type AudiencePlatform,
-  type AudienceRule,
-} from '../../lib/firebase';
+import type { Audience, AudiencePlatform, AudienceRule } from '../../lib/firebase';
+
+async function apiFetchAudiences(): Promise<Audience[]> {
+  const res = await fetch('/api/audiences', { credentials: 'include' });
+  if (!res.ok) return [];
+  const d = (await res.json()) as { audiences?: Audience[] };
+  return d.audiences ?? [];
+}
+
+async function apiSaveAudience(payload: Omit<Audience, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const res = await fetch('/api/audiences', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  const d = (await res.json()) as { id?: string };
+  return d.id ?? '';
+}
+
+async function apiUpdateAudience(id: string, data: Partial<Omit<Audience, 'id' | 'createdAt'>>): Promise<void> {
+  await fetch(`/api/audiences/${id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+}
+
+async function apiDeleteAudience(id: string): Promise<void> {
+  await fetch(`/api/audiences/${id}`, { method: 'DELETE', credentials: 'include' });
+}
 import { getAudienceRecommendations, getAIKeysFromConnections, type AudienceRecommendation } from '../../lib/gemini';
 import type { Connection } from '../../contexts/ConnectionsContext';
 import { fetchMetaCampaigns, isMetaRateLimitMessage } from '../../services/metaService';
@@ -61,7 +83,7 @@ export interface UseAudiencesProps {
 }
 
 export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, isHebrew }: UseAudiencesProps) {
-  const uid = dataOwnerUid || auth.currentUser?.uid;
+  const uid = dataOwnerUid;
   const aiKeys = getAIKeysFromConnections(connections);
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -98,7 +120,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
   // ── Effect: load audiences ─────────────────────────────────────────────────
   useEffect(() => {
     if (!uid) return;
-    getAudiences(uid).then(setAudiences).finally(() => setLoading(false));
+    apiFetchAudiences().then(setAudiences).finally(() => setLoading(false));
   }, [uid]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -248,12 +270,12 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
       };
       let savedAudience: Audience;
       if (editingId) {
-        await updateAudience(uid, editingId, payload);
+        await apiUpdateAudience(editingId, payload);
         savedAudience = { id: editingId, createdAt: existingAudience?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), ...payload };
         setAudiences((prev) => prev.map((a) => (a.id === editingId ? { ...a, ...savedAudience } : a)));
         showToast('הקהל עודכן.');
       } else {
-        const id = await saveAudience(uid, payload);
+        const id = await apiSaveAudience(payload);
         savedAudience = { id, ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         setAudiences((prev) => [...prev, savedAudience]);
         showToast('הקהל נוצר.');
@@ -261,7 +283,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
       if (syncAllOnSave) {
         setSyncingId(savedAudience.id);
         const syncedResult = await syncAudiencePlatforms(savedAudience, true);
-        await updateAudience(uid, savedAudience.id, {
+        await apiUpdateAudience(savedAudience.id, {
           syncedToPlatform: syncedResult.syncedPlatforms.length > 0,
           syncedPlatforms: syncedResult.syncedPlatforms,
           syncStatusByPlatform: syncedResult.syncStatusByPlatform,
@@ -294,7 +316,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
     if (isWorkspaceReadOnly) { showToast('אין הרשאת עריכה. המשתמש מוגדר לצפייה בלבד.'); return; }
     if (!uid || !window.confirm('למחוק את הקהל?')) return;
     try {
-      await deleteAudience(uid, id);
+      await apiDeleteAudience(id);
       setAudiences((prev) => prev.filter((a) => a.id !== id));
       showToast('הקהל נמחק.');
       setModalOpen(false);
@@ -307,7 +329,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
     setSyncingId(a.id);
     try {
       const result = await syncAudiencePlatforms(a, false);
-      await updateAudience(uid, a.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : a.status });
+      await apiUpdateAudience(a.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : a.status });
       setAudiences((prev) =>
         prev.map((x) =>
           x.id === a.id
@@ -327,7 +349,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
     setSyncingId(a.id);
     try {
       const result = await syncAudiencePlatforms(a, true);
-      await updateAudience(uid, a.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : a.status });
+      await apiUpdateAudience(a.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : a.status });
       setAudiences((prev) =>
         prev.map((x) =>
           x.id === a.id
@@ -347,7 +369,7 @@ export function useAudiences({ connections, dataOwnerUid, isWorkspaceReadOnly, i
     try {
       for (const audience of audiences) {
         const result = await syncAudiencePlatforms(audience, true);
-        await updateAudience(uid, audience.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : audience.status });
+        await apiUpdateAudience(audience.id, { syncedToPlatform: result.syncedPlatforms.length > 0, syncedPlatforms: result.syncedPlatforms, syncStatusByPlatform: result.syncStatusByPlatform, externalIdsByPlatform: result.externalIdsByPlatform, externalId: result.externalId, status: result.syncedPlatforms.length > 0 ? 'active' : audience.status });
         setAudiences((prev) =>
           prev.map((x) =>
             x.id === audience.id

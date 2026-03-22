@@ -28,10 +28,9 @@ import {
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 
-import { auth, signOut } from '../lib/firebase';
-
 type UserProfile = {
   uid?: string;
+  name?: string;
   role?: string;
   subscriptionStatus?: string;
   trialEndsAt?: string | null;
@@ -54,7 +53,6 @@ type NavItem = {
 
 export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfile }: SidebarProps) {
   const { t, language } = useLanguage();
-  const currentUser = auth.currentUser;
   const isAdmin = userProfile?.role === 'admin';
   const canViewLeads = userProfile?.role === 'admin';
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
@@ -72,7 +70,8 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
   const handleLogout = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await signOut(auth);
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      window.location.href = '/auth';
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -283,22 +282,13 @@ export function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen, userProfil
           <div className="group flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all duration-200 cursor-pointer">
             <div className="relative">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold overflow-hidden shadow-sm">
-                {currentUser?.photoURL ? (
-                  <img 
-                    src={currentUser.photoURL} 
-                    alt={currentUser.displayName || ''} 
-                    className="w-full h-full object-cover" 
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <User className="w-5 h-5" />
-                )}
+                <User className="w-5 h-5" />
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-[#111] rounded-full shadow-sm" />
             </div>
             <div className="flex-1 min-w-0 text-start">
               <p className="text-sm font-bold text-gray-900 dark:text-white truncate leading-tight">
-                {currentUser?.displayName || 'User'}
+                {userProfile?.name || 'User'}
               </p>
               <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider mt-0.5">
                 {userProfile?.role || 'User'}

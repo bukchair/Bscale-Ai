@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 import { BadgeCheck, Clock3, Download, PhoneCall, Search, XCircle } from 'lucide-react';
-import { db } from '../lib/firebase';
 import { cn } from '../lib/utils';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -28,23 +26,16 @@ export function Leads() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'salesLeads'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const items = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...(docSnap.data() as Record<string, unknown>),
-        })) as SalesLeadRow[];
-        setLeads(items);
+    fetch('/api/leads', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d: { leads?: SalesLeadRow[] }) => {
+        setLeads(d.leads ?? []);
         setLoading(false);
-      },
-      (error) => {
+      })
+      .catch((error) => {
         console.error('Failed to load sales leads:', error);
         setLoading(false);
-      }
-    );
-    return () => unsubscribe();
+      });
   }, []);
 
   const filteredLeads = useMemo(() => {
@@ -69,7 +60,13 @@ export function Leads() {
 
   const updateLeadStatus = async (leadId: string, status: LeadStatus) => {
     try {
-      await updateDoc(doc(db, 'salesLeads', leadId), { status });
+      await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+      setLeads((prev) => prev.map((l) => l.id === leadId ? { ...l, status } : l));
     } catch (error) {
       console.error('Failed to update lead status:', error);
     }

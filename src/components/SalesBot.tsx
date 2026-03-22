@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, MessageCircle, Send, Sparkles, X } from 'lucide-react';
 import { useLanguage, type Language } from '../contexts/LanguageContext';
 import { cn } from '../lib/utils';
-import { ADMIN_SALES_EMAIL, createPublicSalesLead } from '../lib/firebase';
+const ADMIN_SALES_EMAIL: string = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim();
 import { trackEvent } from '../lib/tracking';
 
 type ChatMessage = {
@@ -464,13 +464,17 @@ export function SalesBot() {
         `Timeline: ${form.timeline || '-'}`,
       ].join('\n');
 
-      await createPublicSalesLead({
-        name: form.name,
-        phone: form.phone,
-        email: form.email,
-        sourcePath: window.location.pathname,
-        message: analysisMessage,
-        assignedAdminEmail: ADMIN_SALES_EMAIL,
+      await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email,
+          sourcePath: window.location.pathname,
+          message: analysisMessage,
+          assignedAdminEmail: ADMIN_SALES_EMAIL,
+        }),
       });
       trackEvent('bscale_lead_submit', {
         source: 'sales_bot',

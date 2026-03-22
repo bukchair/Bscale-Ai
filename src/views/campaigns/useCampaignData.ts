@@ -15,7 +15,6 @@ import {
   unifiedLayerToCampaignRows,
 } from '../../lib/unified-data/mappers';
 import { createEmptyUnifiedDataLayer } from '../../lib/unified-data/types';
-import { auth } from '../../lib/firebase';
 import type { Connection } from '../../contexts/ConnectionsContext';
 import type { CampaignRow, PlatformName } from './types';
 
@@ -319,7 +318,7 @@ export function useCampaignData({
       `;
       await sendGmailNotification(
         googleConn.settings.googleAccessToken,
-        auth.currentUser?.email || '',
+        '',
         'BScale AI: Your Campaign Recommendations',
         emailBody
       );

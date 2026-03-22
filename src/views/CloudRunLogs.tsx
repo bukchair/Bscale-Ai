@@ -4,7 +4,6 @@ import React, { useState, useCallback } from 'react';
 import { RefreshCw, Search, AlertCircle, Info, AlertTriangle, XCircle, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { API_BASE } from '../lib/utils/client-api-base';
-import { auth, onAuthStateChanged } from '../lib/firebase';
 
 type Severity = '' | 'DEFAULT' | 'DEBUG' | 'INFO' | 'NOTICE' | 'WARNING' | 'ERROR' | 'CRITICAL' | 'ALERT' | 'EMERGENCY';
 
@@ -96,20 +95,8 @@ function logMessage(entry: LogEntry): string {
   return '—';
 }
 
-async function ensureSession() {
-  const user =
-    auth.currentUser ||
-    (await new Promise<import('firebase/auth').User | null>((resolve) => {
-      const unsub = onAuthStateChanged(auth, (u) => { unsub(); resolve(u); });
-    }));
-  if (!user) return;
-  const idToken = await user.getIdToken();
-  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ idToken }),
-  });
-}
+// Session is maintained via httpOnly cookie — no bootstrap needed.
+async function ensureSession() { /* no-op */ }
 
 export function CloudRunLogs() {
   const [logs, setLogs] = useState<LogEntry[]>([]);

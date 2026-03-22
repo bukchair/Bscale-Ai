@@ -81,6 +81,11 @@ model User {
   image               String?
   role                String               @default("user")
   passwordHash        String?
+  subscriptionStatus  String               @default("trial")
+  plan                String               @default("trial_3_days")
+  trialStartedAt      DateTime?
+  trialEndsAt         DateTime?
+  settings            Json?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   platformConnections PlatformConnection[]
@@ -97,6 +102,9 @@ model User {
   oneClickCampaignRequests     OneClickCampaignRequest[]
   ownedSharedAccess            SharedAccess[] @relation("OwnerSharedAccess")
   receivedSharedAccess         SharedAccess[] @relation("SharedWithAccess")
+  savedAds                     SavedAd[]
+  audiences                    Audience[]
+  supportThreads               SupportThread[]
 
   @@index([createdAt])
   @@index([updatedAt])
@@ -368,6 +376,80 @@ model ActionRequest {
   account          ConnectedAccount    @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
 
   @@index([userId, platform, createdAt])
+}
+
+// ─── SavedAd ─────────────────────────────────────────────────────────────────
+model SavedAd {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "copy" | "image"
+  productName String?
+  payload     Json
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ─── Audience ─────────────────────────────────────────────────────────────────
+model Audience {
+  id                   String   @id @default(cuid())
+  userId               String
+  name                 String
+  platform             String
+  description          String?
+  rules                Json
+  estimatedSize        Int?
+  status               String   @default("draft")
+  syncedToPlatform     Boolean  @default(false)
+  externalId           String?
+  syncedPlatforms      Json?
+  syncStatusByPlatform Json?
+  externalIdsByPlatform Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+}
+
+// ─── SalesLead ────────────────────────────────────────────────────────────────
+model SalesLead {
+  id                 String   @id @default(cuid())
+  name               String
+  email              String?
+  phone              String?
+  website            String?
+  sourcePath         String?
+  message            String?
+  assignedAdminEmail String?
+  status             String   @default("new")
+  readBy             Json?
+  createdAt          DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+// ─── SupportThread ────────────────────────────────────────────────────────────
+model SupportThread {
+  id              String   @id @default(cuid())
+  ownerUserId     String
+  subject         String
+  status          String   @default("waiting-admin") // "open"|"waiting-admin"|"waiting-user"|"resolved"
+  createdByName   String?
+  createdByEmail  String?
+  messages        Json     @default("[]")
+  lastMessageAt   String   @default("")
+  lastMessageFrom String   @default("user")         // "user" | "admin"
+  lastMessageText String   @default("")
+  adminSeenAt     String   @default("")
+  userSeenAt      String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  owner           User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([ownerUserId, updatedAt])
+  @@index([status, updatedAt])
 }
 
 // ─── One Click Campaign ──────────────────────────────────────────────────────

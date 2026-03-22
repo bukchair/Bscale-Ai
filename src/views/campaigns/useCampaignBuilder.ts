@@ -5,7 +5,6 @@ import {
   getAudienceRecommendations,
   getCampaignBuilderSuggestions,
 } from '../../lib/gemini';
-import { auth, onAuthStateChanged } from '../../lib/firebase';
 import { toAmount } from './utils';
 import type {
   ContentType,
@@ -520,38 +519,8 @@ export function useCampaignBuilder({
   const [publishResults, setPublishResults] = useState<Array<{ platform: string; ok: boolean; message: string; campaignId?: string }>>([]);
   const [generateAiImageLoading, setGenerateAiImageLoading] = useState(false);
 
-  const ensureManagedApiSession = async () => {
-    const currentUser =
-      auth.currentUser ||
-      (await new Promise<import('firebase/auth').User | null>((resolve) => {
-        const timeoutId = window.setTimeout(() => { unsubscribe(); resolve(auth.currentUser); }, 3000);
-        const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-          window.clearTimeout(timeoutId);
-          unsubscribe();
-          resolve(nextUser);
-        });
-      }));
-    if (!currentUser) {
-      throw new Error(
-        isHebrew
-          ? 'נדרש להתחבר מחדש למערכת לפני יצירת קמפיין.'
-          : 'Please sign in again before creating a campaign.'
-      );
-    }
-    const idToken = await currentUser.getIdToken(true);
-    const response = await fetch('/api/auth/session/bootstrap', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload?.success === false) {
-      throw new Error(
-        payload?.message ||
-          (isHebrew ? 'אימות הסשן נכשל. התחבר מחדש ונסה שוב.' : 'Session bootstrap failed. Please sign in again.')
-      );
-    }
-  };
+  // Session is maintained via httpOnly cookie — no bootstrap needed.
+  const ensureManagedApiSession = async () => { /* no-op */ };
 
   const handleGenerateCreativeImage = async () => {
     setBuilderMessage(null);

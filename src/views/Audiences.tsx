@@ -4,7 +4,7 @@ import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Users, Target, Zap, Plus, ArrowLeft, BarChart2, Pencil, Trash2, Send, Loader2, X, Sparkles, Globe2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { type Audience, type AudiencePlatform, type AudienceRule } from '../lib/firebase';
+import type { Audience, AudiencePlatform, AudienceRule } from '../lib/firebase';
 import { type AudienceRecommendation } from '../lib/gemini';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { useAudiences, platformLabels, ALL_AUDIENCE_PLATFORMS, statusLabels } from './audiences/useAudiences';

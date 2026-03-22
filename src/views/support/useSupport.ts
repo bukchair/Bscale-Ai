@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { collection, collectionGroup, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
-import { auth, db } from '../../lib/firebase';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import type { Language } from '../../contexts/LanguageContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -142,10 +140,7 @@ export interface UseSupportProps {
 export function useSupport({ userProfile, language }: UseSupportProps) {
   const copy = COPY[language] ?? COPY.en;
   const isAdmin = userProfile?.role === 'admin';
-  const currentUser = auth.currentUser;
-  const currentUid = currentUser?.uid || userProfile?.uid || '';
-  const currentDisplayName = currentUser?.displayName || userProfile?.name || 'User';
-  const currentEmail = currentUser?.email || userProfile?.email || '';
+  const currentUid = userProfile?.uid || '';
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [threads, setThreads] = useState<SupportThreadRow[]>([]);
@@ -159,102 +154,59 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const mapFirebaseError = (raw: unknown, fallback: string) => {
-    const message = raw instanceof Error ? raw.message : '';
-    if (/permission|denied|missing or insufficient/i.test(message)) {
-      return language === 'he' ? 'אין הרשאת כתיבה לתמיכה בחשבון הנוכחי.' : `${fallback} (permission denied)`;
-    }
-    return fallback;
-  };
-
-  const getThreadDocRef = (thread: SupportThreadRow) => {
-    return doc(db, 'users', thread.ownerUid || thread.createdByUid, 'settings', thread.docId || thread.id);
-  };
-
-  // ── Effects ────────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Load threads ────────────────────────────────────────────────────────────
+  const loadThreads = useCallback(async () => {
     if (!currentUid) return;
-
-    const unsubscribe = isAdmin
-      ? onSnapshot(
-          query(collectionGroup(db, 'settings'), where('kind', '==', 'support_thread')),
-          (snapshot) => {
-            const rows = snapshot.docs
-              .map((row) => {
-                const ownerUid = row.ref.parent.parent?.id || '';
-                return {
-                  id: row.id,
-                  ownerUid,
-                  docId: row.id,
-                  ...(row.data() as Record<string, unknown>),
-                } as SupportThreadRow;
-              })
-              .filter((row) => Boolean(row.ownerUid))
-              .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-            setThreads(rows);
-            setSelectedThreadId((prev) => prev || rows[0]?.id || null);
-          },
-          (snapshotError) => {
-            console.error('Failed to load support threads:', snapshotError);
-          }
-        )
-      : onSnapshot(
-          collection(db, 'users', currentUid, 'settings'),
-          (snapshot) => {
-            const rows = snapshot.docs
-              .map((row) => ({
-                id: row.id,
-                ownerUid: currentUid,
-                docId: row.id,
-                ...(row.data() as Record<string, unknown>),
-              } as SupportThreadRow))
-              .filter((row) => row.kind === 'support_thread')
-              .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()) as SupportThreadRow[];
-            setThreads(rows);
-            setSelectedThreadId((prev) => prev || rows[0]?.id || null);
-          },
-          (snapshotError) => {
-            console.error('Failed to load support threads:', snapshotError);
-          }
-        );
-
-    return () => unsubscribe();
-  }, [currentUid, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+    try {
+      const res = await fetch('/api/support', { credentials: 'include' });
+      if (!res.ok) return;
+      const d = (await res.json()) as { threads?: SupportThreadRow[] };
+      const rows = (d.threads ?? []).sort((a, b) =>
+        new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+      );
+      setThreads(rows);
+      setSelectedThreadId((prev) => prev || rows[0]?.id || null);
+    } catch (err) {
+      console.error('Failed to load support threads:', err);
+    }
+  }, [currentUid]);
 
   useEffect(() => {
-    if (!selectedThreadId) {
-      setMessages([]);
-      return;
-    }
-    const thread = threads.find((item) => item.id === selectedThreadId);
-    const rows = (thread?.messages || []).slice().sort((a, b) => {
-      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-    });
+    void loadThreads();
+  }, [loadThreads]);
+
+  // ── Sync messages from selected thread ──────────────────────────────────────
+  useEffect(() => {
+    if (!selectedThreadId) { setMessages([]); return; }
+    const thread = threads.find((t) => t.id === selectedThreadId);
+    const rows = (thread?.messages || []).slice().sort((a, b) =>
+      new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
     setMessages(rows);
   }, [selectedThreadId, threads]);
 
   // ── Memos ──────────────────────────────────────────────────────────────────
   const selectedThread = useMemo(
-    () => threads.find((thread) => thread.id === selectedThreadId) || null,
+    () => threads.find((t) => t.id === selectedThreadId) || null,
     [selectedThreadId, threads]
   );
 
-  // ── Effect: mark seen ──────────────────────────────────────────────────────
+  // ── Mark seen ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedThread) return;
-    const markSeen = async () => {
-      try {
-        const field = isAdmin ? 'adminSeenAt' : 'userSeenAt';
-        const seenAt = isAdmin ? selectedThread.adminSeenAt : selectedThread.userSeenAt;
-        if (!selectedThread.lastMessageAt) return;
-        if (seenAt && new Date(seenAt).getTime() >= new Date(selectedThread.lastMessageAt).getTime()) return;
-        await updateDoc(getThreadDocRef(selectedThread), { [field]: new Date().toISOString() });
-      } catch (updateError) {
-        console.warn('Failed to mark support thread as seen:', updateError);
-      }
-    };
-    markSeen();
+    const field = isAdmin ? 'adminSeenAt' : 'userSeenAt';
+    const seenAt = isAdmin ? selectedThread.adminSeenAt : selectedThread.userSeenAt;
+    if (!selectedThread.lastMessageAt) return;
+    if (seenAt && new Date(seenAt).getTime() >= new Date(selectedThread.lastMessageAt).getTime()) return;
+    fetch(`/api/support/${selectedThread.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ markSeen: true }),
+    }).catch((e) => console.warn('Failed to mark support thread as seen:', e));
+    setThreads((prev) => prev.map((t) =>
+      t.id === selectedThread.id ? { ...t, [field]: new Date().toISOString() } : t
+    ));
   }, [isAdmin, selectedThread]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived helpers ────────────────────────────────────────────────────────
@@ -280,57 +232,31 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const createThread = async () => {
-    if (!currentUid) {
-      setError(copy.authRequired);
-      return;
-    }
-    if (!subject.trim()) {
-      setError(copy.validationSubject);
-      return;
-    }
-    if (!firstMessage.trim()) {
-      setError(copy.validationMessage);
-      return;
-    }
+    if (!currentUid) { setError(copy.authRequired); return; }
+    if (!subject.trim()) { setError(copy.validationSubject); return; }
+    if (!firstMessage.trim()) { setError(copy.validationMessage); return; }
     setIsCreating(true);
     setError(null);
     setSuccess(null);
     try {
-      const now = new Date().toISOString();
-      const threadRef = doc(collection(db, 'users', currentUid, 'settings'));
-      const firstSupportMessage: SupportMessageRow = {
-        id: `msg_${Date.now()}`,
-        threadId: threadRef.id,
-        text: firstMessage.trim().slice(0, 4000),
-        senderUid: currentUid,
-        senderRole: 'user',
-        senderName: currentDisplayName,
-        createdAt: now,
-      };
-
-      await setDoc(threadRef, {
-        kind: 'support_thread',
-        subject: subject.trim().slice(0, 180),
-        createdByUid: currentUid,
-        createdByName: currentDisplayName,
-        createdByEmail: currentEmail,
-        createdAt: now,
-        updatedAt: now,
-        status: 'waiting-admin' as SupportStatus,
-        lastMessageAt: now,
-        lastMessageFrom: 'user' as SenderRole,
-        lastMessageText: firstMessage.trim().slice(0, 300),
-        adminSeenAt: '',
-        userSeenAt: now,
-        messages: [firstSupportMessage],
+      const res = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ subject: subject.trim(), firstMessage: firstMessage.trim() }),
       });
+      if (!res.ok) throw new Error('Failed');
+      const d = (await res.json()) as { thread?: SupportThreadRow };
+      if (d.thread) {
+        setThreads((prev) => [d.thread!, ...prev]);
+        setSelectedThreadId(d.thread.id);
+      }
       setSubject('');
       setFirstMessage('');
-      setSelectedThreadId(threadRef.id);
       setSuccess(copy.createSuccess);
-    } catch (createError) {
-      console.error('Failed creating support thread:', createError);
-      setError(mapFirebaseError(createError, copy.createError));
+    } catch (e) {
+      console.error('Failed creating support thread:', e);
+      setError(copy.createError);
     } finally {
       setIsCreating(false);
     }
@@ -338,39 +264,24 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
 
   const sendReply = async () => {
     if (!selectedThread) return;
-    if (!currentUid) {
-      setError(copy.authRequired);
-      return;
-    }
+    if (!currentUid) { setError(copy.authRequired); return; }
     const clean = reply.trim();
     if (!clean) return;
     setIsSending(true);
     setError(null);
     try {
-      const now = new Date().toISOString();
-      const senderRole: SenderRole = isAdmin ? 'admin' : 'user';
-      const nextMessage: SupportMessageRow = {
-        id: `msg_${Date.now()}`,
-        threadId: selectedThread.id,
-        text: clean.slice(0, 4000),
-        senderUid: currentUid,
-        senderRole,
-        senderName: currentDisplayName || (isAdmin ? 'Admin' : 'User'),
-        createdAt: now,
-      };
-      await updateDoc(getThreadDocRef(selectedThread), {
-        messages: [...(selectedThread.messages || []), nextMessage],
-        updatedAt: now,
-        lastMessageAt: now,
-        lastMessageFrom: senderRole,
-        lastMessageText: clean.slice(0, 300),
-        status: senderRole === 'admin' ? 'waiting-user' : 'waiting-admin',
-        ...(senderRole === 'admin' ? { adminSeenAt: now } : { userSeenAt: now }),
+      const res = await fetch(`/api/support/${selectedThread.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: clean }),
       });
+      if (!res.ok) throw new Error('Failed');
       setReply('');
-    } catch (sendError) {
-      console.error('Failed sending support reply:', sendError);
-      setError(mapFirebaseError(sendError, copy.sendError));
+      await loadThreads();
+    } catch (e) {
+      console.error('Failed sending support reply:', e);
+      setError(copy.sendError);
     } finally {
       setIsSending(false);
     }
@@ -379,21 +290,24 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
   const updateThreadStatus = async (status: SupportStatus) => {
     if (!selectedThread || !isAdmin) return;
     try {
-      await updateDoc(getThreadDocRef(selectedThread), {
-        status,
-        updatedAt: new Date().toISOString(),
+      await fetch(`/api/support/${selectedThread.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
       });
-    } catch (statusError) {
-      console.error('Failed updating support status:', statusError);
+      setThreads((prev) => prev.map((t) =>
+        t.id === selectedThread.id ? { ...t, status, updatedAt: new Date().toISOString() } : t
+      ));
+    } catch (e) {
+      console.error('Failed updating support status:', e);
     }
   };
 
   return {
-    // derived
     copy,
     isAdmin,
     currentUid,
-    // state
     threads,
     selectedThreadId, setSelectedThreadId,
     messages,
@@ -404,12 +318,9 @@ export function useSupport({ userProfile, language }: UseSupportProps) {
     isSending,
     error,
     success,
-    // memos
     selectedThread,
-    // helpers
     isUnread,
     translateStatus,
-    // handlers
     createThread,
     sendReply,
     updateThreadStatus,

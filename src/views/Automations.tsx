@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 import { useConnections } from '../contexts/ConnectionsContext';
 import { useCurrency } from '../contexts/CurrencyContext';
 import { useAutomations } from './automations/useAutomations';
-import { type AutoAdsSchedule } from '../lib/firebase';
+import type { AutoAdsSchedule } from '../lib/firebase';
 
 export function Automations() {
   const { t, dir, language } = useLanguage();

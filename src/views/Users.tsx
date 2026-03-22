@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Users as UsersIcon, Shield, UserPlus, Search, Edit2, Trash2, Building, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { db, auth } from '../lib/firebase';
-import { collection, onSnapshot, query, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -70,28 +68,27 @@ export function Users() {
   const [selectedRole, setSelectedRole] = useState<string>('all');
 
   useEffect(() => {
-    const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const usersData = snapshot.docs.map((d) => {
-        const data = d.data() as Record<string, unknown>;
-        return {
-          ...data,
-          uid: typeof data.uid === 'string' ? data.uid : d.id,
-        } as UserProfile;
+    fetch('/api/admin/users', { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d: { users?: UserProfile[] }) => {
+        setUsers(d.users ?? []);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Error fetching users:", error);
+        setLoading(false);
       });
-      setUsers(usersData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching users:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
   }, []);
 
   const handleRoleChange = async (userId: string, newRole: UserProfile['role']) => {
     try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ role: newRole }),
+      });
+      setUsers((prev) => prev.map((u) => u.uid === userId ? { ...u, role: newRole } : u));
     } catch (error) {
       console.error("Error updating role:", error);
     }
@@ -112,14 +109,19 @@ export function Users() {
           : nextStatus === 'free'
             ? 'free_by_admin'
             : 'demo';
-      await updateDoc(doc(db, 'users', userId), {
-        subscriptionStatus: nextStatus,
-        plan: nextPlan,
-        approvedAt: nextStatus === 'demo' || nextStatus === 'trial' ? null : nowIso,
-        approvedByAdminUid: nextStatus === 'demo' || nextStatus === 'trial' ? null : auth.currentUser?.uid || null,
-        trialStartedAt: nextStatus === 'trial' ? nowIso : null,
-        trialEndsAt: nextStatus === 'trial' ? trialEndsAt : null,
+      await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          subscriptionStatus: nextStatus,
+          plan: nextPlan,
+          approvedAt: nextStatus === 'demo' || nextStatus === 'trial' ? null : nowIso,
+          trialStartedAt: nextStatus === 'trial' ? nowIso : null,
+          trialEndsAt: nextStatus === 'trial' ? trialEndsAt : null,
+        }),
       });
+      setUsers((prev) => prev.map((u) => u.uid === userId ? { ...u, subscriptionStatus: nextStatus, plan: nextPlan } : u));
     } catch (error) {
       console.error("Error updating subscription:", error);
     }
@@ -133,7 +135,11 @@ export function Users() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await deleteDoc(doc(db, 'users', userId));
+      await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      setUsers((prev) => prev.filter((u) => u.uid !== userId));
       setDeleteConfirmId(null);
     } catch (error) {
       console.error("Error deleting user:", error);

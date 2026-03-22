@@ -8,9 +8,7 @@ import { useConnections } from '../contexts/ConnectionsContext';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { cn } from '../lib/utils';
-import { collection, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
-import { useNotificationData, type SupportMessageRow, type SupportThreadNotification } from './hooks/useNotificationData';
+import { useNotificationData, type SupportThreadNotification } from './hooks/useNotificationData';
 import { useTrialCountdown } from './hooks/useTrialCountdown';
 
 type UserProfile = {
@@ -63,8 +61,8 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
   const canViewLeads = userProfile?.role === 'admin';
   const canApproveUsers = userProfile?.role === 'admin';
   const canViewSupport = userProfile?.role === 'admin';
-  const currentUid = auth.currentUser?.uid;
-  const supportCurrentUid = auth.currentUser?.uid || userProfile?.uid || '';
+  const currentUid = userProfile?.uid;
+  const supportCurrentUid = userProfile?.uid || '';
 
   const dateRangeRef = useRef<HTMLDivElement | null>(null);
   const connectionsRef = useRef<HTMLDivElement | null>(null);
@@ -241,22 +239,8 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
     await Promise.all(
       unreadLeads.map((lead) =>
-        updateDoc(doc(db, 'salesLeads', lead.id), {
-          [`readBy.${currentUid}`]: new Date().toISOString(),
-        }).catch((error) => {
-          console.warn('Failed to mark lead notification as read:', error);
-        })
-      )
-    );
-
-    const unreadPendingUsers = pendingUserApprovals.filter((pendingUser) => !pendingUser.approvalReadBy?.[currentUid]);
-    await Promise.all(
-      unreadPendingUsers.map((pendingUser) =>
-        updateDoc(doc(db, 'users', pendingUser.uid), {
-          [`approvalReadBy.${currentUid}`]: new Date().toISOString(),
-        }).catch((error) => {
-          console.warn('Failed to mark pending user notification as read:', error);
-        })
+        fetch(`/api/leads/${lead.id}/read`, { method: 'POST', credentials: 'include' })
+          .catch((error) => console.warn('Failed to mark lead notification as read:', error))
       )
     );
 
@@ -269,17 +253,14 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
     await Promise.all(
       unreadSupportThreads.map((thread) =>
-        updateDoc(doc(db, 'users', thread.ownerUid, 'settings', thread.docId), {
-          adminSeenAt: new Date().toISOString(),
-        }).catch((error) => {
-          console.warn('Failed to mark support notification as read:', error);
-        })
+        fetch(`/api/support/${thread.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ markSeen: true }),
+        }).catch((error) => console.warn('Failed to mark support notification as read:', error))
       )
     );
-  };
-
-  const getSupportThreadDocRef = (thread: SupportThreadNotification) => {
-    return doc(db, 'users', thread.ownerUid || thread.createdByUid || '', 'settings', thread.docId || thread.id);
   };
 
   const handleToggleSupport = () => {
@@ -291,22 +272,18 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
 
   useEffect(() => {
     if (!isSupportOpen || !selectedSupportThread) return;
-    const markSeen = async () => {
-      try {
-        const lastAt = selectedSupportThread.lastMessageAt
-          ? new Date(selectedSupportThread.lastMessageAt).getTime()
-          : 0;
-        if (!lastAt) return;
-        const field = canViewSupport ? 'adminSeenAt' : 'userSeenAt';
-        const seenAtRaw = canViewSupport ? selectedSupportThread.adminSeenAt : selectedSupportThread.userSeenAt;
-        const seenAt = seenAtRaw ? new Date(seenAtRaw).getTime() : 0;
-        if (seenAt >= lastAt) return;
-        await updateDoc(getSupportThreadDocRef(selectedSupportThread), { [field]: new Date().toISOString() });
-      } catch (error) {
-        console.warn('Failed to mark support widget thread as seen:', error);
-      }
-    };
-    markSeen();
+    const lastAt = selectedSupportThread.lastMessageAt
+      ? new Date(selectedSupportThread.lastMessageAt).getTime() : 0;
+    if (!lastAt) return;
+    const seenAtRaw = canViewSupport ? selectedSupportThread.adminSeenAt : selectedSupportThread.userSeenAt;
+    const seenAt = seenAtRaw ? new Date(seenAtRaw).getTime() : 0;
+    if (seenAt >= lastAt) return;
+    fetch(`/api/support/${selectedSupportThread.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ markSeen: true }),
+    }).catch((error) => console.warn('Failed to mark support widget thread as seen:', error));
   }, [canViewSupport, isSupportOpen, selectedSupportThread]);
 
   const handleSupportSend = async () => {
@@ -328,25 +305,13 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           setIsSupportSending(false);
           return;
         }
-        const senderRole: 'user' | 'admin' = canViewSupport ? 'admin' : 'user';
-        const nextMessage: SupportMessageRow = {
-          id: `msg_${Date.now()}`,
-          threadId: selectedSupportThread.id,
-          text: clean.slice(0, 4000),
-          senderUid: supportCurrentUid,
-          senderRole,
-          senderName: auth.currentUser?.displayName || userProfile?.name || (canViewSupport ? 'Admin' : 'User'),
-          createdAt: now,
-        };
-        await updateDoc(getSupportThreadDocRef(selectedSupportThread), {
-          messages: [...(selectedSupportThread.messages || []), nextMessage],
-          updatedAt: now,
-          lastMessageAt: now,
-          lastMessageFrom: senderRole,
-          lastMessageText: clean.slice(0, 300),
-          status: senderRole === 'admin' ? 'waiting-user' : 'waiting-admin',
-          ...(senderRole === 'admin' ? { adminSeenAt: now } : { userSeenAt: now }),
+        const res = await fetch(`/api/support/${selectedSupportThread.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ message: clean }),
         });
+        if (!res.ok) throw new Error('Failed to send message');
         setSupportReply('');
         setSupportSuccess(tr('support.messageSent', 'Message sent.'));
       } else {
@@ -367,37 +332,17 @@ export function Header({ onMenuClick, userProfile }: HeaderProps) {
           setIsSupportSending(false);
           return;
         }
-
-        const threadRef = doc(collection(db, 'users', supportCurrentUid, 'settings'));
-        const firstMessage: SupportMessageRow = {
-          id: `msg_${Date.now()}`,
-          threadId: threadRef.id,
-          text: cleanMessage.slice(0, 4000),
-          senderUid: supportCurrentUid,
-          senderRole: 'user',
-          senderName: auth.currentUser?.displayName || userProfile?.name || 'User',
-          createdAt: now,
-        };
-
-        await setDoc(threadRef, {
-          kind: 'support_thread',
-          subject: cleanSubject.slice(0, 180),
-          createdByUid: supportCurrentUid,
-          createdByName: auth.currentUser?.displayName || userProfile?.name || 'User',
-          createdByEmail: auth.currentUser?.email || userProfile?.email || '',
-          createdAt: now,
-          updatedAt: now,
-          status: 'waiting-admin',
-          lastMessageAt: now,
-          lastMessageFrom: 'user',
-          lastMessageText: cleanMessage.slice(0, 300),
-          adminSeenAt: '',
-          userSeenAt: now,
-          messages: [firstMessage],
+        const res = await fetch('/api/support', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ subject: cleanSubject, firstMessage: cleanMessage }),
         });
+        if (!res.ok) throw new Error('Failed to create thread');
+        const d = (await res.json()) as { thread?: { id: string } };
         setSupportDraftSubject('');
         setSupportDraftMessage('');
-        setSupportSelectedThreadId(threadRef.id);
+        if (d.thread?.id) setSupportSelectedThreadId(d.thread.id);
         setSupportSuccess(tr('support.requestSent', 'Support request sent.'));
       }
     } catch (error) {
