@@ -135,7 +135,7 @@ export const COPY: Record<Language, SupportCopy> = {
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export interface UseSupportProps {
-  userProfile?: { role?: string; uid?: string; name?: string; email?: string } | null;
+  userProfile?: { role?: string; uid?: string; name?: string; email?: string | null } | null;
   language: Language;
 }
 
