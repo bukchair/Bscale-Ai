@@ -1,9 +1,12 @@
-'use client';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { SESSION_COOKIE_NAME } from '@/src/lib/auth/session';
+import LandingPageClient from './LandingPageClient';
 
-import { useRouter } from 'next/navigation';
-import { Landing } from '@/src/views/Landing';
-
-export default function LandingPage() {
-  const router = useRouter();
-  return <Landing onEnter={() => router.push('/auth')} />;
+export default async function LandingPage() {
+  const cookieStore = await cookies();
+  if (cookieStore.get(SESSION_COOKIE_NAME)?.value) {
+    redirect('/app');
+  }
+  return <LandingPageClient />;
 }
