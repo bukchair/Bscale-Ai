@@ -73,11 +73,21 @@ async function createUser(id: string, email: string, name: string | null) {
     });
   } catch (err) {
     if (!isMissingColumnError(err)) throw err;
-    const row = await prisma.user.create({
-      data: { id, email, name },
-      select: { id: true, email: true, name: true },
-    });
-    return { ...row, role: 'user' as const };
+    // role column missing in DB (migration pending).
+    // Prisma adds `role` to INSERT from schema @default, so we must use raw SQL
+    // to insert without that column. ON CONFLICT handles the race where the
+    // first attempt already committed the row before failing on RETURNING.
+    type RawRow = { id: string; email: string; name: string | null };
+    const rows = await prisma.$queryRaw<RawRow[]>`
+      INSERT INTO "User" (id, email, name)
+      VALUES (${id}, ${email}, ${name})
+      ON CONFLICT (id) DO NOTHING
+      RETURNING id, email, name`;
+    if (rows.length > 0) return { ...rows[0], role: 'user' as const };
+    // Row already existed (conflict); fetch it.
+    const existing = await prisma.$queryRaw<RawRow[]>`
+      SELECT id, email, name FROM "User" WHERE id = ${id}`;
+    return { ...existing[0], role: 'user' as const };
   }
 }
 
