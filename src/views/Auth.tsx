@@ -26,6 +26,57 @@ export function Auth({ onLogin, initialMode = 'login' }: AuthProps) {
     setRegisterSent(false);
   }, [initialMode]);
 
+  // OAuth callback redirects here with ?error= when Google flow fails (see /api/auth/google/callback).
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const oauthError = params.get('error');
+    if (!oauthError) return;
+
+    const messages: Record<string, { he: string; en: string }> = {
+      google_denied: {
+        he: 'ביטלת את ההתחברות ב-Google.',
+        en: 'You cancelled Google sign-in.',
+      },
+      invalid_callback: {
+        he: 'תגובה לא תקינה מ-Google. נסה שוב.',
+        en: 'Invalid response from Google. Try again.',
+      },
+      state_mismatch: {
+        he: 'פג תוקף ההתחברות או חסימת עוגיות. נסה שוב.',
+        en: 'Session expired or cookies blocked. Try again.',
+      },
+      token_exchange: {
+        he: 'החלפת הקוד נכשלה — בדוק ב-Vercel/Cloud Run: GOOGLE_AUTH_CLIENT_ID, GOOGLE_AUTH_CLIENT_SECRET, ושה-Redirect URI זהה ל-Google Cloud.',
+        en: 'Token exchange failed—verify GOOGLE_AUTH_CLIENT_ID, GOOGLE_AUTH_CLIENT_SECRET, and that the redirect URI matches Google Cloud exactly.',
+      },
+      no_access_token: {
+        he: 'Google לא החזיר אסימון גישה.',
+        en: 'Google did not return an access token.',
+      },
+      userinfo_fetch: {
+        he: 'לא ניתן לטעון פרטי משתמש מ-Google.',
+        en: 'Could not load user info from Google.',
+      },
+      missing_claims: {
+        he: 'חסרים פרטי אימייל מהחשבון.',
+        en: 'Missing email from Google account.',
+      },
+    };
+
+    const row = messages[oauthError];
+    setError(
+      row
+        ? language === 'he'
+          ? row.he
+          : row.en
+        : language === 'he'
+          ? `שגיאת התחברות: ${oauthError}`
+          : `Sign-in error: ${oauthError}`
+    );
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [language]);
+
   const handleGoogleLogin = () => {
     trackEvent('bscale_login_google_start', { page_path: window.location.pathname });
     window.location.href = '/api/auth/google';
