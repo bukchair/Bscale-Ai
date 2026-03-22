@@ -5,6 +5,10 @@ const CLOUD_RUN_SERVICE = process.env.CLOUD_RUN_SERVICE_NAME || 'bscale';
 const CLOUD_RUN_REGION = process.env.CLOUD_RUN_REGION || 'europe-west1';
 const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || '';
 
+function sanitizeFilterFragment(value: string) {
+  return value.replace(/["\\]/g, '');
+}
+
 async function getAccessToken(): Promise<string> {
   // In Cloud Run, use the metadata server for ADC token
   const metadataRes = await fetch(
@@ -35,17 +39,25 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const severity = url.searchParams.get('severity') || '';
     const search = url.searchParams.get('search') || '';
+    const userEmail = (url.searchParams.get('userEmail') || '').trim();
+    const errorsOnly =
+      url.searchParams.get('errorsOnly') === '1' || url.searchParams.get('errorsOnly') === 'true';
     const pageSize = Math.min(parseInt(url.searchParams.get('pageSize') || '100', 10), 500);
     const pageToken = url.searchParams.get('pageToken') || undefined;
 
     let filter = `resource.type="cloud_run_revision" resource.labels.service_name="${CLOUD_RUN_SERVICE}" resource.labels.location="${CLOUD_RUN_REGION}"`;
-    if (severity) {
+    if (errorsOnly) {
+      filter += ' severity>=ERROR';
+    } else if (severity) {
       filter += ` severity=${severity}`;
     }
     if (search) {
-      // Sanitize: only allow printable non-quote characters to avoid injection in filter
-      const safeSearch = search.replace(/["\\]/g, '');
+      const safeSearch = sanitizeFilterFragment(search);
       filter += ` textPayload:"${safeSearch}"`;
+    }
+    if (userEmail) {
+      const safeEmail = sanitizeFilterFragment(userEmail);
+      filter += ` (textPayload:"${safeEmail}" OR jsonPayload.userEmail="${safeEmail}" OR jsonPayload.user_email="${safeEmail}")`;
     }
 
     const accessToken = await getAccessToken();
