@@ -5,7 +5,7 @@ import { prisma } from '@/src/lib/db/prisma';
 const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim();
 
 // PATCH /api/leads/[id] — admin only, updates lead status
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try {
     user = await requireAuthenticatedUser();
@@ -16,6 +16,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (user.role !== 'admin' && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const { id } = await params;
 
   let body: { status?: string };
   try {
@@ -30,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   await prisma.salesLead.update({
-    where: { id: params.id },
+    where: { id },
     data: { status: body.status ?? undefined },
   });
 
