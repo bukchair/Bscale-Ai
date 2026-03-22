@@ -36,6 +36,11 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appBase}/auth?error=state_mismatch`);
   }
 
+  console.log('[auth/google/callback] state validated, exchanging code for token');
+  console.log('[auth/google/callback] client_id present:', !!integrationsEnv.GOOGLE_AUTH_CLIENT_ID);
+  console.log('[auth/google/callback] client_secret present:', !!integrationsEnv.GOOGLE_AUTH_CLIENT_SECRET);
+  console.log('[auth/google/callback] redirect_uri:', integrationsEnv.GOOGLE_AUTH_REDIRECT_URI);
+
   // Exchange code for tokens
   let accessToken: string;
   try {
@@ -52,15 +57,18 @@ export async function GET(request: Request) {
     });
 
     if (!tokenRes.ok) {
-      console.error('[auth/google/callback] token exchange failed', await tokenRes.text());
+      const body = await tokenRes.text();
+      console.error('[auth/google/callback] token exchange failed', tokenRes.status, body);
       return NextResponse.redirect(`${appBase}/auth?error=token_exchange`);
     }
 
     const tokenData = (await tokenRes.json()) as { access_token?: string };
     if (!tokenData.access_token) {
+      console.error('[auth/google/callback] no access_token in response');
       return NextResponse.redirect(`${appBase}/auth?error=no_access_token`);
     }
     accessToken = tokenData.access_token;
+    console.log('[auth/google/callback] token exchange OK');
   } catch (err) {
     console.error('[auth/google/callback] token exchange error', err);
     return NextResponse.redirect(`${appBase}/auth?error=token_exchange`);
@@ -74,16 +82,19 @@ export async function GET(request: Request) {
     });
 
     if (!userRes.ok) {
+      console.error('[auth/google/callback] userinfo fetch failed', userRes.status);
       return NextResponse.redirect(`${appBase}/auth?error=userinfo_fetch`);
     }
 
     userInfo = (await userRes.json()) as GoogleUserInfo;
+    console.log('[auth/google/callback] userinfo OK, email:', userInfo.email);
   } catch (err) {
     console.error('[auth/google/callback] userinfo error', err);
     return NextResponse.redirect(`${appBase}/auth?error=userinfo_fetch`);
   }
 
   if (!userInfo.email || !userInfo.sub) {
+    console.error('[auth/google/callback] missing claims, sub:', userInfo.sub, 'email:', userInfo.email);
     return NextResponse.redirect(`${appBase}/auth?error=missing_claims`);
   }
 
@@ -93,6 +104,7 @@ export async function GET(request: Request) {
     email: userInfo.email,
     name: userInfo.name ?? null,
   });
+  console.log('[auth/google/callback] session issued, redirecting to /app');
 
   const response = NextResponse.redirect(`${appBase}/app`);
 

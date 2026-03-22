@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     async function bootstrap() {
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
         if (cancelled) return;
 
         if (!res.ok) {
@@ -134,7 +134,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     void bootstrap();
     return () => { cancelled = true; };
-  }, [router]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isLoading) {
     return (
