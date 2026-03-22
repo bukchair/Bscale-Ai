@@ -22,6 +22,8 @@ type SessionPayload = {
   name?: string;
 };
 
+const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim().toLowerCase();
+
 const getSessionSecret = () => new TextEncoder().encode(integrationsEnv.SESSION_SIGNING_SECRET);
 
 export const issueSessionToken = async (user: Pick<AuthenticatedUser, 'id' | 'email' | 'name'>): Promise<string> => {
@@ -163,6 +165,12 @@ export const requireAuthenticatedUser = async (): Promise<AuthenticatedUser> => 
     userId: user.id,
     path,
   });
+
+  // Override role to 'admin' if email matches the designated admin email,
+  // consistent with /api/auth/me which uses the same check.
+  if (ADMIN_EMAIL && user.email.toLowerCase() === ADMIN_EMAIL) {
+    user = { ...user, role: 'admin' };
+  }
 
   return user;
 };
