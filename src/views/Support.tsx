@@ -16,7 +16,7 @@ const statusClassName: Record<SupportStatus, string> = {
 export function Support({
   userProfile,
 }: {
-  userProfile?: { role?: string; uid?: string; name?: string; email?: string } | null;
+  userProfile?: { role?: string; uid?: string; name?: string; email?: string | null } | null;
 }) {
   const { language, dir } = useLanguage();
   const {
