@@ -440,9 +440,9 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const resourceName = Array.isArray(((result.parsed as Record<string, unknown>))?.results)
-        ? String(((result.parsed as Record<string, unknown>)).results[0]?.resourceName || '')
-        : '';
+      const resultResults = (result.parsed as Record<string, unknown>)?.results;
+      const resultRows = Array.isArray(resultResults) ? (resultResults as Record<string, unknown>[]) : [];
+      const resourceName = String((resultRows[0]?.resourceName as string | undefined) || '');
       applied.push({
         term: item.term,
         scope,
