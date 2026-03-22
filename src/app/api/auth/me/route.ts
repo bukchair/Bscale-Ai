@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser, SESSION_COOKIE_NAME } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 const ADMIN_EMAIL = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? '').trim().toLowerCase();
 const TRIAL_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
@@ -26,21 +27,55 @@ export async function GET() {
   }
 
   // Load full user row including subscription fields
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      image: true,
-      role: true,
-      subscriptionStatus: true,
-      plan: true,
-      trialStartedAt: true,
-      trialEndsAt: true,
-      settings: true,
-    },
-  });
+  let dbUser: {
+    id: string;
+    email: string;
+    name: string | null;
+    image: string | null;
+    role: string;
+    subscriptionStatus: string;
+    plan: string;
+    trialStartedAt: Date | null;
+    trialEndsAt: Date | null;
+    settings: Prisma.JsonValue | null;
+  } | null = null;
+
+  try {
+    dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        image: true,
+        role: true,
+        subscriptionStatus: true,
+        plan: true,
+        trialStartedAt: true,
+        trialEndsAt: true,
+        settings: true,
+      },
+    });
+  } catch (err) {
+    // Subscription columns may not exist yet if migration hasn't run.
+    // Fall back to base columns only.
+    console.error('[/api/auth/me] findUnique error, falling back:', err);
+    const base = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, email: true, name: true, image: true },
+    }).catch(() => null);
+    if (base) {
+      dbUser = {
+        ...base,
+        role: user.role ?? 'user',
+        subscriptionStatus: 'trial',
+        plan: 'trial_3_days',
+        trialStartedAt: null,
+        trialEndsAt: null,
+        settings: null,
+      };
+    }
+  }
 
   if (!dbUser) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -52,23 +87,31 @@ export async function GET() {
   if (!isAdmin && !dbUser.trialStartedAt && dbUser.subscriptionStatus === 'trial') {
     const now = new Date();
     const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS_MS);
-    await prisma.user.update({
-      where: { id: dbUser.id },
-      data: { trialStartedAt: now, trialEndsAt },
-    });
-    dbUser.trialStartedAt = now;
-    dbUser.trialEndsAt = trialEndsAt;
+    try {
+      await prisma.user.update({
+        where: { id: dbUser.id },
+        data: { trialStartedAt: now, trialEndsAt },
+      });
+      dbUser.trialStartedAt = now;
+      dbUser.trialEndsAt = trialEndsAt;
+    } catch {
+      // ignore — columns may be missing; non-fatal
+    }
   }
 
   // Check trial expiry
   if (!isAdmin && dbUser.subscriptionStatus === 'trial' && dbUser.trialEndsAt) {
     if (dbUser.trialEndsAt.getTime() <= Date.now()) {
-      await prisma.user.update({
-        where: { id: dbUser.id },
-        data: { subscriptionStatus: 'demo', plan: 'demo' },
-      });
-      dbUser.subscriptionStatus = 'demo';
-      dbUser.plan = 'demo';
+      try {
+        await prisma.user.update({
+          where: { id: dbUser.id },
+          data: { subscriptionStatus: 'demo', plan: 'demo' },
+        });
+        dbUser.subscriptionStatus = 'demo';
+        dbUser.plan = 'demo';
+      } catch {
+        // ignore — columns may be missing; non-fatal
+      }
     }
   }
 
