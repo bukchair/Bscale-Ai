@@ -124,7 +124,7 @@ export function useMediaAssets({ effectiveMediaLimits, isHebrew, onMessage }: Us
   };
 
   const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files ?? []) as File[];
     e.target.value = '';
     await appendMediaFiles(files);
   };

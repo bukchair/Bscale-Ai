@@ -83,34 +83,9 @@ const saveCachedMetaCampaigns = (cacheKey: string, items: Record<string, unknown
   }
 };
 
-const ensureManagedApiSession = async (accessToken: string) => {
-  if (accessToken !== 'server-managed') return;
-  const user =
-    auth.currentUser ||
-    (await new Promise<import('firebase/auth').User | null>((resolve) => {
-      let settled = false;
-      const timeoutId = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        unsubscribe();
-        resolve(auth.currentUser);
-      }, 3000);
-      const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timeoutId);
-        unsubscribe();
-        resolve(nextUser);
-      });
-    }));
-  if (!user) return;
-  const idToken = await user.getIdToken();
-  await fetch(`${API_BASE}/api/auth/session/bootstrap`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ idToken }),
-  });
-};
+// Session is cookie-based; no bootstrap needed.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const ensureManagedApiSession = async (_accessToken: string) => { /* no-op */ };
 
 export async function fetchMetaAdAccounts(accessToken: string) {
   await ensureManagedApiSession(accessToken);

@@ -38,6 +38,7 @@ export type ConnectionCardData = {
 };
 
 type Props = {
+  key?: string | number;
   data: ConnectionCardData;
   busyAction: string | null;
   onConnect: (platform: ConnectionCardData['platform']) => Promise<void>;

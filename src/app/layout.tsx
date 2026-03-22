@@ -28,6 +28,8 @@ export default function RootLayout({ children }: Props) {
         <link rel="apple-touch-icon" href="/favicon.svg" />
       </head>
       <body className="bg-slate-50 text-slate-900">
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-expect-error -- next/script ScriptProps type mismatch in Next.js 16 */}
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-1TMNPV7WM0" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];

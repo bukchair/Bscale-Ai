@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET() {
   let user;
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
       userId: user.id,
       type: body.type,
       productName: body.productName ?? null,
-      payload: body.payload,
+      payload: body.payload as Prisma.InputJsonValue,
     },
   });
 

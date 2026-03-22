@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 // Admin settings are stored in a dedicated system user record or as a global JSON.
 // We use the admin user's own settings as a namespace for app-wide admin config.
@@ -61,7 +62,7 @@ export async function PATCH(request: Request) {
 
   await prisma.user.update({
     where: { id: admin.id },
-    data: { settings: { ...currentSettings, adminConfig: merged } },
+    data: { settings: { ...currentSettings, adminConfig: merged } as Prisma.InputJsonValue },
   });
 
   return NextResponse.json({ success: true, settings: merged });

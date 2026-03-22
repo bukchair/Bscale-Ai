@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 // GET /api/user/connections — returns saved connection items for the current user
 export async function GET() {
@@ -50,7 +51,7 @@ export async function PATCH(request: Request) {
   const currentSettings = (dbUser?.settings ?? {}) as Record<string, unknown>;
   await prisma.user.update({
     where: { id: user.id },
-    data: { settings: { ...currentSettings, connections: body.connections } },
+    data: { settings: { ...currentSettings, connections: body.connections } as Prisma.InputJsonValue },
   });
 
   return NextResponse.json({ success: true });

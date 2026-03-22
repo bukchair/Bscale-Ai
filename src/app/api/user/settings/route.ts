@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuthenticatedUser } from '@/src/lib/auth/session';
 import { prisma } from '@/src/lib/db/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET() {
   let user;
@@ -48,7 +49,7 @@ export async function PATCH(request: Request) {
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { settings: merged },
+    data: { settings: merged as Prisma.InputJsonValue },
   });
 
   return NextResponse.json({ success: true, settings: merged });
