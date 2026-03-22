@@ -251,9 +251,9 @@ const lookupOrCreateSharedSet = async (
   if (!created.response.ok) {
     throw new Error(toErrorMessage(created.response.status, created.raw, created.parsed));
   }
-  const resourceName = Array.isArray(((created.parsed as Record<string, unknown>))?.results)
-    ? String(((created.parsed as Record<string, unknown>)).results[0]?.resourceName || '')
-    : '';
+  const createdResults = (created.parsed as Record<string, unknown>)?.results;
+  const createdRows = Array.isArray(createdResults) ? (createdResults as Record<string, unknown>[]) : [];
+  const resourceName = String((createdRows[0]?.resourceName as string | undefined) || '');
   if (!resourceName) {
     throw new Error('Shared negative keyword list was created without resource name.');
   }
